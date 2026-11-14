@@ -1,0 +1,67 @@
+name: desktop
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'packages/**'
+      - 'desktop/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'packages/**'
+      - 'desktop/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/desktop.yml'
+
+jobs:
+  check:
+    name: typecheck + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck app
+        run: npm run typecheck -w @hub/app
+
+      # Fails on any import crossing a module boundary (see app/scripts/check-boundaries.mjs)
+      - name: Module boundaries
+        run: npm run check:boundaries -w @hub/app -- --strict
+
+      # The SDK's published types match the app's SDK
+      - name: SDK types up to date
+        run: npm run types:sdk -w @hub/app -- --check
+
+      - name: Typecheck desktop
+        working-directory: desktop
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build -w desktop
+
+  audit:
+    name: deps security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Audit production deps
+        run: npm audit --omit=dev --audit-level=high

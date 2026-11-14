@@ -1,0 +1,186 @@
+name: android-release
+
+# Manual release of the private Android APK. The mobile app can't reach the
+# VPN-only server from a phone until the embedded tunnel lands, so releases are
+# cut on demand (workflow_dispatch) rather than on every merge — flip to a push
+# trigger later if wanted. Builds a signed APK, publishes it with a signed
+# manifest to the same VPN-only /releases/ path as the desktop AppImage.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump for mobile/package.json'
+        type: choice
+        default: patch
+        options: [patch, minor, major]
+
+permissions:
+  contents: write  # push the bump commit + tag
+
+jobs:
+  release:
+    name: build + sign + publish APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          # The default ("tools platform-tools") fails: the legacy 'tools' package is gone.
+          packages: platform-tools
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;37.0.0" "ndk;30.0.16248370"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mobile/tunnel/go.mod
+          cache-dependency-path: mobile/tunnel/go.sum
+
+      # the tunnel's Java side only: its native libraries come with the Private module
+      - name: Build the tunnel's Java side (tunnel.aar)
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+          go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
+          mobile/scripts/build-tunnel.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Compute version
+        id: version
+        run: |
+          set -e
+          current=$(node -p "require('./mobile/package.json').version")
+          IFS=. read -r maj min pat <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) maj=$((maj+1)); min=0; pat=0 ;;
+            minor) min=$((min+1)); pat=0 ;;
+            patch) pat=$((pat+1)) ;;
+          esac
+          new="$maj.$min.$pat"
+          # Monotonic integer Android requires; room for 99 patches / 99 minors.
+          code=$((maj*10000 + min*100 + pat))
+          echo "$current → $new (versionCode $code)"
+          echo "name=$new"  >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Bump mobile/package.json
+        run: |
+          npm version "${{ steps.version.outputs.name }}" --no-git-tag-version -w @hub/mobile
+          # Keep the root lockfile's workspace version in sync for `npm ci`.
+          npm install --package-lock-only
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web + sync Android
+        run: npm run sync -w @hub/mobile
+
+      # Firebase (push notifications): its config is not in the repository
+      - name: Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+
+      - name: Configure signing
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          umask 077
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/hub-release.keystore"
+          cat > mobile/android/keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/hub-release.keystore
+          storePassword=$KS_PASS
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASS
+          EOF
+
+      - name: Build signed APK
+        working-directory: mobile/android
+        run: |
+          ./gradlew :app:assembleRelease \
+            -PversionCode=${{ steps.version.outputs.code }} \
+            -PversionName=${{ steps.version.outputs.name }}
+
+      - name: Assemble release artifacts
+        id: dist
+        run: |
+          set -e
+          mkdir -p dist
+          name="${{ steps.version.outputs.name }}"
+          code="${{ steps.version.outputs.code }}"
+          apk="hub-$name.apk"
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk "dist/$apk"
+          sha=$(sha256sum "dist/$apk" | cut -d' ' -f1)
+          # Manifest the app checks against: newer versionCode => update offered.
+          cat > dist/latest-android.json <<EOF
+          {"versionName":"$name","versionCode":$code,"apk":"$apk","sha256":"$sha"}
+          EOF
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+
+      - name: Sign manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          # Ed25519 signature over the raw manifest bytes, same key/scheme as the
+          # desktop pipeline. The app verifies it against the embedded public key.
+          umask 077
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update-signing-key.pem"
+          openssl pkeyutl -sign -inkey "$RUNNER_TEMP/update-signing-key.pem" -rawin \
+            -in dist/latest-android.json -out dist/latest-android.json.sig
+          rm -f "$RUNNER_TEMP/update-signing-key.pem"
+          test -s dist/latest-android.json.sig
+          chmod 644 dist/latest-android.json.sig
+
+      - name: Commit + tag + push
+        env:
+          NAME: ${{ steps.version.outputs.name }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/package.json package-lock.json
+          git commit -m "chore: release android v$NAME [skip ci]"
+          git tag "android-v$NAME"
+          git push origin HEAD:main
+          git push origin "android-v$NAME"
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_release
+          chmod 600 ~/.ssh/id_release
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release (rsync)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          # The release key is locked to `rrsync -wo` on server/var/releases, so
+          # destinations are relative to it. APK first, manifest last: the app
+          # never sees a manifest pointing at a missing APK.
+          rsync -e "ssh -i ~/.ssh/id_release" "dist/${{ steps.dist.outputs.apk }}" "$SSH_USER@$SSH_HOST:"
+          rsync -e "ssh -i ~/.ssh/id_release" dist/latest-android.json.sig "$SSH_USER@$SSH_HOST:"
+          rsync -e "ssh -i ~/.ssh/id_release" dist/latest-android.json "$SSH_USER@$SSH_HOST:"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_release

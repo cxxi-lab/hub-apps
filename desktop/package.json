@@ -1,0 +1,88 @@
+{
+	"name": "hub-desktop",
+	"private": true,
+	"version": "0.81.0",
+	"type": "module",
+	"main": "out/main/index.js",
+	"scripts": {
+		"dev": "electron-vite dev",
+		"build": "electron-vite build",
+		"preview": "electron-vite preview",
+		"start": "electron-vite preview",
+		"pack": "electron-vite build && electron-builder --dir",
+		"dist": "electron-vite build && electron-builder",
+		"lint": "eslint src --ext .ts,.tsx",
+		"clean": "rm -rf out dist node_modules"
+	},
+	"devDependencies": {
+		"electron": "^42.11.3",
+		"electron-builder": "^26.16.1",
+		"electron-vite": "^4.0.0",
+		"eslint": "^8.56.0",
+		"eslint-config-prettier": "^9.1.0",
+		"prettier": "^3.2.4",
+		"typescript": "^5.3.3"
+	},
+	"dependencies": {
+		"@cxxi-lab/hub-sdk": "^1.12.0",
+		"electron-updater": "^6.8.9"
+	},
+	"build": {
+		"appId": "cxxi.hub",
+		"productName": "hub",
+		"directories": {
+			"output": "dist"
+		},
+		"files": [
+			"out/**/*",
+			"!out/renderer/modules/*/**",
+			"!out/renderer/modules/restricted.json",
+			"package.json"
+		],
+		"extraResources": [
+			{
+				"from": "resources/icons",
+				"to": "icons",
+				"filter": [
+					"**/*"
+				]
+			},
+			{
+				"from": "resources/companion-tts",
+				"to": "companion-tts",
+				"filter": [
+					"**/*"
+				]
+			},
+			{
+				"from": "resources/companion-photo",
+				"to": "companion-photo",
+				"filter": [
+					"**/*"
+				]
+			}
+		],
+		"linux": {
+			"target": [
+				"AppImage"
+			],
+			"category": "Utility",
+			"icon": "build/icons"
+		},
+		"publish": [
+			{
+				"provider": "generic",
+				"url": "https://hub.cxxi.io/releases/",
+				"channel": "latest"
+			}
+		],
+		"artifactName": "${productName}-${version}.${ext}",
+		"electronFuses": {
+			"runAsNode": false,
+			"enableNodeOptionsEnvironmentVariable": false,
+			"enableNodeCliInspectArguments": false,
+			"onlyLoadAppFromAsar": true,
+			"loadBrowserProcessSpecificV8Snapshot": false
+		}
+	}
+}

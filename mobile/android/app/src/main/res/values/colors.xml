@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The UI's background (steel-900): splash, window behind the WebView, launcher icon. -->
+    <color name="app_background">#1E2025</color>
+</resources>

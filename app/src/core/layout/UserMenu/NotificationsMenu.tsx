@@ -1,0 +1,107 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faBell, faCube, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { IconButton, Dropdown } from '@cxxi-lab/hub-ui'
+import { useModules } from '@core/contexts/ModulesContext'
+import { dismissNotification, useNotifications, useNotificationsOpening, type AppNotification } from '@core/notifications/notifications'
+
+/**
+ * The bell (top right) and its menu: the notifications of the modules shown, newest first. A click
+ * opens where one leads, its cross dismisses it. A module's dot in the top bar opens it on that
+ * module's notifications.
+ */
+export function NotificationsMenu() {
+	const navigate = useNavigate()
+	const modules = useModules()
+	const all = useNotifications()
+	const opening = useNotificationsOpening()
+	const [open, setOpen] = useState(false)
+	const listRef = useRef<HTMLUListElement>(null)
+
+	const byId = new Map(modules.map(m => [m.id, m]))
+	const shown = all.filter(n => byId.get(n.module)?.supports?.includes('notifications'))
+
+	// opened from a module's dot: on its first notification
+	useEffect(() => {
+		if (!opening) return
+		setOpen(true)
+		if (!opening.module) return
+		const frame = requestAnimationFrame(() => {
+			listRef.current?.querySelector<HTMLElement>(`[data-module="${opening.module}"]`)?.scrollIntoView({ block: 'nearest' })
+		})
+		return () => cancelAnimationFrame(frame)
+	}, [opening])
+
+	const go = (n: AppNotification) => {
+		setOpen(false)
+		if (n.link) navigate(n.link)
+	}
+
+	return (
+		<Dropdown
+			side="right"
+			isOpen={open}
+			onOpenChange={setOpen}
+			header={isOpen => (
+				<span className="relative flex">
+					<IconButton size="xl" shape="circle" color="dark" active={isOpen} icon={faBell} aria-label="Notifications" />
+					{/* a dot, no count */}
+					{shown.length > 0 && (
+						<span className="absolute top-1.5 right-1.5 size-2.5 rounded-full bg-primary-500 pointer-events-none" />
+					)}
+				</span>
+			)}
+		>
+			<div className="w-[340px] max-sm:w-[calc(100vw-2rem)]">
+				{shown.length === 0 ? (
+					<div className="px-5 py-4 text-sm text-steel-300 text-center">No notifications</div>
+				) : (
+					<ul ref={listRef} className="m-0 p-0 list-none max-h-[60vh] overflow-y-auto pretty-scrollbar">
+						{shown.map(n => {
+							const module = byId.get(n.module)
+							return (
+								<li
+									key={n.id}
+									data-module={n.module}
+									className={`flex items-start gap-3 px-4 py-3 border-t border-steel-700 first:border-t-0 ${n.link ? 'cursor-pointer hover:bg-steel-700' : ''}`}
+									onClick={e => { e.stopPropagation(); go(n) }}
+								>
+									<span className="size-8 shrink-0 flex items-center justify-center rounded bg-primary-500 text-steel-800">
+										<FontAwesomeIcon icon={module?.icon ?? faCube} className="text-sm" />
+									</span>
+									<span className="min-w-0 flex-1">
+										<span className="flex items-baseline gap-2">
+											<span className="min-w-0 flex-1 truncate text-sm text-white">{n.title}</span>
+											<span className="shrink-0 text-[11px] text-steel-500 tabular-nums">{when(n.updatedAt)}</span>
+										</span>
+										{n.body && <span className="block text-xs text-steel-300">{n.body}</span>}
+										<span className="block text-[10px] uppercase tracking-[1.5px] text-steel-500">{module?.label ?? n.module}</span>
+									</span>
+									<button
+										type="button"
+										title="Dismiss"
+										aria-label="Dismiss"
+										onClick={e => { e.stopPropagation(); void dismissNotification(n.id) }}
+										className="size-6 shrink-0 flex items-center justify-center rounded border-0 bg-transparent text-steel-300 cursor-pointer hover:text-white hover:bg-steel-900"
+									>
+										<FontAwesomeIcon icon={faXmark} className="text-xs" />
+									</button>
+								</li>
+							)
+						})}
+					</ul>
+				)}
+			</div>
+		</Dropdown>
+	)
+}
+
+/** Its time: today's as hh:mm, else the day. */
+function when(iso: string): string {
+	const date = new Date(iso)
+	const today = new Date()
+	return date.toDateString() === today.toDateString()
+		? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+		: date.toLocaleDateString([], { day: 'numeric', month: 'short' })
+}

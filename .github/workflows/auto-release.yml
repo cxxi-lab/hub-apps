@@ -1,0 +1,203 @@
+name: auto-release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'packages/**'
+      - 'desktop/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/auto-release.yml'
+
+permissions:
+  contents: write  # push the bump commit + tag
+
+jobs:
+  check:
+    name: determine bump
+    runs-on: ubuntu-latest
+    outputs:
+      bump: ${{ steps.bump.outputs.bump }}
+      new_version: ${{ steps.version.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine bump from commits since last tag
+        id: bump
+        run: |
+          set -e
+          last_tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          if [ -z "$last_tag" ]; then
+            range="HEAD"
+          else
+            range="$last_tag..HEAD"
+          fi
+          echo "Analyzing $range for app/ + desktop/ commits"
+
+          commits=$(git log "$range" --pretty='%B%n---END---' -- app/ desktop/)
+          if [ -z "$commits" ]; then
+            echo "No commits touching app/ or desktop/, skipping."
+            echo "bump=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if echo "$commits" | grep -qE '(BREAKING CHANGE:|BREAKING:|!:)'; then
+            bump=major
+          elif echo "$commits" | grep -qiE '^feat(\([^)]+\))?:'; then
+            bump=minor
+          elif echo "$commits" | grep -qiE '^(fix|perf)(\([^)]+\))?:'; then
+            bump=patch
+          else
+            bump=''
+          fi
+
+          if [ -z "$bump" ]; then
+            echo "No release-worthy commits (no feat:/fix:/perf:/BREAKING). Skipping."
+          else
+            echo "Detected bump: $bump"
+          fi
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+
+      - name: Compute new version
+        id: version
+        if: steps.bump.outputs.bump != ''
+        working-directory: desktop
+        run: |
+          set -e
+          current=$(node -p "require('./package.json').version")
+          IFS=. read -r maj min pat <<< "$current"
+          case "${{ steps.bump.outputs.bump }}" in
+            major) maj=$((maj+1)); min=0; pat=0 ;;
+            minor) min=$((min+1)); pat=0 ;;
+            patch) pat=$((pat+1)) ;;
+          esac
+          new="$maj.$min.$pat"
+          echo "$current → $new"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: bump + tag + build + scp
+    needs: check
+    if: needs.check.outputs.bump != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Bump desktop/package.json
+        run: |
+          npm version "${{ needs.check.outputs.new_version }}" --no-git-tag-version -w desktop
+          # Keep the root lockfile's workspace version in sync, or the later
+          # `npm ci` fails on a package.json / lockfile mismatch.
+          npm install --package-lock-only
+
+      - name: Commit + tag + push
+        env:
+          NEW: ${{ needs.check.outputs.new_version }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add desktop/package.json package-lock.json
+          git commit -m "chore: release v$NEW [skip ci]"
+          git tag "v$NEW"
+          # One atomic push: a separate tag push right after main was once rejected by GitHub
+          # ("missing necessary objects"), leaving the bump on main with no tag and no build.
+          git push --atomic origin main "v$NEW"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build AppImage
+        working-directory: desktop
+        run: npm run dist -- --linux AppImage --publish=never
+
+      # The tunnel's native libraries for Android: the APK carries none (mobile/scripts/build-tunnel.sh);
+      # they are attached to this release (GitHub), where the module using the tunnel takes them.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-36" "ndk;30.0.16248370"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mobile/tunnel/go.mod
+          cache-dependency-path: mobile/tunnel/go.sum
+
+      - name: Build the tunnel's native libraries
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+          go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
+          mobile/scripts/build-tunnel.sh
+
+      - name: Sign update manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          # Ed25519 signature of latest-linux.yml: the app installs an update only
+          # if this signature matches the public key embedded in the running build.
+          umask 077
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update-signing-key.pem"
+          openssl pkeyutl -sign -inkey "$RUNNER_TEMP/update-signing-key.pem" -rawin \
+            -in desktop/dist/latest-linux.yml -out desktop/dist/latest-linux.yml.sig
+          test -s desktop/dist/latest-linux.yml.sig
+          rm -f "$RUNNER_TEMP/update-signing-key.pem"
+          # The umask above is for the key: the signature is public, and rsync keeps
+          # its mode on the VPS, where Apache must be able to read it.
+          chmod 644 desktop/dist/latest-linux.yml.sig
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_release
+          chmod 600 ~/.ssh/id_release
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release (rsync)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          # On the VPS the release key is locked to `rrsync -wo` on
+          # server/var/releases (write-only, no shell), so destinations are
+          # relative to that directory.
+          # The app, binary first, manifest last: clients never see a latest-linux.yml pointing
+          # at a missing AppImage (a manifest/signature mismatch in between only postpones the update).
+          rsync -e "ssh -i ~/.ssh/id_release" desktop/dist/hub-*.AppImage "$SSH_USER@$SSH_HOST:"
+          rsync -e "ssh -i ~/.ssh/id_release" desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
+          rsync -e "ssh -i ~/.ssh/id_release" desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
+
+      # The tunnel's native libraries, for the module that uses the tunnel (its CI downloads them)
+      - name: GitHub release (tunnel natives)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW: ${{ needs.check.outputs.new_version }}
+        run: |
+          set -e
+          mkdir -p dist-natives
+          for abi in arm64-v8a x86_64; do cp "mobile/build/tunnel/jni/$abi/libgojni.so" "dist-natives/libgojni-$abi.so"; done
+          gh release create "v$NEW" dist-natives/* --title "v$NEW" --notes "Desktop v$NEW. Assets: the tunnel's native libraries for Android (libgojni-<abi>.so)."
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_release

@@ -1,0 +1,9 @@
+node_modules
+out
+dist
+*.log
+.DS_Store
+
+# the tunnel's native libraries (mobile/scripts/build-tunnel.sh), published with the Private module
+mobile/build/
+.cache

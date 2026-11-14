@@ -1,0 +1,51 @@
+@layer theme, base, components, utilities;
+@import "@cxxi-lab/hub-ui/theme.css";
+@import "tailwindcss/preflight.css" layer(base);
+/* The app's own sources only: each module generates its utilities (modules/<id>/module.css). */
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../core";
+@source "../../../node_modules/@cxxi-lab/hub-ui/src";
+@source "../shared";
+@source "../platform";
+@source "../main.tsx";
+@import "@cxxi-lab/hub-ui/fonts.css";
+
+:root {
+	color-scheme: dark;
+	/* 26px while the status bar shows (developer mode, desktop): set by StatusBar */
+	--status-bar-height: 0px;
+}
+
+@layer base {
+	*, *::before, *::after {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	body {
+		background-color: var(--color-steel-900);
+		color: var(--color-white);
+		font-family: var(--font-display), sans-serif;
+		font-size: 14px;
+		line-height: 1.5;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	#app {
+		min-height: 100vh;
+	}
+}
+
+/* Phone-sized screens: no scrollbars at all (they still showed while scrolling).
+   Unlayered + !important so it beats per-element utilities like pretty-scrollbar. */
+@media (width < 40rem) {
+	* {
+		scrollbar-width: none !important;
+	}
+
+	*::-webkit-scrollbar {
+		display: none !important;
+	}
+}

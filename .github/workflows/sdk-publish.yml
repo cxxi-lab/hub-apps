@@ -1,0 +1,35 @@
+name: sdk-publish
+
+# @cxxi-lab/hub-sdk (packages/hub-sdk): the module contract the app implements. Published when its
+# version is not on npm yet (npm trusted publishing: no token). Its types must match the app's SDK.
+on:
+  push:
+    branches: [main]
+    paths: ['packages/hub-sdk/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - name: Types up to date
+        run: npm run types:sdk -w @hub/app -- --check
+      - name: Publish
+        working-directory: packages/hub-sdk
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@cxxi-lab/hub-sdk@$version" version >/dev/null 2>&1; then echo "$version: already published"
+          else npm publish --provenance --access public; fi

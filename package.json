@@ -1,0 +1,17 @@
+{
+	"name": "hub-apps",
+	"private": true,
+	"workspaces": [
+		"packages/hub-sdk",
+		"app",
+		"desktop",
+		"mobile"
+	],
+	"scripts": {
+		"dev": "npm run dev -w desktop",
+		"build": "npm run build -w desktop",
+		"dist": "npm run dist -w desktop",
+		"lint": "npm run lint -w desktop",
+		"sync:mobile": "npm run sync -w @hub/mobile"
+	}
+}
