@@ -1,6 +1,6 @@
 {
 	"name": "@cxxi-lab/hub-sdk",
-	"version": "1.12.0",
+	"version": "1.12.1",
 	"description": "The contract of hub's modules: the SDK a module builds on (provided by the host app at run time), and the SDK of the modules running isolated in their frame.",
 	"license": "MIT",
 	"type": "module",
@@ -11,7 +11,8 @@
 		"./frame": "./frame/index.ts",
 		"./protocol": "./protocol.ts",
 		"./version.json": "./version.json",
-		"./shared.json": "./shared.json"
+		"./shared.json": "./shared.json",
+		"./package.json": "./package.json"
 	},
 	"files": [
 		"types",
