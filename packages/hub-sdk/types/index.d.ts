@@ -1013,7 +1013,7 @@ export declare function BottomBar({ tabs }: {
  * A module's declared collection, through the hubbies' generic API (/api/data/{module}/{collection},
  * docs/spec-module.md § 5): the current account's documents only, checked against the module's
  * model by the server. For the modules running in the app; an isolated hubby gets the same through
- * its host (@cxxi-lab/hub-sdk/frame, ui/hub-sdk/frame/sdk.ts).
+ * its host (@cxxi-lab/hub-sdk/frame, packages/hub-sdk/frame/sdk.ts).
  *
  * The fields its model declares encrypted are sealed here, on the device, before they leave, and
  * opened when they come back (core/crypto, docs/plan-storage-encryption.md § 3): the server only

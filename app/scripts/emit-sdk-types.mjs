@@ -23,7 +23,8 @@ mkdirSync(WORK, { recursive: true })
 // 1. the app's declarations (its path aliases kept), 2. bundled from the SDK's entry
 execFileSync(bin('tsc'), ['-p', join(APP, 'tsconfig.json'), '--noEmit', 'false', '--declaration', '--emitDeclarationOnly', '--rootDir', resolve(APP, '..'), '--outDir', join(WORK, 'decl')], { stdio: 'inherit' })
 // (the design system apart: reached through node_modules, the app's emit leaves it out)
-const ui = dirname(createRequire(join(APP, 'package.json')).resolve('@cxxi-lab/hub-ui/package.json'))
+// (its entry, src/index.ts: the package exports no ./package.json)
+const ui = dirname(dirname(createRequire(join(APP, 'package.json')).resolve('@cxxi-lab/hub-ui')))
 writeFileSync(join(WORK, 'tsconfig.ui.json'), JSON.stringify({
 	compilerOptions: { target: 'ES2022', lib: ['ES2022', 'DOM', 'DOM.Iterable'], module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', strict: true, skipLibCheck: true, declaration: true, emitDeclarationOnly: true, rootDir: join(ui, 'src'), outDir: join(WORK, 'decl-ui') },
 	include: [join(ui, 'src')]
