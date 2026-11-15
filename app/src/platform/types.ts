@@ -201,7 +201,7 @@ export interface StoredFile {
 }
 
 /**
- * The modules' store on this device (desktop: SQLite in the main process): the scopes the account
+ * The modules' store on this device (SQLite: desktop in the main process, Android a plugin): the scopes the account
  * keeps local. Every call names the account (a hash), the module and the scope.
  */
 export interface LocalStoreApi {

@@ -93,6 +93,8 @@ export class ModuleSync {
 
 		onSyncEvent((module, position) => { if (module === this.module && position > this.position) void this.sync() })
 		window.addEventListener('focus', () => { void this.sync() })
+		// the phone's app back in front
+		document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void this.sync() })
 		setInterval(() => { void this.sync() }, POLL_MS)
 		void this.sync()
 	}

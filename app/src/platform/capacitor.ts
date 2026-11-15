@@ -2,6 +2,7 @@ import { registerPlugin } from '@capacitor/core'
 import type { CompanionApi, NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions, NativePlayerPanel, Platform, PushApi, PlatformCapabilities, Unsubscribe, VpnInfo, WebsiteIntegration } from './types'
 import { checkModuleUpdates, createModuleStore, startModuleUpdates } from './capacitorModules'
 import { createUpdater } from './capacitorUpdater'
+import { createLocalStore } from './capacitorLocalStore'
 
 // Capacitor (Android) adapter. The mobile shell is a second client of the
 // server modules; the desktop-only surfaces (AI companion, embedded browser,
@@ -198,7 +199,7 @@ export function createCapacitorPlatform(): Platform {
 		registerModuleWindows: async () => {},
 		systemNotifications: null,
 		push,
-		localStore: null,
+		localStore: createLocalStore(),
 		moduleStore: import.meta.env.DEV ? null : createModuleStore(),
 		// served by the WebView (ModuleStore intercepts these hosts)
 		hubbyUrl: module => `https://${module}.hubby.localhost/`,

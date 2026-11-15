@@ -27,6 +27,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(DeviceSecretsPlugin.class);
         registerPlugin(ModulesPlugin.class);
         registerPlugin(PushPlugin.class);
+        registerPlugin(LocalStorePlugin.class);
         // Which version of each module this session runs (built in, or a downloaded newer one).
         ModuleStore.get().setup(this);
         // The tunnel only carries Private: it starts with private mode (the web side, VpnPlugin).
