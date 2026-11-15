@@ -400,6 +400,11 @@ export interface Platform {
 		alt: boolean;
 	}) => void): Unsubscribe;
 	showMessage(message: string): Promise<void>;
+	/**
+	 * The theme chosen (`mode`) and shown (`theme`, auto resolved), for the shell: desktop, the
+	 * native theme and the windows' background before they load; Android, the system bars.
+	 */
+	setTheme(mode: "auto" | "light" | "dark", theme: "light" | "dark"): void;
 	getMuted(): Promise<boolean>;
 	setMuted(value: boolean): void;
 	onMutedChange(cb: (value: boolean) => void): Unsubscribe;
