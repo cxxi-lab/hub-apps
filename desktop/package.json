@@ -22,7 +22,7 @@
 		"clean": "rm -rf out dist node_modules"
 	},
 	"devDependencies": {
-		"electron": "^42.11.3",
+		"electron": "42.11.18",
 		"electron-builder": "^26.16.1",
 		"electron-vite": "^4.0.0",
 		"eslint": "^8.56.0",
