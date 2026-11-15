@@ -7,3 +7,6 @@ dist
 # the tunnel's native libraries (mobile/scripts/build-tunnel.sh), published with the Private module
 mobile/build/
 .cache
+
+# test bundles (npm run test:sync -w app)
+app/build/test/
