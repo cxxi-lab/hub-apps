@@ -81,6 +81,10 @@ const api = {
 
 	openSettings: (target?: string): Promise<void> => ipcRenderer.invoke('settings:open', target),
 
+	setTheme: (mode: 'auto' | 'light' | 'dark', theme: 'light' | 'dark'): void => {
+		ipcRenderer.send('theme:set', mode, theme)
+	},
+
 	/** In the Settings window: a screen another window asked for (see openSettings). */
 	onSettingsGoto: (cb: (target: string) => void): (() => void) => {
 		const handler = (_: IpcRendererEvent, target: string) => cb(target)

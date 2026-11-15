@@ -19,6 +19,13 @@ function post(message: GuestMessage) {
 	window.parent.postMessage(envelope, '*')
 }
 
+/** The app's theme on this frame's root: the shared tokens are redefined under data-theme="light". */
+function applyTheme(theme: 'light' | 'dark' | undefined) {
+	const value = theme ?? 'dark'
+	document.documentElement.dataset.theme = value
+	document.documentElement.style.colorScheme = value
+}
+
 window.addEventListener('message', event => {
 	if (event.source !== window.parent) return
 	const data = event.data as Envelope<HostMessage> | undefined
@@ -32,11 +39,13 @@ window.addEventListener('message', event => {
 		else p.reject(new Error(m.error))
 	}
 	else if (m.type === 'init') {
+		applyTheme(m.theme)
 		init = m
 		initListeners.forEach(l => l(m))
 	}
 	else if (m.type === 'back') handleBack()
 	else if (m.type === 'path') pathListeners.forEach(l => l(m.path))
+	else if (m.type === 'theme') applyTheme(m.theme)
 })
 
 /** A call to the host (the platform API, through it). */

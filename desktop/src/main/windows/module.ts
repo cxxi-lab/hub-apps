@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { appIcon } from '../app/icon'
+import { windowBackground } from '../app/theme'
 
 /**
  * Windows of the modules (ModuleManifest.windows). The host knows nothing of them but what the
@@ -44,6 +45,7 @@ export function openModuleWindow(moduleId: string, windowId: string): void {
 
 	const parent = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
 	const window = new BrowserWindow({
+		backgroundColor: windowBackground(),
 		width: info.width ?? 960,
 		height: info.height ?? 640,
 		title: info.title,

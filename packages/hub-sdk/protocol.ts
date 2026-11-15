@@ -26,11 +26,14 @@ export type GuestMessage =
 
 /** Host → guest. */
 export type HostMessage =
-	| { type: 'init', module: string, path: string, phone: boolean, scopes: string[] }
+	/** `theme`: the app's (a host from before themes sends none: dark) */
+	| { type: 'init', module: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark' }
 	| { type: 'result', id: number, ok: true, value: unknown }
 	| { type: 'result', id: number, ok: false, error: string }
 	| { type: 'back' }
 	| { type: 'path', path: string }
+	/** the app's theme changed */
+	| { type: 'theme', theme: 'light' | 'dark' }
 
 export const PROTOCOL = 'hubby/1'
 

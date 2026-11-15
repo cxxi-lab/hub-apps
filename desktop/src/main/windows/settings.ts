@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { appIcon } from '../app/icon'
+import { windowBackground } from '../app/theme'
 
 const isDev = !app.isPackaged
 
@@ -21,6 +22,7 @@ export function openSettingsWindow(target?: string): void {
 	// A small window (a sidebar and one form), within the screen it opens on.
 	const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
 	settingsWindow = new BrowserWindow({
+		backgroundColor: windowBackground(),
 		width: Math.min(800, area.width - 40),
 		height: Math.min(600, area.height - 40),
 		minWidth: 600,

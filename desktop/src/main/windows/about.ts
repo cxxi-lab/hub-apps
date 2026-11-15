@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { appIcon } from '../app/icon'
+import { windowBackground } from '../app/theme'
 
 const isDev = !app.isPackaged
 
@@ -14,6 +15,7 @@ export function openAboutWindow(): void {
 
 	const parent = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
 	aboutWindow = new BrowserWindow({
+		backgroundColor: windowBackground(),
 		width: 420,
 		height: 340,
 		title: 'About',

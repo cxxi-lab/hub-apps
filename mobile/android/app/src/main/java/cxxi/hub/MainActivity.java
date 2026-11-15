@@ -3,8 +3,6 @@ package cxxi.hub;
 import android.os.Bundle;
 
 import androidx.activity.OnBackPressedCallback;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
 import android.webkit.CookieManager;
 import android.webkit.HttpAuthHandler;
 import android.webkit.WebResourceRequest;
@@ -28,16 +26,15 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ModulesPlugin.class);
         registerPlugin(PushPlugin.class);
         registerPlugin(LocalStorePlugin.class);
+        registerPlugin(ThemePlugin.class);
         // Which version of each module this session runs (built in, or a downloaded newer one).
         ModuleStore.get().setup(this);
         // The tunnel only carries Private: it starts with private mode (the web side, VpnPlugin).
         super.onCreate(savedInstanceState);
         // reopened after an update: its "tap to open" notification goes
         UpdatedReceiver.opened(this);
-        // The app is dark: the system bars' icons light (a phone in light mode made them black).
-        WindowInsetsControllerCompat bars = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        bars.setAppearanceLightStatusBars(false);
-        bars.setAppearanceLightNavigationBars(false);
+        // The system bars in the app's theme as last shown (ThemePlugin), not the phone's.
+        ThemePlugin.apply(this, ThemePlugin.isDark(this));
         getBridge().setWebViewClient(new TunnelWebViewClient(getBridge()));
         // The back button: the app first (it closes a menu, a modal, the drawer, or goes back a
         // page: window.hubBack, app/src/shared/back.ts); nothing left to close, hub goes to the

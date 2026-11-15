@@ -10,57 +10,6 @@
 @source "../main.tsx";
 @import "@cxxi-lab/hub-ui/fonts.css";
 
-/*
- * Tokens the shared theme lacks but the sources use (they rendered without a colour): the steps
- * between those it has.
- */
-@theme static {
-	--color-steel-200: oklch(64.5% 0.031 250);
-	--color-steel-400: oklch(54% 0.034 252);
-	--color-steel-600: oklch(41% 0.0335 257);
-	--color-primary-400: oklch(73.5% 0.138 257);
-	--color-red-400: oklch(65% 0.2 26);
-}
-
-/*
- * The light theme (core/theme/theme.ts sets data-theme): the same tokens, redefined. The design is
- * dark-first, so the neutral scale is turned over — steel-900, the page, becomes a light grey and
- * steel-800, the raised surfaces, white;
- * `white`, the text, near black — and the accents darkened enough to read on white. The modules use
- * the same variables: they follow.
- */
-:root[data-theme="light"] {
-	--color-white: oklch(23% 0.012 260);
-	--color-black-overlay: oklch(25% 0.01 255 / 35%);
-
-	--color-steel-100: oklch(35% 0.02 258);
-	--color-steel-200: oklch(41% 0.022 257);
-	--color-steel-300: oklch(47% 0.024 256);
-	--color-steel-400: oklch(55% 0.024 255);
-	--color-steel-500: oklch(63% 0.02 255);
-	--color-steel-600: oklch(79% 0.014 255);
-	--color-steel-700: oklch(88.5% 0.01 255);
-	/* raised surfaces (cards, inputs) lighter than the page, as they are in dark */
-	--color-steel-800: oklch(99.6% 0.001 255);
-	--color-steel-900: oklch(96.6% 0.004 255);
-	--color-steel-950: oklch(95% 0.005 255);
-	--color-steel-1000: oklch(91% 0.008 255);
-
-	--color-primary-300: oklch(50% 0.17 257);
-	--color-primary-400: oklch(54% 0.18 257);
-	--color-primary-500: oklch(58% 0.19 257);
-	--color-primary-700: oklch(92% 0.045 257);
-
-	--color-red-100: oklch(45% 0.15 25);
-	--color-red-300: oklch(54% 0.2 25);
-	--color-red-400: oklch(52% 0.2 26);
-	--color-red-500: oklch(56% 0.2 28);
-
-	--shadow-raised: 0 0 0 1px #00000000, 0 1px 2px #0b0f1414, 0 0 1px #0b0f1426;
-	--shadow-raised-hover: 0 0 0 1px var(--color-steel-700), 0 8px 16px #0b0f141a, 0 0 1px 1px #0b0f1414;
-	--shadow-raised-focus: 0 0 0 1px var(--color-primary-500), 0 8px 16px #0b0f141a;
-}
-
 :root {
 	color-scheme: dark;
 	/* 26px while the status bar shows (developer mode, desktop): set by StatusBar */

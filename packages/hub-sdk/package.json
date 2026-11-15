@@ -1,6 +1,6 @@
 {
 	"name": "@cxxi-lab/hub-sdk",
-	"version": "1.12.1",
+	"version": "1.13.0",
 	"description": "The contract of hub's modules: the SDK a module builds on (provided by the host app at run time), and the SDK of the modules running isolated in their frame.",
 	"license": "MIT",
 	"type": "module",
@@ -31,7 +31,7 @@
 		"access": "public"
 	},
 	"peerDependencies": {
-		"@cxxi-lab/hub-ui": "^0.1.0",
+		"@cxxi-lab/hub-ui": "^0.2.0",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4"
 	}

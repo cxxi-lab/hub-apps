@@ -92,6 +92,7 @@ const Player = registerPlugin<PlayerPlugin>('Player')
 const Session = registerPlugin<SessionPlugin>('Session')
 const DeviceSecrets = registerPlugin<DeviceSecretsPlugin>('DeviceSecrets')
 const Push = registerPlugin<PushPlugin>('Push')
+const Theme = registerPlugin<{ set(options: { theme: 'light' | 'dark' }): Promise<void> }>('Theme')
 
 /** Plugin listeners register asynchronously; the contract's unsubscribe is sync. */
 function subscribe(listener: Promise<PluginListener>): Unsubscribe {
@@ -192,6 +193,7 @@ export function createCapacitorPlatform(): Platform {
 		replaceVpnConfig: () => Vpn.replaceConfig(),
 
 		// no Settings window here: a page of the app
+		setTheme: (_mode, theme) => { void Theme.set({ theme }).catch(() => {}) },
 		openSettings: async target => { window.location.hash = `#/settings${target ? `/${target}` : ''}` },
 		authorizeOAuth: () => unavailable('authorizeOAuth'),
 		onSettingsGoto: () => () => {},

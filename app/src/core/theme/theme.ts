@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react'
+import { platform } from '@platform'
 
 /**
- * The theme: light or dark, or `auto` (the system's, followed live). Chosen per device (a phone and
+ * The theme: light or dark, or `auto` (the system's, followed live); dark by default. Chosen per device (a phone and
  * a desktop needn't agree), shared by the device's windows (a `storage` event). Applied as
  * `data-theme` on the root element: the colour tokens are variables (styles/index.css), redefined
  * for light.
@@ -13,9 +14,10 @@ const KEY = 'hub.theme'
 const listeners = new Set<() => void>()
 const system = window.matchMedia('(prefers-color-scheme: dark)')
 
+/** Dark until chosen otherwise: the app always was, whatever the system's setting. */
 export function themeMode(): ThemeMode {
 	const stored = localStorage.getItem(KEY)
-	return stored === 'light' || stored === 'dark' ? stored : 'auto'
+	return stored === 'auto' || stored === 'light' ? stored : 'dark'
 }
 
 export function currentTheme(): Theme {
@@ -27,12 +29,12 @@ function apply(): void {
 	const theme = currentTheme()
 	document.documentElement.dataset.theme = theme
 	document.documentElement.style.colorScheme = theme
+	platform.setTheme(themeMode(), theme)
 	listeners.forEach(l => l())
 }
 
 export function setThemeMode(mode: ThemeMode): void {
-	if (mode === 'auto') localStorage.removeItem(KEY)
-	else localStorage.setItem(KEY, mode)
+	localStorage.setItem(KEY, mode)
 	apply()
 }
 

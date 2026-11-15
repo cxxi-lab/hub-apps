@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { appIcon } from '../app/icon'
+import { windowBackground } from '../app/theme'
 
 const isDev = !app.isPackaged
 
@@ -18,6 +19,7 @@ export function openUpdateWindow(): BrowserWindow {
 	}
 
 	const win = new BrowserWindow({
+		backgroundColor: windowBackground(),
 		width: 460,
 		height: 280,
 		useContentSize: true,

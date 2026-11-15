@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { appIcon } from '../app/icon'
+import { windowBackground } from '../app/theme'
 
 const isDev = !app.isPackaged
 
@@ -13,6 +14,7 @@ app.on('before-quit', () => { quitting = true })
 export function createWindow(): void {
 
 	const win = new BrowserWindow({
+		backgroundColor: windowBackground(),
 		width: 1280,
 		height: 800,
 		icon: appIcon,

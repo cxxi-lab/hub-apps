@@ -16,6 +16,7 @@ import { setupVpn } from './network/vpn'
 import { setupTray } from './app/tray'
 import { setupSystemNotifications } from './app/notifications'
 import { setupLocalStore } from './store/localStore'
+import { setupTheme } from './app/theme'
 import { createWindow, showMainWindow } from './windows/main'
 import './windows/settings'
 import './windows/oauth'
@@ -70,6 +71,8 @@ installWebviewHandlers()
 
 app.whenReady().then(async () => {
 	if (!(await singleInstance)) return
+	// before any window: they open in the theme's colours
+	setupTheme()
 	persistRefreshCookie()
 	setupPlayerBlocklist()
 	setupVpn()
