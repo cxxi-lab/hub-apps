@@ -397,10 +397,11 @@ export interface Platform {
 	showMessage(message: string): Promise<void>
 
 	/**
-	 * The theme chosen (`mode`) and shown (`theme`, auto resolved), for the shell: desktop, the
-	 * native theme and the windows' background before they load; Android, the system bars.
+	 * The theme chosen (`mode`) and shown (`theme`, auto resolved), and the accent colour, for the
+	 * shell: desktop, the native theme, the windows' background before they load and the icon in
+	 * the accent; Android, the system bars.
 	 */
-	setTheme(mode: 'auto' | 'light' | 'dark', theme: 'light' | 'dark'): void
+	setTheme(mode: 'auto' | 'light' | 'dark', theme: 'light' | 'dark', accent: string): void
 
 	getMuted(): Promise<boolean>
 	setMuted(value: boolean): void

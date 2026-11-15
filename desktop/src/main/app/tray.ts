@@ -1,6 +1,6 @@
 import { app, Menu, nativeImage, Tray } from 'electron'
 
-import { appIcon } from './icon'
+import { appIcon, onIconChange } from './icon'
 import { restartApp } from './restart'
 import { engine } from '../companion/engine'
 import { checkForUpdateNow, onUpdateFound, openPendingUpdate, pendingUpdateVersion } from '../network/updater'
@@ -84,6 +84,8 @@ export function setTrayDot(dot: boolean): void {
 export function setupTray(): void {
 	if (tray) return
 	tray = new Tray(trayIcon(dotShown))
+	// the icon in another accent colour: the tray's follows
+	onIconChange(() => tray?.setImage(trayIcon(dotShown)))
 	tray.setToolTip(app.getName())
 	tray.setContextMenu(buildMenu())
 	tray.on('click', () => (isMainWindowVisible() ? hideMainWindow() : showMainWindow()))

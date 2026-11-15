@@ -19,11 +19,14 @@ function post(message: GuestMessage) {
 	window.parent.postMessage(envelope, '*')
 }
 
-/** The app's theme on this frame's root: the shared tokens are redefined under data-theme="light". */
-function applyTheme(theme: 'light' | 'dark' | undefined) {
+/** The app's theme and accent on this frame's root (the shared tokens are redefined under them). */
+function applyTheme(theme: 'light' | 'dark' | undefined, accent: string | undefined) {
+	const root = document.documentElement
 	const value = theme ?? 'dark'
-	document.documentElement.dataset.theme = value
-	document.documentElement.style.colorScheme = value
+	root.dataset.theme = value
+	root.style.colorScheme = value
+	if (accent && accent !== 'blue') root.dataset.accent = accent
+	else delete root.dataset.accent
 }
 
 window.addEventListener('message', event => {
@@ -39,13 +42,13 @@ window.addEventListener('message', event => {
 		else p.reject(new Error(m.error))
 	}
 	else if (m.type === 'init') {
-		applyTheme(m.theme)
+		applyTheme(m.theme, m.accent)
 		init = m
 		initListeners.forEach(l => l(m))
 	}
 	else if (m.type === 'back') handleBack()
 	else if (m.type === 'path') pathListeners.forEach(l => l(m.path))
-	else if (m.type === 'theme') applyTheme(m.theme)
+	else if (m.type === 'theme') applyTheme(m.theme, m.accent)
 })
 
 /** A call to the host (the platform API, through it). */

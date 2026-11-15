@@ -7,7 +7,7 @@ import { useBackHandler, useMediaQuery } from '@cxxi-lab/hub-ui'
 import { platform } from '@platform'
 import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage } from '@cxxi-lab/hub-sdk/protocol'
 import { setHubbyNav } from './navs'
-import { currentTheme, useTheme } from '@core/theme/theme'
+import { currentAccent, currentTheme, useAccent, useTheme } from '@core/theme/theme'
 
 /**
  * An isolated hubby (docs/plan-module-architecture.md § 4 ter): its frame — a sandboxed iframe
@@ -39,7 +39,8 @@ export function HubbyHost({ module }: { module: string }) {
 	useBackHandler(backDepth > 0, () => send({ type: 'back' }))
 	useEffect(() => { if (inner !== null) send({ type: 'path', path: inner }) }, [inner])
 	const theme = useTheme()
-	useEffect(() => { send({ type: 'theme', theme }) }, [theme])
+	const accent = useAccent()
+	useEffect(() => { send({ type: 'theme', theme, accent }) }, [theme, accent])
 
 	useEffect(() => {
 		const granted = (scope: string) => hasScope(state.current.scopes, module, scope)
@@ -73,7 +74,7 @@ export function HubbyHost({ module }: { module: string }) {
 			const m = data.message
 			switch (m.type) {
 				case 'ready':
-					send({ type: 'init', module, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme() })
+					send({ type: 'init', module, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
 					break
 				case 'register':
 					setHubbyNav(module, m.pages, m.sections)
