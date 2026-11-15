@@ -28,19 +28,25 @@ export interface Operation {
 	modelVersion?: number
 }
 
-interface FieldState { value: FieldValue; hlc: string }
-interface DocState { fields: Record<string, FieldState>; deleted: string | null }
+export interface FieldState { value: FieldValue; hlc: string }
+/** A document as merged: each field with its latest write, its last deletion, and when it was first and last written. */
+export interface DocState {
+	fields: Record<string, FieldState>
+	deleted: string | null
+	created: string
+	updated: string
+	/** changes applied here (this device's count: what If-Match compares) */
+	version: number
+}
 
-/** What a replica is, to start another from it (a new device), with the operations applied. */
+/** What a replica is, to start another from it (a new device). */
 export interface Snapshot {
 	clock: string
 	docs: Record<string, Record<string, DocState>>
-	applied: string[]
 }
 
 export class Replica {
 	private readonly docs = new Map<string, Map<string, DocState>>()
-	private readonly applied = new Set<string>()
 	/** written here, not sent yet */
 	private outbox: Operation[] = []
 	private readonly listeners = new Set<(collection: string, doc: string) => void>()
@@ -53,7 +59,6 @@ export class Replica {
 		for (const [collection, docs] of Object.entries(snapshot.docs)) {
 			replica.docs.set(collection, new Map(Object.entries(docs).map(([id, state]) => [id, structuredClone(state)])))
 		}
-		snapshot.applied.forEach(id => replica.applied.add(id))
 		return replica
 	}
 
@@ -82,17 +87,34 @@ export class Replica {
 	// --- receiving ---
 
 	/**
-	 * Operations from the relay (any device, any order, some maybe already applied). Returns those
-	 * stamped too far in the future (applied all the same): a device's clock is wrong.
+	 * Operations from the relay (any device, any order, some maybe already applied: applying one
+	 * again changes nothing). Returns those stamped too far in the future (applied all the same):
+	 * a device's clock is wrong.
 	 */
 	receive(operations: Operation[]): Operation[] {
 		const drifted: Operation[] = []
 		for (const op of operations) {
-			if (this.applied.has(op.id)) continue
 			if (!this.clock.receive(op.hlc)) drifted.push(op)
 			this.apply(op)
 		}
 		return drifted
+	}
+
+	/** Documents as stored (a base read back at start): no operation, no listener called. */
+	load(collection: string, docs: Record<string, DocState>): void {
+		let map = this.docs.get(collection)
+		if (!map) this.docs.set(collection, map = new Map())
+		for (const [id, state] of Object.entries(docs)) map.set(id, state)
+	}
+
+	/** A document as merged, to store it. */
+	state(collection: string, doc: string): DocState | null {
+		return this.docs.get(collection)?.get(doc) ?? null
+	}
+
+	/** The outbox as it stands (to store it, without taking it). */
+	pending(): Operation[] {
+		return [...this.outbox]
 	}
 
 	// --- reading ---
@@ -102,11 +124,11 @@ export class Replica {
 		return state ? materialize(state) : null
 	}
 
-	list(collection: string): Array<{ id: string; data: Record<string, FieldValue> }> {
-		const out: Array<{ id: string; data: Record<string, FieldValue> }> = []
+	list(collection: string): Array<{ id: string; data: Record<string, FieldValue>; state: DocState }> {
+		const out: Array<{ id: string; data: Record<string, FieldValue>; state: DocState }> = []
 		for (const [id, state] of this.docs.get(collection) ?? []) {
 			const data = materialize(state)
-			if (data) out.push({ id, data })
+			if (data) out.push({ id, data, state })
 		}
 		return out
 	}
@@ -120,7 +142,7 @@ export class Replica {
 	snapshot(): Snapshot {
 		const docs: Snapshot['docs'] = {}
 		for (const [collection, map] of this.docs) docs[collection] = Object.fromEntries([...map].map(([id, s]) => [id, structuredClone(s)]))
-		return { clock: this.clock.current(), docs, applied: [...this.applied] }
+		return { clock: this.clock.current(), docs }
 	}
 
 	// ---
@@ -132,21 +154,31 @@ export class Replica {
 	}
 
 	private apply(op: Operation): void {
-		this.applied.add(op.id)
 		let collection = this.docs.get(op.collection)
 		if (!collection) this.docs.set(op.collection, collection = new Map())
 		let state = collection.get(op.doc)
-		if (!state) collection.set(op.doc, state = { fields: {}, deleted: null })
+		if (!state) collection.set(op.doc, state = { fields: {}, deleted: null, created: op.hlc, updated: op.hlc, version: 0 })
 
+		let changed = false
 		if (op.kind === 'delete') {
-			if (state.deleted === null || op.hlc > state.deleted) state.deleted = op.hlc
+			if (state.deleted === null || op.hlc > state.deleted) {
+				state.deleted = op.hlc
+				changed = true
+			}
 		}
 		else {
 			for (const [field, value] of Object.entries(op.fields ?? {})) {
 				const current = state.fields[field]
-				if (!current || op.hlc > current.hlc) state.fields[field] = { value, hlc: op.hlc }
+				if (!current || op.hlc > current.hlc) {
+					state.fields[field] = { value, hlc: op.hlc }
+					changed = true
+				}
 			}
 		}
+		if (op.hlc < state.created) state.created = op.hlc
+		if (op.hlc > state.updated) state.updated = op.hlc
+		if (!changed) return
+		state.version++
 		this.listeners.forEach(listener => listener(op.collection, op.doc))
 	}
 }

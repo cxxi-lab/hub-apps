@@ -7,10 +7,15 @@ import { blindIndex, isSealed, open, seal, type DataKeys } from './format'
  * its sources' models/, in development). A server that lied about them would get values in clear.
  */
 
-interface FieldSpec {
+export interface FieldSpec {
 	type: string
 	/** true / 'equality': sealed here, by the device; 'server': sealed by the server (sent in clear) */
 	encrypted?: boolean | 'equality' | 'server'
+	required?: boolean
+	default?: unknown
+	/** a `ref`: the collection it points to, and what its deletion does */
+	collection?: string
+	onDelete?: 'nullify' | 'cascade' | 'restrict'
 	fields?: Record<string, FieldSpec>
 	items?: FieldSpec
 }
@@ -41,12 +46,19 @@ const hasEncrypted = (field: FieldSpec): boolean =>
 	byDevice(field) || Object.values(field.fields ?? {}).some(hasEncrypted) || (!!field.items && hasEncrypted(field.items))
 
 const MODELS = new Map<string, EncryptedModel>()
+/** every model, encrypted or not (the local-first collections read defaults and references from them) */
+const ALL_MODELS = new Map<string, Map<string, ModelFile>>()
 const listeners = new Set<() => void>()
+
+/** A module's models as registered (by collection). */
+export const modelsOf = (module: string): Map<string, ModelFile> => ALL_MODELS.get(module) ?? new Map()
 
 /** A module's models (as it ships them: models.json, by collection), registered as it loads. */
 export function registerModels(module: string, models: Record<string, ModelFile> | ModelFile[], formerly: string[] = []): void {
 	let added = false
 	for (const model of Object.values(models)) {
+		if (!ALL_MODELS.has(module)) ALL_MODELS.set(module, new Map())
+		ALL_MODELS.get(module)!.set(model.collection, model)
 		const encrypted = Object.entries(model.fields).filter(([, f]) => hasEncrypted(f)).map(([name]) => name)
 		if (encrypted.length === 0) continue
 		MODELS.set(`${module}/${model.collection}`, {

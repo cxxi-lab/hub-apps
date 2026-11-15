@@ -36,6 +36,16 @@ type ServerEvent =
 	| { type: 'upsert', notification: AppNotification }
 	| { type: 'remove', id: number }
 	| { type: 'reload' }
+	/** a local-first module's data got new operations (docs/plan-local-first.md § 3.4) */
+	| { type: 'sync', module: string, position: number }
+
+const syncListeners = new Set<(module: string, position: number) => void>()
+
+/** Called when the relay says a module has new operations (the sync engine listens). */
+export function onSyncEvent(listener: (module: string, position: number) => void): () => void {
+	syncListeners.add(listener)
+	return () => { syncListeners.delete(listener) }
+}
 
 const POLL_MS = 60_000
 const RETRY_MS = [2_000, 5_000, 15_000, 30_000, 60_000]
@@ -113,6 +123,9 @@ function apply(event: ServerEvent): void {
 	}
 	else if (event.type === 'remove') {
 		emit(items.filter(n => n.id !== event.id))
+	}
+	else if (event.type === 'sync') {
+		syncListeners.forEach(listener => listener(event.module, event.position))
 	}
 	else {
 		void load().catch(() => {})

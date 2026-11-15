@@ -3,6 +3,8 @@ import { currentDataKeys, requireDataKeys, whenDataKeyReady } from '@core/crypto
 import { DataKeyMissingError, encryptedModel, encryptedModels, equalityIndex, onModelsRegistered, needsSealing, openDocument, openedUnderFormerId, sealDocument, type EncryptedModel } from '@core/crypto/documents'
 import { uuidv7 } from '@core/crypto/format'
 import { getApiBaseUrl } from '@core/api/baseUrl'
+import { isLocalFirst } from '@core/sync/mode'
+import { localCollection } from '@core/sync/localCollection'
 
 /**
  * A module's declared collection, through the hubbies' generic API (/api/data/{module}/{collection},
@@ -82,8 +84,30 @@ async function blindQuery(model: EncryptedModel, query: CollectionQuery): Promis
 	return { ...query, filter }
 }
 
-/** One of a module's collections. `T`: its declared fields (the platform's are added). */
-export function collection<T extends object>(module: string, name: string) {
+/**
+ * One of a module's collections. `T`: its declared fields (the platform's are added). Served by the
+ * server, or by this device's base when the module is local-first here (docs/plan-local-first.md):
+ * decided on each call, so that switching takes effect without the module knowing.
+ */
+export function collection<T extends object>(module: string, name: string): ReturnType<typeof remoteCollection<T>> {
+	const remote = remoteCollection<T>(module, name)
+	type Api = typeof remote
+	const pick = (): Api => isLocalFirst(module) ? localCollection<T>(module, name) as unknown as Api : remote
+	return {
+		find: q => pick().find(q),
+		findAll: q => pick().findAll(q),
+		get: id => pick().get(id),
+		create: data => pick().create(data),
+		update: (id, data, version) => pick().update(id, data, version),
+		replace: (id, data) => pick().replace(id, data),
+		remove: id => pick().remove(id),
+		batch: operations => pick().batch(operations),
+		createWithId: (id, data) => pick().createWithId(id, data),
+	}
+}
+
+/** The collection on the server (/api/data), whatever the module's mode: the local-first engine writes there too. */
+export function remoteCollection<T extends object>(module: string, name: string) {
 	type Doc = T & HubbyDocument
 	const base = `/api/data/${module}/${name}`
 	const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) })
@@ -139,7 +163,10 @@ export function collection<T extends object>(module: string, name: string) {
 		get: (id: string) => api<{ data: Doc }>(`${base}/${id}`).then(r => incoming(r.data)),
 		async create(data: Partial<T>): Promise<Doc> {
 			// the id first: the sealed values are bound to it
-			const id = uuidv7()
+			return this.createWithId(uuidv7(), data)
+		},
+		/** A new document under an id chosen here (a uuidv7). */
+		async createWithId(id: string, data: Partial<T>): Promise<Doc> {
 			return incoming((await api<{ data: Doc }>(base, json('POST', { ...(await outgoing(id, data)), id }))).data)
 		},
 		/** The given fields; `version`: refused (409) if the document changed since. */
@@ -185,12 +212,12 @@ export async function sealLeftInClear(): Promise<void> {
 		const mark = `${server}|${model.module}/${model.collection}`
 		if (marks[mark] === model.version) continue
 		try {
-			const docs = await collection<Record<string, unknown>>(model.module, model.collection).findAll()
+			const docs = await remoteCollection<Record<string, unknown>>(model.module, model.collection).findAll()
 			let sealed = 0
 			for (const doc of docs) {
 				if (!needsSealing(model, doc)) continue
 				const data = Object.fromEntries(model.encrypted.filter(f => f in doc).map(f => [f, doc[f]]))
-				await collection(model.module, model.collection).update(doc.id, data, doc._version)
+				await remoteCollection(model.module, model.collection).update(doc.id, data, doc._version)
 				sealed++
 			}
 			if (sealed) console.log(`[crypto] ${model.module}/${model.collection}: ${sealed} document(s) sealed`)
