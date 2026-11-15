@@ -16,6 +16,10 @@ import { initBaseUrl } from '@core/api/baseUrl'
 import { bootAuth } from '@core/auth/authState'
 import { platform } from '@platform'
 import './styles/index.css'
+import { startTheme } from '@core/theme/theme'
+
+// before anything renders: no flash of the other theme
+startTheme()
 
 // the phone's back button (MainActivity calls it; it does the rest itself when it answers false)
 window.hubBack = handleBack
