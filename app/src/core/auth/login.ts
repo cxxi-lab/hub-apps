@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '@core/api/baseUrl'
+import { CLIENT_HEADER } from '@shared/constants'
 
 export type LoginResult =
 	| { token: string; expiresAt: number }
@@ -18,7 +19,7 @@ export async function loginTwoFactor(challenge: string, code: string): Promise<{
 		const response = await fetch(`${getApiBaseUrl()}/api/hub/auth/2fa`, {
 			method: 'POST',
 			credentials: 'include',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', ...CLIENT_HEADER },
 			body: JSON.stringify({ challenge, code })
 		})
 		if (response.ok) return await response.json()
@@ -36,7 +37,7 @@ async function post<T>(path: string, body: unknown): Promise<T | null> {
 		const response = await fetch(`${getApiBaseUrl()}${path}`, {
 			method: 'POST',
 			credentials: 'include',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', ...CLIENT_HEADER },
 			body: JSON.stringify(body)
 		})
 
