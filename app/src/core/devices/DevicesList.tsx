@@ -6,14 +6,14 @@ import { errorMessage } from '@core/api/client'
 /** What a user agent says, shortly: the app and its version, the system. */
 function describe(session: DeviceSession): { name: string; detail: string | null } {
 	const agent = session.userAgent ?? ''
-	const app = agent.match(/\bhub\/([\d.]+)/i)?.[1]
+	const app = agent.match(/\bhub(?:-dev)?\/([\d.]+)/i)?.[1]
 	const android = agent.match(/Android ([\d.]+)/)?.[1]
 	const system = android ? `Android ${android}`
 		: /Windows/.test(agent) ? 'Windows'
 		: /Mac OS X/.test(agent) ? 'macOS'
 		: /Linux/.test(agent) ? 'Linux'
 		: null
-	const name = session.client === 'desktop' ? 'Desktop app'
+	const name = session.client === 'desktop' ? (/\bhub-dev\//i.test(agent) ? 'Desktop app (dev)' : 'Desktop app')
 		: session.client === 'android' ? 'Android app'
 		: session.client ?? 'Unknown device'
 	const detail = [system, app ? `v${app}` : null].filter(Boolean).join(' · ')

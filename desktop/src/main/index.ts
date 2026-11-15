@@ -23,7 +23,21 @@ import './windows/module'
 import './windows/about'
 import { installWebviewHandlers } from './windows/webview'
 
-app.setName('hub')
+// The shipped app is `hub`, a development build `hub-dev`: its own name, so its own data folder
+// (~/.config/hub-dev: session, local store, modules) and its own single-instance lock — both can
+// run side by side — and its windows titled hub-dev.
+export const APP_NAME = app.isPackaged ? 'hub' : 'hub-dev'
+app.setName(APP_NAME)
+if (!app.isPackaged) {
+	app.on('browser-window-created', (_event, window) => {
+		const title = (page: string) => page === '' || page === 'hub' ? 'hub-dev' : `${page} · hub-dev`
+		window.setTitle(title(window.getTitle()))
+		window.on('page-title-updated', (event, page) => {
+			event.preventDefault()
+			window.setTitle(title(page))
+		})
+	})
+}
 
 // Force WebRTC to only use the proxied transport, blocking direct UDP that
 // would otherwise leak the real IP via STUN. Must be set before app ready.

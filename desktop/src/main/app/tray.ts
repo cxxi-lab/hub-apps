@@ -84,7 +84,7 @@ export function setTrayDot(dot: boolean): void {
 export function setupTray(): void {
 	if (tray) return
 	tray = new Tray(trayIcon(dotShown))
-	tray.setToolTip('hub')
+	tray.setToolTip(app.getName())
 	tray.setContextMenu(buildMenu())
 	tray.on('click', () => (isMainWindowVisible() ? hideMainWindow() : showMainWindow()))
 	engine.on('status', refreshTray)
