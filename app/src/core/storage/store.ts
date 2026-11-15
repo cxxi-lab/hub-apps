@@ -5,6 +5,8 @@ import { getAuthData } from '@core/auth/authState'
 import { MODULE_MANIFESTS } from '@core/module/registry'
 import type { StorageScope } from '@core/module/types'
 import { platform, type StoredDocument, type StoredFile } from '@platform'
+import { requireDataKeys } from '@core/crypto/dataKey'
+import { isSealed, open, seal } from '@core/crypto/format'
 
 /**
  * The modules' generic store (docs/plan-module-storage.md). A module declares scopes of its data
@@ -104,6 +106,25 @@ interface Place {
 	deleteFile(path: string): Promise<void>
 }
 
+/**
+ * On the server, a document's data is sealed by this device (the account's data key, `v1:`), its
+ * place as associated data: the server keeps `{ $sealed: 'v1:…' }` and can't read it
+ * (docs/plan-storage-encryption.md § 6, step 4). A document from before, in clear, reads as it is.
+ */
+const where = (module: string, scope: string, collection: string, id: string) => `store/${module}/${scope}/${collection}/${id}`
+
+async function sealDocuments(module: string, scope: string, documents: StoredDocument[]): Promise<StoredDocument[]> {
+	const keys = await requireDataKeys()
+	return documents.map(d => ({ ...d, data: { $sealed: seal(keys.fields, where(module, scope, d.collection, d.id), JSON.stringify(d.data)) } }))
+}
+
+async function openDocument(module: string, scope: string, d: StoredDocument): Promise<StoredDocument> {
+	const sealed = (d.data as { $sealed?: unknown } | null)?.$sealed
+	if (!isSealed(sealed)) return d
+	const keys = await requireDataKeys()
+	return { ...d, data: JSON.parse(open(keys.fields, where(module, scope, d.collection, d.id), sealed)) }
+}
+
 function serverPlace(module: string, scope: string): Place {
 	const base = `/api/${module}/_store/${scope}`
 	let urls: Map<string, string> | null = null
@@ -112,18 +133,24 @@ function serverPlace(module: string, scope: string): Place {
 		return urls
 	}
 	return {
-		list: async collection => (await api<{ data: StoredDocument[] }>(collection ? `${base}?collection=${collection}` : base)).data,
+		list: async collection => {
+			const documents = (await api<{ data: StoredDocument[] }>(collection ? `${base}?collection=${collection}` : base)).data
+			return Promise.all(documents.map(d => openDocument(module, scope, d)))
+		},
 		get: async (collection, id) => {
+			let document: StoredDocument
 			try {
-				return (await api<{ data: StoredDocument }>(`${base}/docs/${collection}/${encodeURIComponent(id)}`)).data
+				document = (await api<{ data: StoredDocument }>(`${base}/docs/${collection}/${encodeURIComponent(id)}`)).data
 			}
 			catch {
 				return null
 			}
+			return openDocument(module, scope, document)
 		},
 		put: async documents => {
-			for (let i = 0; i < documents.length; i += 100) {
-				await api(`${base}/docs`, { method: 'POST', body: JSON.stringify(documents.slice(i, i + 100)) })
+			const sealed = await sealDocuments(module, scope, documents)
+			for (let i = 0; i < sealed.length; i += 100) {
+				await api(`${base}/docs`, { method: 'POST', body: JSON.stringify(sealed.slice(i, i + 100)) })
 			}
 		},
 		delete: async (collection, id) => { await api(`${base}/docs/${collection}/${encodeURIComponent(id)}`, { method: 'DELETE' }) },
