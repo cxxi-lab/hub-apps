@@ -2,6 +2,13 @@
 	"name": "hub-desktop",
 	"private": true,
 	"version": "0.81.0",
+	"description": "hub, the desktop app",
+	"homepage": "https://hub.cxxi.io",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/cxxi-lab/hub-apps.git",
+		"directory": "desktop"
+	},
 	"type": "module",
 	"main": "out/main/index.js",
 	"scripts": {
