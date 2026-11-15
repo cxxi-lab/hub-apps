@@ -4,7 +4,7 @@ import { type UserMenuProps } from './UserMenu.types'
 import { styles } from './UserMenu.variants'
 import { NotificationsMenu } from './NotificationsMenu'
 
-export function UserMenu({ onModules, onSettings, onLogout }: UserMenuProps) {
+export function UserMenu({ onModules, onDevices, onSettings, onLogout }: UserMenuProps) {
 	const userHeader = (isOpen: boolean) => (
 		<IconButton
 			size="xl"
@@ -29,6 +29,11 @@ export function UserMenu({ onModules, onSettings, onLogout }: UserMenuProps) {
 							{onModules && (
 								<button type="button" onClick={onModules} className={styles.item()}>
 									Modules
+								</button>
+							)}
+							{onDevices && (
+								<button type="button" onClick={onDevices} className={styles.item()}>
+									Devices
 								</button>
 							)}
 							{onSettings && (

@@ -36,7 +36,7 @@ function ago(iso: string | null): string {
  * The devices signed in to the account (its sessions): which app, from where, since when, last
  * active. Another one can be signed out from here; its access stops at once.
  */
-export function SettingsDevices() {
+export function DevicesList() {
 	const [sessions, setSessions] = useState<DeviceSession[] | null>(null)
 	const [busy, setBusy] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)

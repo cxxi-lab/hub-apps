@@ -150,6 +150,7 @@ export function TopBar({ domains, activeDomainId }: Props) {
 
 				<UserMenu
 					onModules={() => navigate('/modules')}
+					onDevices={() => navigate('/devices')}
 					onSettings={() => platform.openSettings()}
 					onLogout={handleLogout}
 				/>

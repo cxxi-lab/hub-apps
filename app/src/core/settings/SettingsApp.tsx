@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { platform } from '@platform'
-import { faBell, faCode, faMobileScreenButton, faLink, faLock, faPalette } from '@fortawesome/free-solid-svg-icons'
+import { faBell, faCode, faLink, faLock, faPalette } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { SettingsConnections } from '@core/settings/SettingsConnections'
-import { SettingsDevices } from '@core/settings/SettingsDevices'
 import { SettingsNotifications } from '@core/settings/SettingsNotifications'
 import { SettingsSecurity } from '@core/settings/SettingsSecurity'
 import { SettingsTheme } from '@core/settings/SettingsTheme'
@@ -22,7 +21,6 @@ interface Section {
 
 const SECTIONS: Section[] = [
 	{ id: 'security', label: 'Security', icon: faLock, component: () => <SettingsSecurity /> },
-	{ id: 'devices', label: 'Devices', icon: faMobileScreenButton, component: () => <SettingsDevices /> },
 	{ id: 'connections', label: 'Connections', icon: faLink, component: () => <SettingsConnections /> },
 	{ id: 'notifications', label: 'Notifications', icon: faBell, component: () => <SettingsNotifications /> },
 	{ id: 'theme', label: 'Theme', icon: faPalette, component: () => <SettingsTheme /> },

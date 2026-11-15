@@ -13,6 +13,7 @@ import { enabledModules, wantedIds } from '@core/module/visibility'
 import { fetchModulesState, onModulesChange, type ModulesState } from '@core/api/modules'
 import { ModulesContext } from '@core/contexts/ModulesContext'
 import { ModulesPage } from '@core/modules/ModulesPage'
+import { DevicesPage } from '@core/devices/DevicesPage'
 import { SettingsPage } from '@core/settings/SettingsApp'
 import { platform } from '@platform'
 import { startNotifications } from '@core/notifications/notifications'
@@ -38,6 +39,7 @@ export interface NavDomain {
 // Always-present shell pages (not modules).
 const CORE_SHELL_PAGES: { path: string; Component: ComponentType }[] = [
 	{ path: '/modules', Component: ModulesPage },
+	{ path: '/devices', Component: DevicesPage },
 	// the shells without a Settings window (Android): Settings as a page
 	{ path: '/settings', Component: SettingsPage }
 ]
