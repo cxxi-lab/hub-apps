@@ -155,13 +155,16 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add mobile/package.json package-lock.json
           git commit -m "chore: release android v$NAME [skip ci]"
-          # another release (desktop) may have pushed meanwhile: on top of it, a few tries
+          # another release (desktop) may have pushed meanwhile: on top of it, a few tries; the
+          # branch and the tag in one push (a tag pushed alone after a rebase in this shallow clone
+          # was refused: "missing necessary objects")
+          ok=
           for i in 1 2 3; do
-            git pull --rebase origin main && git push origin HEAD:main && break
+            git pull --rebase origin main && git tag -f "android-v$NAME" \
+              && git push --atomic origin HEAD:main "refs/tags/android-v$NAME" && ok=1 && break
             sleep 5
           done
-          git tag "android-v$NAME"
-          git push origin "android-v$NAME"
+          test -n "$ok"
 
       - name: Setup SSH
         env:
