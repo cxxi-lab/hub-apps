@@ -13,8 +13,8 @@ const config: CapacitorConfig = {
 	// only way to see what a sideloaded build does.
 	loggingBehavior: 'production',
 	plugins: {
-		// The app is dark: light system bar icons (DEFAULT follows the phone's theme, black icons
-		// on a phone in light mode).
+		// The first style, the app's default theme (dark): light system bar icons (DEFAULT would follow
+		// the phone's theme). The app's own theme then wins (ThemePlugin, Android).
 		SystemBars: { style: 'DARK' }
 	}
 }

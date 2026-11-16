@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 
 import androidx.core.view.WindowCompat;
@@ -20,7 +21,9 @@ import java.util.List;
 /**
  * The app's theme on the shell's side (platform.setTheme, app/src/core/theme/theme.ts): the system
  * bars' icons dark on a light theme, light on a dark one, and the window's background behind the
- * WebView. Kept, so that the next start opens in the right colours (MainActivity).
+ * WebView. Kept, so that the next start opens in the right colours (MainActivity). Capacitor's
+ * SystemBars sets its own style (capacitor.config.ts) once loaded and again on every configuration
+ * change (the phone's night mode): the app's theme is put back after it, each time.
  * And the launcher icon in the accent: one launcher alias per accent (AndroidManifest.xml), the
  * chosen one enabled when the app goes to the background (switching a launcher entry may close the
  * app on some launchers, and drops its home screen shortcut: the new icon is in the app drawer).
@@ -69,6 +72,21 @@ public class ThemePlugin extends Plugin {
         bars.setAppearanceLightStatusBars(!dark);
         bars.setAppearanceLightNavigationBars(!dark);
         activity.getWindow().getDecorView().setBackgroundColor(dark ? DARK : LIGHT);
+    }
+
+    /** After SystemBars, whose first style is posted while the plugins load. */
+    @Override
+    public void load() {
+        Activity activity = getActivity();
+        activity.getWindow().getDecorView().post(() -> apply(activity, isDark(activity)));
+    }
+
+    @Override
+    protected void handleOnConfigurationChanged(Configuration newConfig) {
+        super.handleOnConfigurationChanged(newConfig);
+        Activity activity = getActivity();
+        // posted: runs after every plugin's own handling, SystemBars' included
+        activity.getWindow().getDecorView().post(() -> apply(activity, isDark(activity)));
     }
 
     @PluginMethod
