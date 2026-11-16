@@ -18,7 +18,10 @@ import { openOperation, sealOperation, type Envelope } from './envelope'
  *  - the relay's new operations are read when it says so (Mercure), on focus, and every minute;
  *  - the trial keeps the server's collections (Mongo) up to date too, so that a device not
  *    local-first yet still reads the same data (its own writes don't come back here).
- * The first time, the module's documents are copied from the server.
+ * The first time, the relay's log is read first: when another device already started it, this
+ * one takes everything from it; only an empty log is seeded with the module's documents on the
+ * server (copying them on every new device would rewrite them with a later clock, and could undo a
+ * change the server's copy missed).
  */
 
 const SCOPE = 'sync'
@@ -65,6 +68,7 @@ export class ModuleSync {
 	private pushTimer: ReturnType<typeof setTimeout> | null = null
 	private syncing: Promise<void> | null = null
 	private again = false
+	private imported = false
 
 	constructor(readonly module: string) {
 		this.ready = this.start()
@@ -89,17 +93,21 @@ export class ModuleSync {
 		if (meta?.outbox?.length) this.replica.requeue(meta.outbox)
 
 		this.replica.subscribe((collection, doc) => this.markDirty(collection, doc))
-		if (!meta?.imported) await this.importFromServer()
+		this.imported = meta?.imported ?? false
+		// a first start: its data before the first screen, when the relay answers (offline: later)
+		if (!this.imported) await this.sync()
 
 		onSyncEvent((module, position) => { if (module === this.module && position > this.position) void this.sync() })
 		window.addEventListener('focus', () => { void this.sync() })
 		// the phone's app back in front
 		document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void this.sync() })
+		// back online: what was written meanwhile goes at once
+		window.addEventListener('online', () => { void this.sync() })
 		setInterval(() => { void this.sync() }, POLL_MS)
 		void this.sync()
 	}
 
-	/** The first time: the module's documents on the server, as this device's first writes. */
+	/** The log still empty: the module's documents on the server become its first operations. */
 	private async importFromServer(): Promise<void> {
 		let count = 0
 		for (const collection of modelsOf(this.module).keys()) {
@@ -111,7 +119,6 @@ export class ModuleSync {
 				count++
 			}
 		}
-		await this.save(true)
 		console.log(`[sync] ${this.module}: ${count} document(s) imported from the server`)
 	}
 
@@ -134,6 +141,14 @@ export class ModuleSync {
 					this.again = false
 					await this.push()
 					await this.pull()
+					if (!this.imported) {
+						// the log read: empty, this device seeds it; else it already has everything
+						if (this.position === 0) {
+							await this.importFromServer()
+							this.again = true
+						}
+						this.imported = true
+					}
 				} while (this.again)
 			}
 			catch (err) {
@@ -188,7 +203,7 @@ export class ModuleSync {
 	}
 
 	/** Stores the documents changed and the state (clock, position, what is waiting). */
-	private save(imported = true): Promise<void> {
+	private save(): Promise<void> {
 		const run = async () => {
 			const local = platform.localStore!
 			const key = await account()
@@ -198,7 +213,7 @@ export class ModuleSync {
 				return { collection, id, data: this.replica.state(collection, id), updatedAt: now }
 			})
 			this.dirty.clear()
-			const meta: Meta = { clock: this.replica.clock.current(), position: this.position, outbox: this.replica.pending(), imported }
+			const meta: Meta = { clock: this.replica.clock.current(), position: this.position, outbox: this.replica.pending(), imported: this.imported }
 			await local.put(key, this.module, SCOPE, [...docs, { collection: META, id: 'state', data: meta, updatedAt: now }])
 		}
 		// one after the other: a later save never lands before an earlier one
