@@ -183,9 +183,12 @@ jobs:
           # relative to that directory.
           # The app, binary first, manifest last: clients never see a latest-linux.yml pointing
           # at a missing AppImage (a manifest/signature mismatch in between only postpones the update).
-          rsync -e "ssh -i ~/.ssh/id_release" desktop/dist/hub-*.AppImage "$SSH_USER@$SSH_HOST:"
-          rsync -e "ssh -i ~/.ssh/id_release" desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
-          rsync -e "ssh -i ~/.ssh/id_release" desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
+          # one upload at a time on the server (rrsync locks the directory): another release
+          # uploading at the same moment is waited for
+          send() { for i in 1 2 3 4 5 6 7 8; do rsync -e "ssh -i ~/.ssh/id_release" "$@" && return 0; echo "upload busy, again in 15 s"; sleep 15; done; return 1; }
+          send desktop/dist/hub-*.AppImage "$SSH_USER@$SSH_HOST:"
+          send desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
+          send desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
 
       # The tunnel's native libraries, for the module that uses the tunnel (its CI downloads them)
       - name: GitHub release (tunnel natives)
