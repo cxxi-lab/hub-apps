@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { api, ApiError } from '@core/api/client'
-import { getApiBaseUrl, onBaseUrlChange } from '@core/api/baseUrl'
+import { getApiBaseUrl, onBaseUrlChange, serverIdentity } from '@core/api/baseUrl'
 import { platform } from '@platform'
 import { DataKeyMissingError } from './documents'
 import { base64url, deriveKeys, fromBase64url, newDataKey, type DataKeys } from './format'
@@ -31,7 +31,8 @@ function setState(next: DataKeyState): void {
 	listeners.forEach(l => l())
 }
 
-const secretName = () => `data-key@${getApiBaseUrl(DATA_KEY_PATH)}`
+// by the server's identity (serverIdentity): the same across its renames
+const secretName = () => `data-key@${serverIdentity(getApiBaseUrl(DATA_KEY_PATH))}`
 
 /** fingerprint → key (base64url): the keys this device holds for this server's accounts */
 async function storedKeys(): Promise<Record<string, string>> {
