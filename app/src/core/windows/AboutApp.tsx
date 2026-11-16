@@ -32,7 +32,7 @@ export function AboutApp() {
 
 	return (
 		<div className="flex flex-col h-screen bg-steel-950 text-steel-100 p-6">
-			<h1 className="text-xl font-semibold text-white mb-5">hub</h1>
+			<h1 className="text-xl font-semibold text-white mb-5">Hubbyware</h1>
 
 			<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
 				{rows.map(([label, value]) => (

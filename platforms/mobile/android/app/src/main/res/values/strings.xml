@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">hub</string>
-    <string name="title_activity_main">hub</string>
+    <string name="app_name">Hubbyware</string>
+    <string name="title_activity_main">Hubbyware</string>
     <string name="package_name">cxxi.hub</string>
     <string name="custom_url_scheme">cxxi.hub</string>
 </resources>

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
 	appId: 'cxxi.hub',
-	appName: 'hub',
+	appName: 'Hubbyware',
 	// The shared UI is built by the @hub/app workspace (vite build → app/dist).
 	webDir: '../../app/dist',
 	// The UI's background (steel-900), so the WebView doesn't flash grey before

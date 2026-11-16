@@ -23,7 +23,7 @@ export function openUpdateWindow(): BrowserWindow {
 		width: 460,
 		height: 280,
 		useContentSize: true,
-		title: 'Update hub',
+		title: 'Update Hubbyware',
 		icon: appIcon,
 		center: true,
 		resizable: false,

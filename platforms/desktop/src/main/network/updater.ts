@@ -277,7 +277,7 @@ function startPeriodicChecks(): void {
 
 function notify(body: string, onClick?: () => void): void {
 	if (!Notification.isSupported()) return
-	const notification = new Notification({ title: 'hub', body })
+	const notification = new Notification({ title: 'Hubbyware', body })
 	if (onClick) notification.on('click', onClick)
 	notification.show()
 }

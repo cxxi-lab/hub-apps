@@ -124,7 +124,7 @@ jobs:
           mkdir -p dist
           name="${{ steps.version.outputs.name }}"
           code="${{ steps.version.outputs.code }}"
-          apk="hub-$name.apk"
+          apk="hubbyware-$name.apk"
           cp platforms/mobile/android/app/build/outputs/apk/release/app-release.apk "dist/$apk"
           sha=$(sha256sum "dist/$apk" | cut -d' ' -f1)
           # Manifest the app checks against: newer versionCode => update offered.

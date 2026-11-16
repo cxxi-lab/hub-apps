@@ -36,7 +36,7 @@
 	},
 	"build": {
 		"appId": "cxxi.hub",
-		"productName": "hub",
+		"productName": "Hubbyware",
 		"directories": {
 			"output": "dist"
 		},
@@ -83,7 +83,7 @@
 				"channel": "latest"
 			}
 		],
-		"artifactName": "${productName}-${version}.${ext}",
+		"artifactName": "hubbyware-${version}.${ext}",
 		"electronFuses": {
 			"runAsNode": false,
 			"enableNodeOptionsEnvironmentVariable": false,

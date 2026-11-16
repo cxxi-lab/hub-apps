@@ -1,3 +1,6 @@
+// first: the app's name and data folder, before any module reads them
+import { APP_NAME } from './app/identity'
+export { APP_NAME }
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 
 import { applyMenu } from './app/menu'
@@ -24,14 +27,10 @@ import './windows/module'
 import './windows/about'
 import { installWebviewHandlers } from './windows/webview'
 
-// The shipped app is `hub`, a development build `hub-dev`: its own name, so its own data folder
-// (~/.config/hub-dev: session, local store, modules) and its own single-instance lock — both can
-// run side by side — and its windows titled hub-dev.
-export const APP_NAME = app.isPackaged ? 'hub' : 'hub-dev'
-app.setName(APP_NAME)
+// its windows titled Hubbyware (dev) in development
 if (!app.isPackaged) {
 	app.on('browser-window-created', (_event, window) => {
-		const title = (page: string) => page === '' || page === 'hub' ? 'hub-dev' : `${page} · hub-dev`
+		const title = (page: string) => page === '' || page === 'Hubbyware' ? 'Hubbyware (dev)' : `${page} · Hubbyware (dev)`
 		window.setTitle(title(window.getTitle()))
 		window.on('page-title-updated', (event, page) => {
 			event.preventDefault()
