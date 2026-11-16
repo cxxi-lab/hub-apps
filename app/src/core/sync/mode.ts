@@ -12,7 +12,7 @@ import { platform } from '@platform'
 const KEY = 'hub.localFirst'
 
 /** Local-first everywhere: their server collections are read-only, then emptied. */
-export const MIGRATED: readonly string[] = ['planner']
+export const MIGRATED: readonly string[] = ['planner', 'workout']
 
 export function localFirstModules(): string[] {
 	try {
