@@ -1,4 +1,4 @@
-import { Clock } from './hlc'
+import { Clock, format, parse } from './hlc'
 
 /**
  * A module's data as one device holds it, merged from the operations of every device
@@ -66,6 +66,22 @@ export class Replica {
 
 	put(collection: string, doc: string, fields: Record<string, FieldValue>, modelVersion?: number): Operation {
 		return this.local({ id: this.newId(), hlc: this.clock.tick(), collection, doc, kind: 'put', fields, modelVersion })
+	}
+
+	/**
+	 * A document written before the log existed (an import), at its own dates (ms): first written
+	 * at `created`, last at `updated`, so that its dates and the order by them stay as they were.
+	 * In the past, so any change since wins. A date missing or ahead of the clock: now.
+	 */
+	putAt(collection: string, doc: string, fields: Record<string, FieldValue>, created: number, updated: number, modelVersion?: number): Operation[] {
+		const now = this.clock.tick()
+		const at = (ms: number) => Number.isFinite(ms) && ms > 0 && ms < parse(now).wall ? format({ wall: ms, counter: 0, device: this.clock.device }) : now
+		const ops: Operation[] = []
+		const first = at(created)
+		const last = at(updated)
+		if (first < last) ops.push(this.local({ id: this.newId(), hlc: first, collection, doc, kind: 'put', fields: {}, modelVersion }))
+		ops.push(this.local({ id: this.newId(), hlc: last, collection, doc, kind: 'put', fields, modelVersion }))
+		return ops
 	}
 
 	delete(collection: string, doc: string): Operation {

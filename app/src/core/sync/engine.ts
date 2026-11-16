@@ -120,8 +120,8 @@ export class ModuleSync {
 			const docs = await remoteCollection<Record<string, unknown>>(this.module, collection).findAll()
 			for (const doc of docs) {
 				const { id, _createdAt, _updatedAt, _version, ...fields } = doc
-				void _createdAt; void _updatedAt; void _version
-				this.replica.put(collection, String(id), fields)
+				void _version
+				this.replica.putAt(collection, String(id), fields, Date.parse(String(_createdAt)), Date.parse(String(_updatedAt)))
 				count++
 			}
 		}

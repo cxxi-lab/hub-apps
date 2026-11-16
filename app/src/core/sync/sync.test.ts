@@ -179,3 +179,23 @@ test('an operation from a clock far in the future is applied, without dragging t
 	assert.equal(a.get('event', 'e1')?.title, 'from the future', 'applied all the same')
 	assert.ok(a.clock.tick() < op.hlc, "this device's clock stayed on its own time")
 })
+
+test('an import keeps the documents\' dates, and a later change still wins', () => {
+	const time = { now: 1_800_000_000_000 }
+	const relay = new Relay()
+	const a = device('a', time)
+	const b = device('b', time)
+	a.replica.putAt('event', 'e1', { title: 'old' }, time.now - 2 * 86_400_000, time.now - 86_400_000)
+	a.replica.putAt('event', 'e2', { title: 'future?' }, time.now + 1000, time.now + 1000)
+	a.sync(relay)
+	b.sync(relay)
+	const e1 = b.replica.state('event', 'e1')!
+	assert.equal(parseInt(e1.created.slice(0, 9), 36), time.now - 2 * 86_400_000)
+	assert.equal(parseInt(e1.updated.slice(0, 9), 36), time.now - 86_400_000)
+	assert.equal(parseInt(b.replica.state('event', 'e2')!.created.slice(0, 9), 36), time.now)
+	time.now += 1
+	b.replica.put('event', 'e1', { title: 'new' })
+	b.sync(relay)
+	a.sync(relay)
+	assert.deepEqual(a.replica.get('event', 'e1'), { title: 'new' })
+})
