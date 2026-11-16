@@ -73,8 +73,10 @@ function signedEntry(entry: string, signature: string, publisher?: Publisher): b
 	if (!publisher || typeof publisher.certificate !== 'string' || typeof publisher.signature !== 'string') return false
 	if (!verify(null, Buffer.from(publisher.certificate, 'utf8'), PUBLIC_KEY, Buffer.from(publisher.signature, 'base64'))) return false
 	try {
-		const certificate = JSON.parse(publisher.certificate) as { hubby?: unknown, key?: unknown }
-		if (typeof certificate.key !== 'string' || certificate.hubby !== (JSON.parse(entry) as { id?: unknown }).id) return false
+		// {"module": <id>, "key": …}: the field's name signed into the certificates (kept: a hubby's
+		// certificate is signed once by the update key); `hubby` for one issued after the rename
+		const certificate = JSON.parse(publisher.certificate) as { hubby?: unknown, module?: unknown, key?: unknown }
+		if (typeof certificate.key !== 'string' || (certificate.hubby ?? certificate.module) !== (JSON.parse(entry) as { id?: unknown }).id) return false
 		return verify(null, body, createPublicKey({ key: Buffer.from(certificate.key, 'base64'), format: 'der', type: 'spki' }), sig)
 	}
 	catch {

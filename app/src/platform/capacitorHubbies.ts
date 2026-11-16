@@ -40,8 +40,10 @@ async function signedEntry(entry: string, signature: string, publisher?: Publish
 	if (await verifySignature(utf8(entry), base64(signature))) return true
 	if (!publisher || !(await verifySignature(utf8(publisher.certificate), base64(publisher.signature)))) return false
 	try {
-		const certificate = JSON.parse(publisher.certificate) as { hubby?: unknown, key?: unknown }
-		if (typeof certificate.key !== 'string' || certificate.hubby !== (JSON.parse(entry) as { id?: unknown }).id) return false
+		// {"module": <id>, "key": …}: the field's name signed into the certificates (kept: a hubby's
+		// certificate is signed once by the update key); `hubby` for one issued after the rename
+		const certificate = JSON.parse(publisher.certificate) as { hubby?: unknown, module?: unknown, key?: unknown }
+		if (typeof certificate.key !== 'string' || (certificate.hubby ?? certificate.module) !== (JSON.parse(entry) as { id?: unknown }).id) return false
 		return await verifySignature(utf8(entry), base64(signature), base64(certificate.key))
 	}
 	catch {
