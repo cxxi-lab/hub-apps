@@ -522,9 +522,20 @@ public final class ModuleStore {
         return 0;
     }
 
-    /** ^1.2.3 = >=1.2.3 <2.0.0 (^0.2.3 = >=0.2.3 <0.3.0), else exact. */
+    /**
+     * ^1.2.3 = >=1.2.3 <2.0.0 (^0.2.3 = >=0.2.3 <0.3.0), else exact; alternatives joined by `||`
+     * (`^1.12.0 || ^2.0.0`: a module running on two majors of the SDK), as the desktop's semver.ts.
+     */
     static boolean satisfies(String version, String range) {
         if (range == null || range.isEmpty()) return false;
+        for (String alternative : range.split("\\|\\|")) {
+            if (satisfiesOne(version, alternative.trim())) return true;
+        }
+        return false;
+    }
+
+    private static boolean satisfiesOne(String version, String range) {
+        if (range.isEmpty()) return false;
         if (!range.startsWith("^")) return compare(version, range) == 0;
         String base = range.substring(1);
         int[] b = parts(base), v = parts(version);
