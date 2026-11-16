@@ -4,6 +4,7 @@
 /* The app's own sources only: each module generates its utilities (modules/<id>/module.css). */
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "../core";
+/* the hub-ui at the root: a single copy (the SDK admits the app's version), else its classes are those of another */
 @source "../../../node_modules/@cxxi-lab/hub-ui/src";
 @source "../shared";
 @source "../platform";
