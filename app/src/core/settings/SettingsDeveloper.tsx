@@ -1,38 +1,6 @@
 import { useState } from 'react'
 import { Switch } from '@cxxi-lab/hub-ui'
 import { setDeveloperMode, useDeveloperMode } from '@core/settings/developer'
-import { isLocalFirst, localFirstAvailable, setLocalFirst } from '@core/sync/mode'
-import { isInstalled, MODULE_MANIFESTS } from '@core/module/registry'
-import { useHiddenModules, useRevealedModules } from '@core/privacy/hidden'
-
-/** The modules the local-first trial covers (docs/plan-local-first.md § 6); every module with data migrated (core/sync/mode.ts). */
-const LOCAL_FIRST_TRIAL: Array<{ id: string, label: string }> = []
-
-function LocalFirstTrial() {
-	const [, refresh] = useState(0)
-	const hidden = useHiddenModules()
-	const revealed = useRevealedModules()
-	// installed here, and shown: a hidden module isn't named here either
-	const modules = LOCAL_FIRST_TRIAL.filter(m => MODULE_MANIFESTS.some(x => x.id === m.id && isInstalled(x)) && (!hidden.includes(m.id) || revealed.includes(m.id)))
-	if (!localFirstAvailable() || modules.length === 0) return null
-	return (
-		<section className="bg-steel-900 border border-steel-700 rounded-md p-5 flex flex-col gap-3">
-			<div>
-				<h2 className="m-0 mb-1 text-sm font-semibold text-white uppercase tracking-wider">Local-first (trial)</h2>
-				<p className="m-0 text-xs text-steel-300">
-					The module's data in this device's base, synced with your other devices through the server, which only relays it encrypted. During the trial the server's copy is kept up to date too; writes made on a device not in the trial don't come back here. The app reloads when switched.
-				</p>
-			</div>
-			{modules.map(m => (
-				<div key={m.id} className="flex items-center gap-4">
-					<span className="flex-1 text-sm text-white">{m.label}</span>
-					<Switch checked={isLocalFirst(m.id)} onChange={next => { setLocalFirst(m.id, next); refresh(n => n + 1) }}
-						title={isLocalFirst(m.id) ? `Back to the server for ${m.label}` : `${m.label} local-first on this device`} />
-				</div>
-			))}
-		</section>
-	)
-}
 
 export function SettingsDeveloper() {
 	const on = useDeveloperMode()
@@ -55,7 +23,6 @@ export function SettingsDeveloper() {
 				</div>
 				<Switch checked={on} onChange={change} title={on ? 'Turn developer mode off' : 'Turn developer mode on'} />
 			</section>
-			<LocalFirstTrial />
 		</div>
 	)
 }

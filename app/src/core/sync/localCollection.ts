@@ -2,7 +2,7 @@ import { ApiError } from '@core/api/client'
 import { modelsOf, type ModelFile } from '@core/crypto/documents'
 import { uuidv7 } from '@core/crypto/format'
 import type { BatchOperation, CollectionPage, CollectionQuery, FilterValue, HubbyDocument } from '@core/hubby/collections'
-import { engine, mirror, type ModuleSync } from './engine'
+import { engine, type ModuleSync } from './engine'
 import { parse } from './hlc'
 import type { DocState, FieldValue } from './replica'
 import { decode, InvalidDocument } from './validate'
@@ -124,13 +124,12 @@ export function localCollection<T extends object>(module: string, name: string) 
 		}
 	}
 
-	const write = async (e: ModuleSync, id: string, data: Record<string, unknown>, existed: boolean): Promise<D> => {
+	const write = async (e: ModuleSync, id: string, data: Record<string, unknown>): Promise<D> => {
 		const { id: _id, _createdAt, _updatedAt, _version, ...fields } = data
 		void _id; void _createdAt; void _updatedAt; void _version
 		checkUnique(e, id, fields)
-		const op = e.replica.put(name, id, fields, model()?.version)
+		e.replica.put(name, id, fields, model()?.version)
 		e.wrote()
-		void mirror(module, op, existed)
 		return found(e, id) as D
 	}
 
@@ -143,17 +142,17 @@ export function localCollection<T extends object>(module: string, name: string) 
 				if (pointing.length === 0) continue
 				if (spec.onDelete === 'restrict') throw new ApiError(409, `Still used by ${collection}`)
 				for (const doc of pointing) {
-					const op = spec.onDelete === 'cascade' ? e.replica.delete(collection, doc.id) : e.replica.put(collection, doc.id, { [field]: null })
-					void mirror(module, op, true)
+					if (spec.onDelete === 'cascade') e.replica.delete(collection, doc.id)
+					else e.replica.put(collection, doc.id, { [field]: null })
 				}
 			}
 		}
-		const op = e.replica.delete(name, id)
+		e.replica.delete(name, id)
 		e.wrote()
-		void mirror(module, op, true)
 	}
 
 	return {
+		/** One page (`limit`: 1–200, default 50). */
 		async find(q: CollectionQuery = {}): Promise<CollectionPage<D>> {
 			const e = await sync()
 			const list = sorted(all(e).filter(d => matches(d, q.filter)), q.sort)
@@ -162,6 +161,7 @@ export function localCollection<T extends object>(module: string, name: string) 
 			const page = list.slice(start, start + limit)
 			return { data: page as D[], next: start + limit < list.length ? String(start + limit) : null }
 		},
+		/** Every document matching. */
 		async findAll(q: Omit<CollectionQuery, 'cursor' | 'limit'> = {}): Promise<D[]> {
 			const e = await sync()
 			return sorted(all(e).filter(d => matches(d, q.filter)), q.sort) as D[]
@@ -172,29 +172,33 @@ export function localCollection<T extends object>(module: string, name: string) 
 		async create(data: Partial<T>): Promise<D> {
 			return this.createWithId(uuidv7(), data)
 		},
+		/** A new document under an id chosen by the module (a fixed id: two devices make the same one). */
 		async createWithId(id: string, data: Partial<T>): Promise<D> {
 			const e = await sync()
 			if (one(e, id)) throw new ApiError(409, 'A document already has this id')
-			return write(e, id, complete(data as Record<string, unknown>, true), false)
+			return write(e, id, complete(data as Record<string, unknown>, true))
 		},
+		/** The given fields; `version`: refused (409) if the document changed since. */
 		async update(id: string, data: Partial<T>, version?: number): Promise<D> {
 			const e = await sync()
 			const current = found(e, id)
 			if (version !== undefined && version !== current._version) throw new ApiError(409, 'The document changed since')
-			return write(e, id, complete(data as Record<string, unknown>, false), true)
+			return write(e, id, complete(data as Record<string, unknown>, false))
 		},
+		/** The whole document (the fields not given are emptied). */
 		async replace(id: string, data: T): Promise<D> {
 			const e = await sync()
 			found(e, id)
 			// the fields not given are emptied
 			const emptied = Object.fromEntries(Object.keys(model()?.fields ?? {}).map(f => [f, null]))
-			return write(e, id, complete({ ...emptied, ...(data as Record<string, unknown>) }, true), true)
+			return write(e, id, complete({ ...emptied, ...(data as Record<string, unknown>) }, true))
 		},
 		async remove(id: string): Promise<void> {
 			const e = await sync()
 			found(e, id)
 			await removeWithReferences(e, id)
 		},
+		/** Several operations, in order. */
 		async batch(operations: BatchOperation<T>[]): Promise<Array<D | null>> {
 			const out: Array<D | null> = []
 			for (const op of operations) {

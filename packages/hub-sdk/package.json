@@ -1,6 +1,6 @@
 {
 	"name": "@cxxi-lab/hub-sdk",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "The contract of hub's modules: the SDK a module builds on (provided by the host app at run time), and the SDK of the modules running isolated in their frame.",
 	"license": "MIT",
 	"type": "module",

@@ -221,7 +221,7 @@ async function fromSources(): Promise<ModuleManifest[]> {
 	const models = import.meta.glob<ModelFile>('@hub-modules/*/models/*.json', { import: 'default', eager: true })
 	for (const [path, model] of Object.entries(models)) {
 		const id = path.split('/').at(-3)!
-		registerModels(id, [model], Object.values(infos).find(i => i.id === id)?.formerly)
+		registerModels(id, [model])
 	}
 	const modules = await Promise.all(Object.values(entries).map(load => load()))
 	const manifests = modules.map(manifestOf).filter((m): m is ModuleManifest => m !== null)
@@ -271,11 +271,11 @@ async function fromBundles(): Promise<ModuleManifest[]> {
  * its code can write any. An entry from before the `models` flag: asked anyway, absent then.
  */
 async function loadModels(entry: ModuleDeclaration & { models?: boolean }): Promise<void> {
-	const { id, models, formerly } = entry
+	const { id, models } = entry
 	declareModule(entry)
 	if (models === false) return
 	const res = await fetch(new URL(`modules/${id}/models.json`, document.baseURI)).catch(() => null)
-	if (res?.ok) registerModels(id, await res.json() as Record<string, ModelFile>, formerly)
+	if (res?.ok) registerModels(id, await res.json() as Record<string, ModelFile>)
 	else if (models) throw new Error(`${id}: its models are missing`)
 }
 
