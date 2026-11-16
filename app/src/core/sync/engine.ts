@@ -2,7 +2,7 @@ import { platform } from '@platform'
 import { api, TunnelDownError } from '@core/api/client'
 import { requireDataKeys } from '@core/crypto/dataKey'
 import { open, seal } from '@core/crypto/format'
-import { encryptsAtRest, formerlyOf } from '@core/module/declarations'
+import { encryptsAtRest, formerlyOf } from '@core/hubby/declarations'
 import { uuidv7 } from '@core/crypto/format'
 import { onSyncEvent } from '@core/notifications/notifications'
 import { account } from '@core/storage/account'
@@ -44,16 +44,16 @@ function deviceId(): string {
 	return id
 }
 
-const engines = new Map<string, ModuleSync>()
+const engines = new Map<string, HubbySync>()
 
 /** The module's engine, started on first use. */
-export function engine(module: string): ModuleSync {
+export function engine(module: string): HubbySync {
 	let found = engines.get(module)
-	if (!found) engines.set(module, found = new ModuleSync(module))
+	if (!found) engines.set(module, found = new HubbySync(module))
 	return found
 }
 
-export class ModuleSync {
+export class HubbySync {
 	readonly ready: Promise<void>
 	readonly device = deviceId()
 	replica!: Replica

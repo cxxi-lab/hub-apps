@@ -7,7 +7,7 @@ const isDev = !app.isPackaged
 
 let settingsWindow: BrowserWindow | null = null
 
-/** A screen to open on (e.g. 'modules/mail'), else wherever the window is. */
+/** A screen to open on (e.g. 'hubbies/mail'), else wherever the window is. */
 const TARGET = /^[a-z0-9-]+(\/[a-z0-9-]+)?$/
 
 export function openSettingsWindow(target?: string): void {

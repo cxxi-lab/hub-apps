@@ -1,10 +1,10 @@
 import { localCollection } from '@core/sync/localCollection'
 
 /**
- * A module's declared collection (docs/spec-module.md § 5): the current account's documents, kept
+ * A hubby's declared collection (docs/spec-hubby.md § 5): the current account's documents, kept
  * on this device and synced through the server, which only relays them sealed
- * (docs/plan-local-first.md, core/sync). For the modules running in the app; an isolated hubby gets
- * the same through its host (@cxxi-lab/hub-sdk/frame, packages/hub-sdk/frame/sdk.ts).
+ * (docs/plan-local-first.md, core/sync). For the hubbies running in the app; an isolated hubby gets
+ * the same through its host (@cxxi-lab/hubbyware-sdk/frame, packages/hubbyware-sdk/frame/sdk.ts).
  */
 
 /** What the platform adds to every document. */
@@ -38,7 +38,7 @@ export type BatchOperation<T> =
 	| { op: 'update', id: string, data: Partial<T>, version?: number }
 	| { op: 'delete', id: string }
 
-/** One of a module's collections. `T`: its declared fields (the platform's are added). */
-export function collection<T extends object>(module: string, name: string) {
-	return localCollection<T>(module, name)
+/** One of a hubby's collections. `T`: its declared fields (the platform's are added). */
+export function collection<T extends object>(hubby: string, name: string) {
+	return localCollection<T>(hubby, name)
 }

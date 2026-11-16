@@ -1,11 +1,11 @@
 import { hideAll, reveal } from '@core/privacy/hidden'
-import { MODULE_MANIFESTS } from '@core/module/registry'
+import { HUBBY_MANIFESTS } from '@core/hubby/registry'
 import { registerCommand } from './registry'
 
 registerCommand({
 	name: 'reveal',
 	usage: '<keys>',
-	description: 'reveal the hidden modules these keys open (their shortcut, Ctrl+Alt + keys on a keyboard)',
+	description: 'reveal the hidden hubbies these keys open (their shortcut, Ctrl+Alt + keys on a keyboard)',
 	async run(args) {
 		const keys = (args[0] ?? '').toLowerCase()
 		if (!keys) return 'usage: /reveal <keys>'
@@ -17,7 +17,7 @@ registerCommand({
 registerCommand({
 	name: 'hide',
 	usage: '',
-	description: 'hide the revealed modules again (Ctrl+Alt+Q)',
+	description: 'hide the revealed hubbies again (Ctrl+Alt+Q)',
 	run() {
 		hideAll()
 		return 'hidden'
@@ -26,13 +26,13 @@ registerCommand({
 
 registerCommand({
 	name: 'settings',
-	usage: '<module>',
-	description: "open a module's settings, a hidden one's too (its Privacy: the shortcut, with the password)",
+	usage: '<hubby>',
+	description: "open a hubby's settings, a hidden one's too (its Privacy: the shortcut, with the password)",
 	run(args) {
 		const id = (args[0] ?? '').toLowerCase()
-		if (!id) return 'usage: /settings <module>'
-		if (!MODULE_MANIFESTS.some(m => m.id === id)) return `no module "${id}"`
-		window.location.hash = `#/modules/${id}`
+		if (!id) return 'usage: /settings <hubby>'
+		if (!HUBBY_MANIFESTS.some(m => m.id === id)) return `no hubby "${id}"`
+		window.location.hash = `#/hubbies/${id}`
 		return `${id} settings`
 	}
 })

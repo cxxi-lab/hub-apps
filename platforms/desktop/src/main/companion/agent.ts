@@ -73,7 +73,7 @@ function instruction(userName: string, last: CompanionMessage | undefined, pendi
 
 /**
  * Lets the companion write first, at random moments, while the engine is on — whether or
- * not the private module is visible (messages wait as unread until the user opens it).
+ * not the private hubby is visible (messages wait as unread until the user opens it).
  */
 export class Agent {
 	private timer: NodeJS.Timeout | null = null

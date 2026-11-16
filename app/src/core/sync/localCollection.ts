@@ -2,7 +2,7 @@ import { ApiError } from '@core/api/client'
 import { modelsOf, type ModelFile } from '@core/crypto/documents'
 import { uuidv7 } from '@core/crypto/format'
 import type { BatchOperation, CollectionPage, CollectionQuery, FilterValue, HubbyDocument } from '@core/hubby/collections'
-import { engine, type ModuleSync } from './engine'
+import { engine, type HubbySync } from './engine'
 import { parse } from './hlc'
 import type { DocState, FieldValue } from './replica'
 import { decode, InvalidDocument } from './validate'
@@ -85,15 +85,15 @@ function sorted(docs: Doc[], sort = '-_updatedAt'): Doc[] {
 
 export function localCollection<T extends object>(module: string, name: string) {
 	type D = T & HubbyDocument
-	const sync = (): Promise<ModuleSync> => { const e = engine(module); return e.ready.then(() => e) }
+	const sync = (): Promise<HubbySync> => { const e = engine(module); return e.ready.then(() => e) }
 	const model = (): ModelFile | undefined => modelsOf(module).get(name)
 
-	const all = (e: ModuleSync): Doc[] => e.replica.list(name).map(({ id, data, state }) => toDoc(id, data, state))
-	const one = (e: ModuleSync, id: string): Doc | null => {
+	const all = (e: HubbySync): Doc[] => e.replica.list(name).map(({ id, data, state }) => toDoc(id, data, state))
+	const one = (e: HubbySync, id: string): Doc | null => {
 		const data = e.replica.get(name, id)
 		return data ? toDoc(id, data, e.replica.state(name, id)!) : null
 	}
-	const found = (e: ModuleSync, id: string): Doc => {
+	const found = (e: HubbySync, id: string): Doc => {
 		const doc = one(e, id)
 		if (!doc) throw new ApiError(404, 'No such document')
 		return doc
@@ -113,7 +113,7 @@ export function localCollection<T extends object>(module: string, name: string) 
 	}
 
 	/** The model's unique indexes, among the documents on this device. */
-	const checkUnique = (e: ModuleSync, id: string, fields: Record<string, unknown>): void => {
+	const checkUnique = (e: HubbySync, id: string, fields: Record<string, unknown>): void => {
 		const merged = { ...(e.replica.get(name, id) ?? {}), ...fields }
 		for (const index of model()?.indexes ?? []) {
 			if (!index.unique) continue
@@ -124,7 +124,7 @@ export function localCollection<T extends object>(module: string, name: string) 
 		}
 	}
 
-	const write = async (e: ModuleSync, id: string, data: Record<string, unknown>): Promise<D> => {
+	const write = async (e: HubbySync, id: string, data: Record<string, unknown>): Promise<D> => {
 		const { id: _id, _createdAt, _updatedAt, _version, ...fields } = data
 		void _id; void _createdAt; void _updatedAt; void _version
 		checkUnique(e, id, fields)
@@ -134,7 +134,7 @@ export function localCollection<T extends object>(module: string, name: string) 
 	}
 
 	/** A deletion, and what the models say it does to the documents pointing at it. */
-	const removeWithReferences = async (e: ModuleSync, id: string): Promise<void> => {
+	const removeWithReferences = async (e: HubbySync, id: string): Promise<void> => {
 		for (const [collection, other] of modelsOf(module)) {
 			for (const [field, spec] of Object.entries(other.fields)) {
 				if (spec.type !== 'ref' || spec.collection !== name) continue

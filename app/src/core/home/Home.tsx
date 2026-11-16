@@ -2,29 +2,29 @@ import type { KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCube } from '@fortawesome/free-solid-svg-icons'
-import { useModules } from '@core/contexts/ModulesContext'
-import { INSTALLS, isComingSoon, isInstalled, MODULE_MANIFESTS, moduleHomePath, useRegistry, type InstallState } from '@core/module/registry'
-import type { ModuleManifest } from '@core/module/types'
+import { useHubbies } from '@core/contexts/HubbiesContext'
+import { INSTALLS, isComingSoon, isInstalled, HUBBY_MANIFESTS, hubbyHomePath, useRegistry, type InstallState } from '@core/hubby/registry'
+import type { HubbyManifest } from '@core/hubby/types'
 
-/** The home page: the enabled modules as cards, in their order (pinning one to the top bar: its settings). */
+/** The home page: the enabled hubbies as cards, in their order (pinning one to the top bar: its settings). */
 export function Home() {
-	const modules = useModules()
+	const hubbies = useHubbies()
 	useRegistry()
-	// enabled modules on their way to this device (shown once installed)
-	const installing = MODULE_MANIFESTS.filter(m => !isInstalled(m) && INSTALLS.has(m.id))
+	// enabled hubbies on their way to this device (shown once installed)
+	const installing = HUBBY_MANIFESTS.filter(m => !isInstalled(m) && INSTALLS.has(m.id))
 
 	return (
 		<div className="flex-1 min-h-0 overflow-y-auto">
 			<div className="max-w-[70rem] px-20 max-lg:px-10 max-sm:px-4">
 				<ul className="mt-12 mb-12 max-sm:mt-4 p-0 list-none grid grid-cols-2 gap-3 sm:gap-6">
-					{modules.filter(m => !isComingSoon(m)).map(m => (
+					{hubbies.filter(m => !isComingSoon(m)).map(m => (
 						<li key={m.id}>
-							<ModuleCard module={m} />
+							<HubbyCard hubby={m} />
 						</li>
 					))}
 					{installing.map(m => (
 						<li key={m.id}>
-							<ModuleCard module={m} install={INSTALLS.get(m.id)} />
+							<HubbyCard hubby={m} install={INSTALLS.get(m.id)} />
 						</li>
 					))}
 				</ul>
@@ -35,12 +35,12 @@ export function Home() {
 
 // The cards of the first hub's product pages: a primary tile, no border, a lift on hover (shadow-raised).
 
-function ModuleCard({ module: m, install }: { module: ModuleManifest, install?: InstallState }) {
+function HubbyCard({ hubby: m, install }: { hubby: HubbyManifest, install?: InstallState }) {
 	const navigate = useNavigate()
 	const soon = isComingSoon(m) || !!install
 	const badge = install?.phase === 'installing' ? 'Installing…' : install?.phase === 'error' ? 'Install failed' : 'Coming soon'
 
-	const open = () => { if (!soon) navigate(moduleHomePath(m)) }
+	const open = () => { if (!soon) navigate(hubbyHomePath(m)) }
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
 		if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
 		e.preventDefault()

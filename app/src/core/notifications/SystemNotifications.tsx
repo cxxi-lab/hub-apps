@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { platform } from '@platform'
-import { useModules } from '@core/contexts/ModulesContext'
+import { useHubbies } from '@core/contexts/HubbiesContext'
 import { useNotifications } from '@core/notifications/notifications'
 import { registerPushDevice } from '@core/notifications/push'
 
@@ -12,7 +12,7 @@ import { registerPushDevice } from '@core/notifications/push'
  */
 export function SystemNotifications() {
 	const navigate = useNavigate()
-	const modules = useModules()
+	const modules = useHubbies()
 	const all = useNotifications()
 	const api = platform.systemNotifications
 

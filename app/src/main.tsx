@@ -9,9 +9,9 @@ import { AudioMutedProvider } from '@core/contexts/AudioMutedContext'
 import { DevModeProvider } from '@core/contexts/DevModeContext'
 import { AboutApp } from '@core/windows/AboutApp'
 import { UpdateApp, UpdateGate } from '@core/windows/UpdateApp'
-import { loadModules, MODULE_MANIFESTS } from '@core/module/registry'
+import { loadHubbies, HUBBY_MANIFESTS } from '@core/hubby/registry'
 import { SettingsApp } from '@core/settings/SettingsApp'
-import { handleBack } from '@cxxi-lab/hub-ui'
+import { handleBack } from '@cxxi-lab/hubbyware-ui'
 import { initBaseUrl } from '@core/api/baseUrl'
 import { bootAuth } from '@core/auth/authState'
 import { platform } from '@platform'
@@ -28,8 +28,8 @@ const windowKind = new URLSearchParams(window.location.search).get('window')
 
 const root = createRoot(document.getElementById('app')!)
 
-// The modules first: every window lists or renders them.
-loadModules().then(render)
+// The hubbies first: every window lists or renders them.
+loadHubbies().then(render)
 
 function render(): void {
 	if (windowKind === 'settings') {
@@ -41,14 +41,14 @@ function render(): void {
 			)
 		})
 	}
-	else if (windowKind === 'module') {
-		// A module's own window (ModuleManifest.windows), opened by the desktop for an active module.
+	else if (windowKind === 'hubby') {
+		// A hubby's own window (HubbyManifest.windows), opened by the desktop for an active hubby.
 		const params = new URLSearchParams(window.location.search)
-		const Window = MODULE_MANIFESTS.find(m => m.id === params.get('module'))?.windows?.find(w => w.id === params.get('id'))?.Component
+		const Window = HUBBY_MANIFESTS.find(m => m.id === params.get('hubby'))?.windows?.find(w => w.id === params.get('id'))?.Component
 		initBaseUrl().then(() => {
 			root.render(
 				<StrictMode>
-					{Window ? <Window /> : <div className="p-6 text-sm text-steel-300">This window belongs to a module that is not installed.</div>}
+					{Window ? <Window /> : <div className="p-6 text-sm text-steel-300">This window belongs to a hubby that is not installed.</div>}
 				</StrictMode>
 			)
 		})

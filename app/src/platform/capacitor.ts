@@ -1,11 +1,11 @@
 import { registerPlugin } from '@capacitor/core'
 import type { CompanionApi, NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions, NativePlayerPanel, Platform, PushApi, PlatformCapabilities, Unsubscribe, VpnInfo, WebsiteIntegration } from './types'
-import { checkModuleUpdates, createModuleStore, startModuleUpdates } from './capacitorModules'
+import { checkHubbyUpdates, createHubbyStore, startHubbyUpdates } from './capacitorHubbies'
 import { createUpdater } from './capacitorUpdater'
 import { createLocalStore } from './capacitorLocalStore'
 
 // Capacitor (Android) adapter. The mobile shell is a second client of the
-// server modules; the desktop-only surfaces (AI companion, embedded browser,
+// server hubbies; the desktop-only surfaces (AI companion, embedded browser,
 // native windows) are absent and advertised as such through `capabilities`, so
 // the UI hides them and never calls into them. The VPN (embedded WireGuard
 // tunnel), the video player (fullscreen native WebView) and the website
@@ -33,7 +33,7 @@ function unavailable(feature: string): never {
 	throw new Error(`[platform:capacitor] ${feature} is not available on mobile`)
 }
 
-// The companion is desktop-only; capabilities.companion is false so the module
+// The companion is desktop-only; capabilities.companion is false so the hubby
 // is hidden and these are never reached. They throw rather than lie, to catch a
 // missing capability check during development.
 const companion: CompanionApi = new Proxy({} as CompanionApi, {
@@ -126,7 +126,7 @@ const player: NativePlayerApi = {
 }
 
 /**
- * The hidden modules revealed this session live in memory, like desktop's main-process list: forgotten
+ * The hidden hubbies revealed this session live in memory, like desktop's main-process list: forgotten
  * when the app restarts. No keyboard on a phone: the /reveal command reveals.
  */
 function createRevealed() {
@@ -150,10 +150,10 @@ function createRevealed() {
 export function createCapacitorPlatform(): Platform {
 	const revealed = createRevealed()
 	const updater = createUpdater()
-	startModuleUpdates()
+	startHubbyUpdates()
 	// /releases/ is public (signed): checked at once, the periodic check covers the rest
 	void updater.check()
-	void checkModuleUpdates()
+	void checkHubbyUpdates()
 
 	return {
 		name: 'capacitor',
@@ -171,9 +171,9 @@ export function createCapacitorPlatform(): Platform {
 		notifyAuthState: noop,
 		persistSession: () => { void Session.flush() },
 
-		getRevealedModules: () => Promise.resolve(revealed.value),
-		setRevealedModules: ids => revealed.set(ids),
-		onRevealedModulesChange: cb => revealed.subscribe(cb),
+		getRevealedHubbies: () => Promise.resolve(revealed.value),
+		setRevealedHubbies: ids => revealed.set(ids),
+		onRevealedHubbiesChange: cb => revealed.subscribe(cb),
 
 		getDeviceSecret: name => DeviceSecrets.get({ name }).then(r => r.value ?? null),
 		setDeviceSecret: (name, value) => DeviceSecrets.set({ name, value }),
@@ -197,14 +197,15 @@ export function createCapacitorPlatform(): Platform {
 		openSettings: async target => { window.location.hash = `#/settings${target ? `/${target}` : ''}` },
 		authorizeOAuth: () => unavailable('authorizeOAuth'),
 		onSettingsGoto: () => () => {},
-		openModuleWindow: () => unavailable('openModuleWindow'),
-		registerModuleWindows: async () => {},
+		openHubbyWindow: () => unavailable('openHubbyWindow'),
+		openModuleWindow: () => unavailable('openHubbyWindow'),
+		registerHubbyWindows: async () => {},
 		systemNotifications: null,
 		push,
 		localStore: createLocalStore(),
-		moduleStore: import.meta.env.DEV ? null : createModuleStore(),
-		// served by the WebView (ModuleStore intercepts these hosts)
-		hubbyUrl: module => `https://${module}.hubby.localhost/`,
+		hubbyStore: import.meta.env.DEV ? null : createHubbyStore(),
+		// served by the WebView (HubbyStore intercepts these hosts)
+		hubbyUrl: hubby => `https://${hubby}.hubby.localhost/`,
 		openAbout: () => unavailable('openAbout'),
 
 		getAppVersion: () => updater.getCurrentVersion(),

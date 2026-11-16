@@ -80,9 +80,9 @@ export interface CompanionMessage {
 	replyId: number | null
 }
 
-/** A module's window as the host knows it (its component stays in the module). */
-export interface ModuleWindowInfo {
-	moduleId: string
+/** A hubby's window as the host knows it (its component stays in the hubby). */
+export interface HubbyWindowInfo {
+	hubbyId: string
 	id: string
 	title: string
 	width?: number
@@ -94,10 +94,10 @@ export interface ModuleWindowInfo {
 export type Unsubscribe = () => void
 
 /**
- * A module as published or installed: its catalogue entry (app/scripts/build-modules.mjs), enough
+ * A hubby as published or installed: its catalogue entry (app/scripts/build-hubbies.mjs), enough
  * to list it before it is installed.
  */
-export interface ModulePackage {
+export interface HubbyPackage {
 	id: string
 	version: string
 	/** the SDK range it needs (^x.y.z) */
@@ -115,11 +115,11 @@ export interface ModulePackage {
 }
 
 /**
- * A restricted module (offered only to the accounts given it), as the server lists it for this
+ * A restricted hubby (offered only to the accounts given it), as the server lists it for this
  * account: its catalogue entry (JSON, with its files) signed alone with the update key, and a
  * signed, expiring URL per file.
  */
-export interface RestrictedModulePackage {
+export interface RestrictedHubbyPackage {
 	entry: string
 	/** base64 */
 	signature: string
@@ -129,34 +129,34 @@ export interface RestrictedModulePackage {
 }
 
 /**
- * A key allowed to sign one module's entries (a third party's): `certificate` is the JSON text
- * {"module": <id>, "key": <its Ed25519 public key, SPKI DER, base64>}, `signature` the official
- * key's (base64). Trusted for that module only.
+ * A key allowed to sign one hubby's entries (a third party's): `certificate` is the JSON text
+ * {"hubby": <id>, "key": <its Ed25519 public key, SPKI DER, base64>}, `signature` the official
+ * key's (base64). Trusted for that hubby only.
  */
 export interface PublisherCertificate {
 	certificate: string
 	signature: string
 }
 
-/** The modules of this device: installed from the server's catalogue (signed), on demand. */
-export interface ModuleStoreApi {
+/** The hubbies of this device: installed from the server's catalogue (signed), on demand. */
+export interface HubbyStoreApi {
 	/**
-	 * The modules this app can have, one entry each: the installed ones, and the published ones
+	 * The hubbies this app can have, one entry each: the installed ones, and the published ones
 	 * compatible with this app (the newest). Without the server (VPN down), the installed ones and
 	 * the last catalogue read.
 	 */
-	list(): Promise<{ modules: ModulePackage[]; installed: string[] }>
-	/** Installs a module (its newest compatible version), usable at once. Already installed: at once. */
-	install(id: string): Promise<ModulePackage>
-	/** Removes a module's files from this device (a loaded one stays until the app restarts). */
+	list(): Promise<{ hubbies: HubbyPackage[]; installed: string[] }>
+	/** Installs a hubby (its newest compatible version), usable at once. Already installed: at once. */
+	install(id: string): Promise<HubbyPackage>
+	/** Removes a hubby's files from this device (a loaded one stays until the app restarts). */
 	uninstall(id: string): Promise<void>
 	/**
-	 * The restricted modules this account was given (the server's list, renderer side: it needs the
+	 * The restricted hubbies this account was given (the server's list, renderer side: it needs the
 	 * session): the store checks each signature, lists and installs them like the others.
 	 */
-	setRestricted(modules: RestrictedModulePackage[]): Promise<void>
+	setRestricted(hubbies: RestrictedHubbyPackage[]): Promise<void>
 	/**
-	 * The newer versions already downloaded than what runs ("id version"). A module's version is
+	 * The newer versions already downloaded than what runs ("id version"). A hubby's version is
 	 * decided at start; these wait for activate() (or the next start).
 	 */
 	pending(): Promise<string[]>
@@ -185,7 +185,7 @@ export interface SystemNotificationsApi {
 	onOpen(cb: (link: string) => void): Unsubscribe
 }
 
-/** A document of a module's store (docs/plan-module-storage.md), local or on the server. */
+/** A document of a hubby's store (docs/plan-hubby-storage.md), local or on the server. */
 export interface StoredDocument {
 	collection: string
 	id: string
@@ -195,16 +195,16 @@ export interface StoredDocument {
 }
 
 /**
- * The device's base for the modules' data (SQLite: desktop in the main process, Android a plugin),
+ * The device's base for the hubbies' data (SQLite: desktop in the main process, Android a plugin),
  * where the local-first sync keeps them (core/sync). Every call names the account (a hash), the
- * module and the scope.
+ * hubby and the scope.
  */
 export interface LocalStoreApi {
-	list(account: string, module: string, scope: string, collection?: string): Promise<StoredDocument[]>
-	get(account: string, module: string, scope: string, collection: string, id: string): Promise<StoredDocument | null>
-	put(account: string, module: string, scope: string, documents: StoredDocument[]): Promise<void>
-	delete(account: string, module: string, scope: string, collection: string, id: string): Promise<void>
-	purge(account: string, module: string, scope: string): Promise<void>
+	list(account: string, hubby: string, scope: string, collection?: string): Promise<StoredDocument[]>
+	get(account: string, hubby: string, scope: string, collection: string, id: string): Promise<StoredDocument | null>
+	put(account: string, hubby: string, scope: string, documents: StoredDocument[]): Promise<void>
+	delete(account: string, hubby: string, scope: string, collection: string, id: string): Promise<void>
+	purge(account: string, hubby: string, scope: string): Promise<void>
 }
 
 /**
@@ -220,7 +220,7 @@ export interface PushApi {
 
 /**
  * The AI companion. Desktop-only today (local Ollama); a shell without it
- * reports `capabilities.companion === false` and the UI hides the module.
+ * reports `capabilities.companion === false` and the UI hides the hubby.
  */
 export interface CompanionApi {
 	getEngine(): Promise<CompanionEngineInfo>
@@ -317,7 +317,7 @@ export interface PlatformCapabilities {
 	companion: boolean
 	/** integrated WireGuard tunnel controllable from the UI */
 	vpn: boolean
-	/** modules hidden behind a reveal shortcut (Privacy) */
+	/** hubbies hidden behind a reveal shortcut (Privacy) */
 	privateMode: boolean
 	/** in-app self-update */
 	updates: boolean
@@ -368,10 +368,10 @@ export interface Platform {
 	persistSession(): void
 
 	/**
-	 * The hidden modules revealed this session (Privacy: their shortcut), shared by the app's
+	 * The hidden hubbies revealed this session (Privacy: their shortcut), shared by the app's
 	 * windows; forgotten at restart. Hidden again all at once by Ctrl+Alt+Q.
 	 */
-	getRevealedModules(): Promise<string[]>
+	getRevealedHubbies(): Promise<string[]>
 	/**
 	 * A secret kept by this device only, encrypted by the system (desktop: the OS keyring through
 	 * safeStorage; Android: the Keystore): the account's data key (core/crypto). null: none.
@@ -380,8 +380,8 @@ export interface Platform {
 	/** null: forgotten. */
 	setDeviceSecret(name: string, value: string | null): Promise<void>
 
-	setRevealedModules(ids: string[]): void
-	onRevealedModulesChange(cb: (ids: string[]) => void): Unsubscribe
+	setRevealedHubbies(ids: string[]): void
+	onRevealedHubbiesChange(cb: (ids: string[]) => void): Unsubscribe
 
 	onWebviewKey(cb: (event: { key: string; ctrl: boolean; alt: boolean }) => void): Unsubscribe
 
@@ -413,10 +413,12 @@ export interface Platform {
 	 * (`redirectUri` + the code), caught before it loads, or null when the window was closed.
 	 */
 	authorizeOAuth(url: string, redirectUri: string): Promise<string | null>
-	/** Opens a module's window (ModuleManifest.windows), registered beforehand. */
-	openModuleWindow(moduleId: string, windowId: string): Promise<void>
-	/** The windows of the active modules: what the app menu offers (replaces the previous list). */
-	registerModuleWindows(windows: ModuleWindowInfo[]): Promise<void>
+	/** Opens a hubby's window (HubbyManifest.windows), registered beforehand. */
+	openHubbyWindow(hubbyId: string, windowId: string): Promise<void>
+	/** @deprecated openHubbyWindow: its SDK 2 name, kept for the hubbies built before the rename */
+	openModuleWindow(hubbyId: string, windowId: string): Promise<void>
+	/** The windows of the active hubbies: what the app menu offers (replaces the previous list). */
+	registerHubbyWindows(windows: HubbyWindowInfo[]): Promise<void>
 	openAbout(): Promise<void>
 
 	getAppVersion(): Promise<string>
@@ -446,11 +448,11 @@ export interface Platform {
 	readonly push: PushApi | null
 	/** null: no local store here (Android, for now): a scope kept local isn't reachable on this device */
 	readonly localStore: LocalStoreApi | null
-	/** null: the modules come from their sources (development), all of them, nothing to install */
-	readonly moduleStore: ModuleStoreApi | null
+	/** null: the hubbies come from their sources (development), all of them, nothing to install */
+	readonly hubbyStore: HubbyStoreApi | null
 	/**
 	 * Where an isolated hubby's frame loads from (its own origin: desktop hubby://<id>/, Android
 	 * https://<id>.hubby.localhost/); null where hubbies can't run isolated (yet).
 	 */
-	hubbyUrl(module: string): string | null
+	hubbyUrl(hubby: string): string | null
 }

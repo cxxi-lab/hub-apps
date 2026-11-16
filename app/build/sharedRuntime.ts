@@ -5,15 +5,17 @@ import { pathToFileURL } from 'node:url'
 import type { Plugin, UserConfig } from 'vite'
 
 /**
- * What the app shares with the module bundles, one instance each: the app build emits them as
- * `shared/<name>.js` entries with their real export names, and a module bundle imports them from
- * there instead of embedding its own copy (see scripts/build-modules.mjs). The SDK is the module
+ * What the app shares with the hubby bundles, one instance each: the app build emits them as
+ * `shared/<name>.js` entries with their real export names, and a hubby bundle imports them from
+ * there instead of embedding its own copy (see scripts/build-hubbies.mjs). The SDK is the hubby
  * contract, the design system its components; the others are the libraries that must stay single (React and its renderers, the
- * router, FontAwesome's React component and core). Icons are embedded by each module.
+ * router, FontAwesome's React component and core). Icons are embedded by each hubby.
  */
-export const SHARED: Record<string, string> = createRequire(import.meta.url)('@cxxi-lab/hub-sdk/shared.json')
+export const SHARED: Record<string, string> = createRequire(import.meta.url)('@cxxi-lab/hubbyware-sdk/shared.json')
 
 const VIRTUAL = 'virtual:hub-shared/'
+/** The packages' names before the rename → their current ones. */
+const FORMER: [string, string][] = [['@cxxi-lab/hub-sdk', '@cxxi-lab/hubbyware-sdk'], ['@cxxi-lab/hub-ui', '@cxxi-lab/hubbyware-ui']]
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 
 /**
@@ -22,12 +24,12 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
  * key the package has.
  */
 /**
- * Where the modules' sources are, for development (the app loads them from there, hot reload):
- * HUB_MODULES_DIR, else src/modules if there is one, else the official hubbies' checkout next to the apps'
- * (repos/hubbies beside repos/client; repos/modules, its former name, still read).
+ * Where the hubbies' sources are, for development (the app loads them from there, hot reload):
+ * HUB_HUBBIES_DIR, else src/hubbies if there is one, else the official hubbies' checkout next to the apps'
+ * (repos/hubbies beside repos/client; repos/hubbies, its former name, still read).
  */
-export function modulesDir(appRoot: string): string {
-	if (process.env.HUB_MODULES_DIR) return resolve(process.env.HUB_MODULES_DIR)
+export function hubbiesDir(appRoot: string): string {
+	if (process.env.HUB_HUBBIES_DIR ?? process.env.HUB_MODULES_DIR) return resolve((process.env.HUB_HUBBIES_DIR ?? process.env.HUB_MODULES_DIR)!)
 	const inside = resolve(appRoot, 'src/modules')
 	if (existsSync(inside)) return inside
 	const next = resolve(appRoot, '../../hubbies')
@@ -37,7 +39,7 @@ export function modulesDir(appRoot: string): string {
 export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNullable<UserConfig['build']>, alias: Record<string, string> } {
 	const require = createRequire(resolve(appRoot, 'package.json'))
 	// ES sources, entries as they are: the SDK (implemented by the app) and the design system
-	const SOURCES: Record<string, string> = { '@cxxi-lab/hub-sdk': resolve(appRoot, 'src/sdk/index.ts'), '@cxxi-lab/hub-ui': '@cxxi-lab/hub-ui' }
+	const SOURCES: Record<string, string> = { '@cxxi-lab/hubbyware-sdk': resolve(appRoot, 'src/sdk/index.ts'), '@cxxi-lab/hubbyware-ui': '@cxxi-lab/hubbyware-ui' }
 	const inputs: Record<string, string> = {}
 	for (const [specifier, name] of Object.entries(SHARED)) {
 		inputs[`shared/${name}`] = SOURCES[specifier] ?? VIRTUAL + specifier
@@ -50,12 +52,12 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 		configResolved(config) {
 			outDir = resolve(config.root, config.build.outDir)
 		},
-		// The app ships no module (each is installed from the catalogue): an empty built-in catalogue
-		// and the SDK version it provides (what a module must fit).
+		// The app ships no hubby (each is installed from the catalogue): an empty built-in catalogue
+		// and the SDK version it provides (what a hubby must fit).
 		async closeBundle() {
-			const { writeBuiltInCatalog } = await import(pathToFileURL(resolve(appRoot, 'scripts/build-modules.mjs')).href)
+			const { writeBuiltInCatalog } = await import(pathToFileURL(resolve(appRoot, 'scripts/build-hubbies.mjs')).href)
 			writeBuiltInCatalog(outDir)
-			// the runtime of the hubbies running isolated (their frames): docs/plan-module-architecture.md § 4 ter
+			// the runtime of the hubbies running isolated (their frames): docs/plan-hubby-architecture.md § 4 ter
 			const { buildHubbyRuntime } = await import(pathToFileURL(resolve(appRoot, 'scripts/build-hubby-runtime.mjs')).href)
 			await buildHubbyRuntime(outDir)
 		},
@@ -77,22 +79,27 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 	// The SDK's package holds its types only: the app is its implementation (dev and build alike;
 	// its subpaths, /frame and /protocol, are the package's own files)
 	const sdk: Plugin = {
-		name: 'hub-sdk-source',
+		name: 'hubbyware-sdk-source',
 		enforce: 'pre',
-		// development: the modules' sources live outside this repository (../../hubbies)
-		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), modulesDir(appRoot)] } } }),
-		resolveId(id) {
-			return id === '@cxxi-lab/hub-sdk' ? SOURCES[id] : null
+		// development: the hubbies' sources live outside this repository (../../hubbies)
+		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), hubbiesDir(appRoot)] } } }),
+		// a hubby's sources from before the rename import the packages by their former names (until
+		// layer 5): the same SDK, the same design system
+		async resolveId(id, importer) {
+			if (id === '@cxxi-lab/hubbyware-sdk' || id === '@cxxi-lab/hub-sdk') return SOURCES['@cxxi-lab/hubbyware-sdk']
+			const former = FORMER.find(([name]) => id === name || id.startsWith(name + '/'))
+			if (former) return this.resolve(former[1] + id.slice(former[0].length), importer, { skipSelf: true })
+			return null
 		}
 	}
 
 	return {
-		alias: { '@hub-modules': modulesDir(appRoot) },
+		alias: { '@hub-hubbies': hubbiesDir(appRoot) },
 		plugin: [sdk, plugin],
 		build: {
 			rollupOptions: {
 				input: { index: resolve(appRoot, 'index.html'), ...inputs },
-				// the shared entries keep their export names: modules import them by name
+				// the shared entries keep their export names: hubbies import them by name
 				preserveEntrySignatures: 'exports-only',
 				output: {
 					entryFileNames: chunk => chunk.name.startsWith('shared/') ? '[name].js' : 'assets/[name]-[hash].js'

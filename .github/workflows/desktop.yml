@@ -38,8 +38,8 @@ jobs:
       - name: Typecheck app
         run: npm run typecheck -w @hub/app
 
-      # Fails on any import crossing a module boundary (see app/scripts/check-boundaries.mjs)
-      - name: Module boundaries
+      # Fails on any import crossing a hubby boundary (see app/scripts/check-boundaries.mjs)
+      - name: Hubby boundaries
         run: npm run check:boundaries -w @hub/app -- --strict
 
       # The SDK's published types match the app's SDK

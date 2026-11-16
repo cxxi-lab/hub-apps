@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, errorMessage } from '@core/api/client'
-import { Button } from '@cxxi-lab/hub-ui'
+import { Button } from '@cxxi-lab/hubbyware-ui'
 import { DataKeySettings } from '@core/crypto/DataKeySettings'
 
 interface TwoFactorState {

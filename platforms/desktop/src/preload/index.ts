@@ -9,9 +9,9 @@ import type {
 	CompanionMessage,
 	CompanionActivity,
 	CompanionLogEntry,
-	ModuleWindowInfo,
-	ModulePackage,
-	RestrictedModulePackage,
+	HubbyWindowInfo,
+	HubbyPackage,
+	RestrictedHubbyPackage,
 	StoredDocument,
 	SystemNotification
 } from '@hub/app/platform'
@@ -35,16 +35,16 @@ const api = {
 		ipcRenderer.send('auth:state-changed', authenticated)
 	},
 
-	getRevealedModules: (): Promise<string[]> => ipcRenderer.invoke('revealed-modules:get'),
+	getRevealedHubbies: (): Promise<string[]> => ipcRenderer.invoke('revealed-hubbies:get'),
 
 	getDeviceSecret: (name: string): Promise<string | null> => ipcRenderer.invoke('device-secret:get', name),
 	setDeviceSecret: (name: string, value: string | null): Promise<void> => ipcRenderer.invoke('device-secret:set', name, value),
 
-	setRevealedModules: (ids: string[]): void => {
-		ipcRenderer.send('revealed-modules:set', ids)
+	setRevealedHubbies: (ids: string[]): void => {
+		ipcRenderer.send('revealed-hubbies:set', ids)
 	},
 
-	onRevealedModulesChange: (cb: (ids: string[]) => void): (() => void) => subscribe<string[]>('revealed-modules:changed', cb),
+	onRevealedHubbiesChange: (cb: (ids: string[]) => void): (() => void) => subscribe<string[]>('revealed-hubbies:changed', cb),
 
 	onWebviewKey: (cb: (event: { key: string; ctrl: boolean; alt: boolean }) => void): (() => void) => {
 		const handler = (_: IpcRendererEvent, payload: { key: string; ctrl: boolean; alt: boolean }) => cb(payload)
@@ -94,16 +94,16 @@ const api = {
 	/** Opens an OAuth consent page; resolves with the redirect URL it ended on (null: closed). */
 	authorizeOAuth: (url: string, redirectUri: string): Promise<string | null> => ipcRenderer.invoke('oauth:authorize', url, redirectUri),
 
-	openModuleWindow: (moduleId: string, windowId: string): Promise<void> => ipcRenderer.invoke('module-window:open', moduleId, windowId),
+	openHubbyWindow: (hubbyId: string, windowId: string): Promise<void> => ipcRenderer.invoke('hubby-window:open', hubbyId, windowId),
 
-	registerModuleWindows: (windows: ModuleWindowInfo[]): Promise<void> => ipcRenderer.invoke('module-windows:register', windows),
+	registerHubbyWindows: (windows: HubbyWindowInfo[]): Promise<void> => ipcRenderer.invoke('hubby-windows:register', windows),
 
 	localStore: {
-		list: (account: string, module: string, scope: string, collection?: string): Promise<StoredDocument[]> => ipcRenderer.invoke('store:list', account, module, scope, collection),
-		get: (account: string, module: string, scope: string, collection: string, id: string): Promise<StoredDocument | null> => ipcRenderer.invoke('store:get', account, module, scope, collection, id),
-		put: (account: string, module: string, scope: string, documents: StoredDocument[]): Promise<void> => ipcRenderer.invoke('store:put', account, module, scope, documents),
-		delete: (account: string, module: string, scope: string, collection: string, id: string): Promise<void> => ipcRenderer.invoke('store:delete', account, module, scope, collection, id),
-		purge: (account: string, module: string, scope: string): Promise<void> => ipcRenderer.invoke('store:purge', account, module, scope)
+		list: (account: string, hubby: string, scope: string, collection?: string): Promise<StoredDocument[]> => ipcRenderer.invoke('store:list', account, hubby, scope, collection),
+		get: (account: string, hubby: string, scope: string, collection: string, id: string): Promise<StoredDocument | null> => ipcRenderer.invoke('store:get', account, hubby, scope, collection, id),
+		put: (account: string, hubby: string, scope: string, documents: StoredDocument[]): Promise<void> => ipcRenderer.invoke('store:put', account, hubby, scope, documents),
+		delete: (account: string, hubby: string, scope: string, collection: string, id: string): Promise<void> => ipcRenderer.invoke('store:delete', account, hubby, scope, collection, id),
+		purge: (account: string, hubby: string, scope: string): Promise<void> => ipcRenderer.invoke('store:purge', account, hubby, scope)
 	},
 
 	systemNotifications: {
@@ -113,13 +113,13 @@ const api = {
 		onOpen: (cb: (link: string) => void): (() => void) => subscribe<string>('system-notifications:open', cb)
 	},
 
-	moduleStore: {
-		list: (): Promise<{ modules: ModulePackage[]; installed: string[] }> => ipcRenderer.invoke('modules:list'),
-		install: (id: string): Promise<ModulePackage> => ipcRenderer.invoke('modules:install', id),
-		uninstall: (id: string): Promise<void> => ipcRenderer.invoke('modules:uninstall', id),
-		setRestricted: (modules: RestrictedModulePackage[]): Promise<void> => ipcRenderer.invoke('modules:restricted', modules),
-		pending: (): Promise<string[]> => ipcRenderer.invoke('modules:pending'),
-		activate: (): Promise<string[]> => ipcRenderer.invoke('modules:activate')
+	hubbyStore: {
+		list: (): Promise<{ hubbies: HubbyPackage[]; installed: string[] }> => ipcRenderer.invoke('hubbies:list'),
+		install: (id: string): Promise<HubbyPackage> => ipcRenderer.invoke('hubbies:install', id),
+		uninstall: (id: string): Promise<void> => ipcRenderer.invoke('hubbies:uninstall', id),
+		setRestricted: (hubbies: RestrictedHubbyPackage[]): Promise<void> => ipcRenderer.invoke('hubbies:restricted', hubbies),
+		pending: (): Promise<string[]> => ipcRenderer.invoke('hubbies:pending'),
+		activate: (): Promise<string[]> => ipcRenderer.invoke('hubbies:activate')
 	},
 
 	openAbout: (): Promise<void> => ipcRenderer.invoke('about:open'),

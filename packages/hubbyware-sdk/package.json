@@ -1,0 +1,38 @@
+{
+	"name": "@cxxi-lab/hubbyware-sdk",
+	"version": "3.0.0",
+	"description": "The contract of Hubbyware's hubbies: the SDK a hubby builds on (provided by the host app at run time), and the SDK of the hubbies running isolated in their frame. Formerly @cxxi-lab/hub-sdk.",
+	"license": "MIT",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./types/index.d.ts"
+		},
+		"./frame": "./frame/index.ts",
+		"./protocol": "./protocol.ts",
+		"./version.json": "./version.json",
+		"./shared.json": "./shared.json",
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"types",
+		"frame",
+		"protocol.ts",
+		"version.json",
+		"LICENSE",
+		"shared.json"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/cxxi-lab/hubbyware-client.git",
+		"directory": "packages/hubbyware-sdk"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"peerDependencies": {
+		"@cxxi-lab/hubbyware-ui": "^0.5.0",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4"
+	}
+}

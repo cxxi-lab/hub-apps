@@ -2,7 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import { getAppMuted } from '../app/state'
 import { stripTrustedTypesCsp } from '../session/sessions'
 
-// Keys forwarded from webviews to the host so the modules' reveal shortcuts (Ctrl+Alt + letters or
+// Keys forwarded from webviews to the host so the hubbies' reveal shortcuts (Ctrl+Alt + letters or
 // digits) and Ctrl+Alt+Q (hide them all) work there too. No native default to suppress (so we
 // always forward, never preventDefault).
 const WEBVIEW_FORWARD_KEY = /^[a-z0-9]$/

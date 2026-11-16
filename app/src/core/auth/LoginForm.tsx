@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { login, loginTwoFactor } from '@core/auth/login'
 import { establishAuthState } from '@core/auth/authState'
 import { get, set } from '@shared/store'
-import { type FormData, Brand, Button, Form, InputField, SpoilerField } from '@cxxi-lab/hub-ui'
+import { type FormData, Brand, Button, Form, InputField, SpoilerField } from '@cxxi-lab/hubbyware-ui'
 
 interface Credentials {
 	email: string

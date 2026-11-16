@@ -11,6 +11,7 @@ import { readEventStream } from '@core/api/stream'
 
 export interface AppNotification {
 	id: number
+	/** the hubby's id (a field of the server's API, named `module` until the routes are reviewed) */
 	module: string
 	/** a state's key (e.g. a mailbox's unread count, updated in place); null: an event */
 	key: string | null
@@ -69,8 +70,8 @@ export function useNotifications(): AppNotification[] {
 }
 
 /** A module's badge: the sum of its notifications' counts (an event counts as one). */
-export function moduleCount(list: AppNotification[], module: string): number {
-	return list.filter(n => n.module === module).reduce((sum, n) => sum + (n.count ?? 1), 0)
+export function hubbyCount(list: AppNotification[], hubby: string): number {
+	return list.filter(n => n.module === hubby).reduce((sum, n) => sum + (n.count ?? 1), 0)
 }
 
 /** Its cross: an event goes, a state hides until it grows. */
@@ -88,13 +89,13 @@ export async function dismissNotification(id: number): Promise<void> {
 
 // --- the menu, opened from elsewhere (a module's badge), on that module's notifications
 
-type Opening = { at: number, module: string | null }
+type Opening = { at: number, hubby: string | null }
 let opening: Opening | null = null
 const openingListeners = new Set<() => void>()
 
 /** Opens the notifications menu, scrolled to a module's when given. */
-export function openNotifications(module: string | null = null): void {
-	opening = { at: Date.now(), module }
+export function openNotifications(hubby: string | null = null): void {
+	opening = { at: Date.now(), hubby }
 	for (const cb of openingListeners) cb()
 }
 

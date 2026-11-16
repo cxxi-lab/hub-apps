@@ -14,13 +14,13 @@ const shared = sharedRuntime(appRoot)
 
 export default defineConfig({
 	main: {
-		// the SDK's version (module manager) is read at build: bundled, not a dependency of the package
-		plugins: [externalizeDepsPlugin({ exclude: ['@cxxi-lab/hub-sdk'] })]
+		// the SDK's version (hubby manager) is read at build: bundled, not a dependency of the package
+		plugins: [externalizeDepsPlugin({ exclude: ['@cxxi-lab/hubbyware-sdk'] })]
 	},
 	preload: {
 		plugins: [externalizeDepsPlugin()],
 		// Windows run sandboxed, and sandboxed preloads must be CommonJS (package is
-		// "type": "module", hence the explicit .cjs extension).
+		// "type": "hubby", hence the explicit .cjs extension).
 		build: {
 			rollupOptions: {
 				output: {

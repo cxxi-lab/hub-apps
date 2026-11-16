@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Module boundaries of the app (see app/src/sdk):
-//  - a module (src/modules/<id>, in development only: the modules have their own repositories) imports
-//    only its own files and packages: the SDK (@cxxi-lab/hub-sdk),
-//    the design system (@cxxi-lab/hub-ui), npm ones;
-//  - nothing outside the modules imports a module, except the module catalogue (core/module/registry).
-// Reports every crossing; with --strict, fails when there is one (CI, once the modules are clean).
+// Hubby boundaries of the app (see app/src/sdk):
+//  - a hubby (src/hubbies/<id>, in development only: the hubbies have their own repositories) imports
+//    only its own files and packages: the SDK (@cxxi-lab/hubbyware-sdk),
+//    the design system (@cxxi-lab/hubbyware-ui), npm ones;
+//  - nothing outside the hubbies imports a hubby, except the hubby catalogue (core/hubby/registry).
+// Reports every crossing; with --strict, fails when there is one (CI, once the hubbies are clean).
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, normalize, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')
 const STRICT = process.argv.includes('--strict')
 const ALIASES = { '@core': 'core', '@shared': 'shared', '@platform': 'platform', '@': '' }
-// Core files allowed to know the modules (to be emptied by the module system, then this list too).
-const CORE_ALLOWED = new Set(['core/module/registry.tsx'])
+// Core files allowed to know the hubbies (to be emptied by the hubby system, then this list too).
+const CORE_ALLOWED = new Set(['core/hubby/registry.tsx'])
 
 function files(dir) {
 	return readdirSync(dir).flatMap(name => {
@@ -56,5 +56,5 @@ for (const [owner, list] of Object.entries(byOwner).sort()) {
 	console.log(`${owner}: ${list.length}`)
 	for (const c of list) console.log(`  ${c.file}  →  ${c.spec}`)
 }
-console.log(crossings.length === 0 ? 'Module boundaries: clean.' : `Module boundaries: ${crossings.length} crossing(s).`)
+console.log(crossings.length === 0 ? 'Hubby boundaries: clean.' : `Hubby boundaries: ${crossings.length} crossing(s).`)
 process.exit(STRICT && crossings.length > 0 ? 1 : 0)

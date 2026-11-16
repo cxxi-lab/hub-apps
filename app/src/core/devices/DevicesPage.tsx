@@ -1,6 +1,6 @@
 import { DevicesList } from './DevicesList'
 
-/** The devices signed in to the account: a page of its own, from the top bar's menu (like Modules). */
+/** The devices signed in to the account: a page of its own, from the top bar's menu (like Hubbies). */
 export function DevicesPage() {
 	return (
 		<div className="flex-1 min-h-0 overflow-y-auto">

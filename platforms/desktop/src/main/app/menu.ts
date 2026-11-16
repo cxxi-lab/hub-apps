@@ -2,7 +2,7 @@ import { ipcMain, Menu } from 'electron'
 import { getDevMode, setDevMode } from './state'
 import { engine } from '../companion/engine'
 import { openAboutWindow } from '../windows/about'
-import { moduleWindows, onModuleWindowsChange, openModuleWindow } from '../windows/module'
+import { hubbyWindows, onHubbyWindowsChange, openHubbyWindow } from '../windows/hubby'
 import { openSettingsWindow } from '../windows/settings'
 
 let _authenticated = false
@@ -21,18 +21,18 @@ function buildMenu(): Electron.Menu {
 					click: () => setDevMode(!getDevMode())
 				},
 				{
-					// Neutral label on purpose: the companion lives in a private module.
+					// Neutral label on purpose: the companion lives in a private hubby.
 					label: engine.getInfo().status === 'starting' ? 'Toggle AI Engine (starting…)' : 'Toggle AI Engine',
 					type: 'checkbox',
 					checked: engine.getInfo().status === 'on' || engine.getInfo().status === 'starting',
 					click: () => void (engine.getInfo().status === 'off' || engine.getInfo().status === 'error' ? engine.start() : engine.stop())
 				},
 				{ type: 'separator' },
-				// the windows of the active modules that ask for a menu entry
-				...moduleWindows().filter(w => w.menu).map<Electron.MenuItemConstructorOptions>(w => ({
+				// the windows of the active hubbies that ask for a menu entry
+				...hubbyWindows().filter(w => w.menu).map<Electron.MenuItemConstructorOptions>(w => ({
 					label: w.menu!.label,
 					accelerator: w.menu!.accelerator,
-					click: () => openModuleWindow(w.moduleId, w.id)
+					click: () => openHubbyWindow(w.hubbyId, w.id)
 				})),
 				{
 					label: 'Settings…',
@@ -67,7 +67,7 @@ export function applyMenu(): void {
 	Menu.setApplicationMenu(buildMenu())
 }
 
-onModuleWindowsChange(applyMenu)
+onHubbyWindowsChange(applyMenu)
 
 ipcMain.on('auth:state-changed', (_, value: boolean) => {
 	if (_authenticated === value) return

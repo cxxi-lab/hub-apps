@@ -2,22 +2,22 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { platform } from '@platform'
 import { useVpnStatus } from '@shared/hooks/useVpnStatus'
-import { Button } from '@cxxi-lab/hub-ui'
+import { Button } from '@cxxi-lab/hubbyware-ui'
 
 /**
- * The VPN tunnel of a module that uses it (`supports: ['vpn']`, i.e. Private): it runs only while
- * the module is open. Entering starts it, and the module's pages wait for it (their calls only go
+ * The VPN tunnel of a hubby that uses it (`supports: ['vpn']`, i.e. Private): it runs only while
+ * the hubby is open. Entering starts it, and the hubby's pages wait for it (their calls only go
  * through it); leaving stops it. Down later (lost, reconnecting), the pages stay, under a notice.
  */
 /** the open pages needing the tunnel; it stops when none is left */
 let openGates = 0
 
-export function TunnelGate({ module, active, children }: { module: string, active: boolean, children: ReactNode }) {
+export function TunnelGate({ hubby, active, children }: { hubby: string, active: boolean, children: ReactNode }) {
 	const vpn = useVpnStatus()
 	const navigate = useNavigate()
 	const [ready, setReady] = useState(false)
 
-	// Open: the tunnel runs. Left, or the module gone while open (hidden again: Ctrl+Alt+Q, /hide;
+	// Open: the tunnel runs. Left, or the hubby gone while open (hidden again: Ctrl+Alt+Q, /hide;
 	// uninstalled): it stops, once no page needs it any more (a moment later: a page remounting, as
 	// React does in development, keeps it).
 	useEffect(() => {
@@ -49,7 +49,7 @@ export function TunnelGate({ module, active, children }: { module: string, activ
 					{vpn.error && <span className="max-w-md text-center text-xs text-red-300 break-words">{vpn.error}</span>}
 					<div className="flex gap-2">
 						<Button label="Retry" onClick={() => void platform.startVpn()} />
-						<Button label="VPN settings" color="secondary" onClick={() => navigate(`/modules/${module}`)} />
+						<Button label="VPN settings" color="secondary" onClick={() => navigate(`/hubbies/${hubby}`)} />
 					</div>
 				</>
 			)}

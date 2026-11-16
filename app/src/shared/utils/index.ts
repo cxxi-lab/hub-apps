@@ -1,2 +1,2 @@
-export { withLoading, snakeCase } from '@cxxi-lab/hub-ui'
+export { withLoading, snakeCase } from '@cxxi-lab/hubbyware-ui'
 export * from './misc'

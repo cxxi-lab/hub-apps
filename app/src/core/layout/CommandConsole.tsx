@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
-import { useBackHandler } from '@cxxi-lab/hub-ui'
+import { useBackHandler } from '@cxxi-lab/hubbyware-ui'
 import { faTerminal } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { runCommand } from '@core/commands'

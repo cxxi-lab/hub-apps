@@ -1,9 +1,9 @@
-// The runtime a hubby's frame loads next to the hubby's own code (docs/plan-module-architecture.md
-// § 4 ter): React, the design system and the guest SDK, as ES modules sharing one React, plus the
+// The runtime a hubby's frame loads next to the hubby's own code (docs/plan-hubby-architecture.md
+// § 4 ter): React, the design system and the guest SDK, as ES hubbies sharing one React, plus the
 // base stylesheet. A hubby imports them by name (react, react/jsx-runtime, react-dom/client,
-// @fortawesome/react-fontawesome, @cxxi-lab/hub-ui, @cxxi-lab/hub-sdk/frame), mapped to these files by the frame's import map.
+// @fortawesome/react-fontawesome, @cxxi-lab/hubbyware-ui, @cxxi-lab/hubbyware-sdk/frame), mapped to these files by the frame's import map.
 //   <out>/hubby-runtime/<name>.js, <out>/hubby-runtime/runtime.css
-// Run by the app build (build/sharedRuntime.ts, after the modules), or by hand:
+// Run by the app build (build/sharedRuntime.ts, after the hubbies), or by hand:
 //   node scripts/build-hubby-runtime.mjs [out]
 import { build } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -25,12 +25,15 @@ export const RUNTIME = {
 	'react/jsx-runtime': 'jsx-runtime',
 	'react-dom/client': 'react-dom-client',
 	'@fortawesome/react-fontawesome': 'fontawesome-react',
-	'@cxxi-lab/hub-ui': 'ui',
-	'@cxxi-lab/hub-sdk/frame': 'sdk'
+	'@cxxi-lab/hubbyware-ui': 'ui',
+	'@cxxi-lab/hubbyware-sdk/frame': 'sdk'
 }
 
-/** The names hubbies built before the packages import (same files): kept for the bundles already published. */
-const LEGACY = { '@hub/ui': 'ui', '@hub/sdk': 'sdk' }
+/**
+ * The names hubbies built before import (same files): kept for the bundles already published —
+ * the monorepo's (@hub/…), then the packages' before the rename (until layer 5 of the rename).
+ */
+const LEGACY = { '@hub/ui': 'ui', '@hub/sdk': 'sdk', '@cxxi-lab/hub-ui': 'ui', '@cxxi-lab/hub-sdk/frame': 'sdk' }
 
 const NPM = ['react', 'react/jsx-runtime', 'react-dom/client', '@fortawesome/react-fontawesome']
 
@@ -40,12 +43,12 @@ export async function buildHubbyRuntime(out) {
 	// (lib mode wants real files as entries; this place resolves the packages as the app does)
 	const generated = join(APP, 'node_modules/.cache/hubby-runtime')
 	mkdirSync(generated, { recursive: true })
-	const entry = { ui: require.resolve('@cxxi-lab/hub-ui'), sdk: require.resolve('@cxxi-lab/hub-sdk/frame') }
+	const entry = { ui: require.resolve('@cxxi-lab/hubbyware-ui'), sdk: require.resolve('@cxxi-lab/hubbyware-sdk/frame') }
 	for (const spec of NPM) {
 		const mod = require(spec)
 		const keys = Object.keys(mod).filter(k => k !== 'default' && IDENTIFIER.test(k))
 		const file = join(generated, `${RUNTIME[spec]}.js`)
-		// a CommonJS package (react…) gets its module as default; an ES one without a default, its namespace
+		// a CommonJS package (react…) gets its hubby as default; an ES one without a default, its namespace
 		const fallback = mod.__esModule && !('default' in mod) ? 'export default m' : 'export default (m.default ?? m)'
 		writeFileSync(file, [`import * as m from '${spec}'`, fallback, keys.length ? `export const { ${keys.join(', ')} } = m` : ''].join('\n') + '\n')
 		entry[RUNTIME[spec]] = file
@@ -96,7 +99,7 @@ export async function buildHubbyRuntime(out) {
 </html>
 `)
 	// the hubby's own code (its index.js, at the root) defines it; the SDK runs it
-	writeFileSync(join(outDir, 'boot.js'), "import definition from '/index.js'\nimport { start } from '@cxxi-lab/hub-sdk/frame'\nstart(definition)\n")
+	writeFileSync(join(outDir, 'boot.js'), "import definition from '/index.js'\nimport { start } from '@cxxi-lab/hubbyware-sdk/frame'\nstart(definition)\n")
 	console.log(`hubby runtime → ${outDir}`)
 }
 

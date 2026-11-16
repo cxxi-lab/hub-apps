@@ -1,6 +1,6 @@
 import { useVpnStatus } from '@shared/hooks/useVpnStatus'
 import { useEffect } from 'react'
-import { useMediaQuery } from '@cxxi-lab/hub-ui'
+import { useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import { useDeveloperMode } from '@core/settings/developer'
 import { useDevMode } from '@core/contexts/DevModeContext'
 import { getApiBaseUrl } from '@core/api/baseUrl'

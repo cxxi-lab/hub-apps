@@ -1,47 +1,47 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { api, ApiError, errorMessage } from '@core/api/client'
 import { isUnlocked, lock, setUnlocked, useLocks } from '@core/privacy/locks'
-import { Button } from '@cxxi-lab/hub-ui'
+import { Button } from '@cxxi-lab/hubbyware-ui'
 
-/** without activity in an unlocked module for this long, it locks again */
+/** without activity in an unlocked hubby for this long, it locks again */
 const IDLE_MS = 10 * 60_000
 const ACTIVITY = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
 
 /**
- * A module locked by a password of its own (Privacy): its pages show only once it is given (the
- * server answers its API only then). Leaving the module locks it again, its pages and their data
+ * A hubby locked by a password of its own (Privacy): its pages show only once it is given (the
+ * server answers its API only then). Leaving the hubby locks it again, its pages and their data
  * gone; so does a while without activity in it, or the server's word (the unlock ran out).
  */
-export function LockGate({ module, label, active, children }: { module: string, label: string, active: boolean, children: ReactNode }) {
+export function LockGate({ hubby, label, active, children }: { hubby: string, label: string, active: boolean, children: ReactNode }) {
 	useLocks()
-	const unlocked = isUnlocked(module)
+	const unlocked = isUnlocked(hubby)
 
 	// leaving it locks it, and so does its disappearing (hidden again, uninstalled)
 	useEffect(() => {
-		if (!active) lock(module)
-	}, [active, module])
-	useEffect(() => () => lock(module), [module])
+		if (!active) lock(hubby)
+	}, [active, hubby])
+	useEffect(() => () => lock(hubby), [hubby])
 
 	// idle in it
 	useEffect(() => {
 		if (!active || !unlocked) return
-		let timer = setTimeout(() => lock(module), IDLE_MS)
+		let timer = setTimeout(() => lock(hubby), IDLE_MS)
 		const reset = () => {
 			clearTimeout(timer)
-			timer = setTimeout(() => lock(module), IDLE_MS)
+			timer = setTimeout(() => lock(hubby), IDLE_MS)
 		}
 		for (const e of ACTIVITY) window.addEventListener(e, reset, { passive: true })
 		return () => {
 			clearTimeout(timer)
 			for (const e of ACTIVITY) window.removeEventListener(e, reset)
 		}
-	}, [active, unlocked, module])
+	}, [active, unlocked, hubby])
 
 	if (unlocked) return <>{children}</>
-	return active ? <UnlockScreen module={module} label={label} /> : null
+	return active ? <UnlockScreen hubby={hubby} label={label} /> : null
 }
 
-function UnlockScreen({ module, label }: { module: string, label: string }) {
+function UnlockScreen({ hubby, label }: { hubby: string, label: string }) {
 	const [password, setPassword] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -50,8 +50,8 @@ function UnlockScreen({ module, label }: { module: string, label: string }) {
 		setBusy(true)
 		setError(null)
 		try {
-			const { data } = await api<{ data: { token: string, expiresIn: number } }>(`/api/hub/privacy/${module}/unlock`, { method: 'POST', body: JSON.stringify({ password }) })
-			setUnlocked(module, data.token, data.expiresIn)
+			const { data } = await api<{ data: { token: string, expiresIn: number } }>(`/api/hub/privacy/${hubby}/unlock`, { method: 'POST', body: JSON.stringify({ password }) })
+			setUnlocked(hubby, data.token, data.expiresIn)
 		}
 		catch (err) {
 			setError(err instanceof ApiError && err.status === 403 ? 'Wrong password' : errorMessage(err))

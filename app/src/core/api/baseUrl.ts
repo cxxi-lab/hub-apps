@@ -1,6 +1,6 @@
 import { CONFIG } from '@core/config'
 import { platform } from '@platform'
-import { isVpnPath } from '@core/module/declarations'
+import { isVpnPath } from '@core/hubby/declarations'
 
 let currentDevMode = false
 const listeners = new Set<(baseUrl: string) => void>()
@@ -17,8 +17,8 @@ export async function initBaseUrl(): Promise<void> {
 }
 
 /**
- * The server's base URL. Given the path called, the routes of the modules reached through the VPN
- * (their data, their capabilities, their media: as they declare, core/module/declarations.ts) go to
+ * The server's base URL. Given the path called, the routes of the hubbies reached through the VPN
+ * (their data, their capabilities, their media: as they declare, core/hubby/declarations.ts) go to
  * the name only reachable through it (prod): the desktop routes that name through the tunnel, the
  * phone routes everything through it in private mode. Development: one local server.
  */

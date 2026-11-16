@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 
 /**
- * The app's name inside the system, imported before anything else (index.ts): modules read the data
+ * The app's name inside the system, imported before anything else (index.ts): hubbies read the data
  * folder as they load. The shipped app is `hub`, a development build `hub-dev`: its single-instance
  * lock (both run side by side) and the keyring entry protecting the data key. The name shown,
  * Hubbyware (productName), is another: changing this one would lose them.

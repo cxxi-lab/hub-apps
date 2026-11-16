@@ -4,7 +4,7 @@ import { fetchSettings, updateSettings } from '@core/api/settings'
 const MIN = 10
 const MAX = 500
 
-/** The account's notifications: how many are kept (the oldest go). Each module's are on or off in its settings (Modules). */
+/** The account's notifications: how many are kept (the oldest go). Each hubby's are on or off in its settings (Hubbies). */
 export function SettingsNotifications() {
 	const [saved, setSaved] = useState<number | null>(null)
 	const [value, setValue] = useState('')
@@ -35,7 +35,7 @@ export function SettingsNotifications() {
 				<div className="flex-1 min-w-0">
 					<h2 className="m-0 mb-1 text-sm font-semibold text-white uppercase tracking-wider">History</h2>
 					<p className="m-0 text-xs text-steel-300">
-						How many notifications are kept, all modules together: past it, the oldest go. Each module's notifications are turned on or off in its settings (Modules).
+						How many notifications are kept, all hubbies together: past it, the oldest go. Each hubby's notifications are turned on or off in its settings (Modules).
 					</p>
 					{state !== 'idle' && state !== 'saving' && (
 						<p className={`m-0 mt-1 text-xs ${state === 'saved' ? 'text-steel-300' : 'text-red-300'}`}>{state === 'saved' ? 'Saved' : state}</p>

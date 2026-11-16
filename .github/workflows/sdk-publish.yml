@@ -1,11 +1,11 @@
 name: sdk-publish
 
-# @cxxi-lab/hub-sdk (packages/hub-sdk): the module contract the app implements. Published when its
+# @cxxi-lab/hubbyware-sdk (packages/hubbyware-sdk): the hubby contract the app implements. Published when its
 # version is not on npm yet (npm trusted publishing: no token). Its types must match the app's SDK.
 on:
   push:
     branches: [main]
-    paths: ['packages/hub-sdk/**']
+    paths: ['packages/hubbyware-sdk/**']
   workflow_dispatch:
 
 permissions:
@@ -28,8 +28,8 @@ jobs:
       - name: Types up to date
         run: npm run types:sdk -w @hub/app -- --check
       - name: Publish
-        working-directory: packages/hub-sdk
+        working-directory: packages/hubbyware-sdk
         run: |
           version=$(node -p "require('./package.json').version")
-          if npm view "@cxxi-lab/hub-sdk@$version" version >/dev/null 2>&1; then echo "$version: already published"
+          if npm view "@cxxi-lab/hubbyware-sdk@$version" version >/dev/null 2>&1; then echo "$version: already published"
           else npm publish --provenance --access public; fi

@@ -23,12 +23,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(IntegrationsPlugin.class);
         registerPlugin(SessionPlugin.class);
         registerPlugin(DeviceSecretsPlugin.class);
-        registerPlugin(ModulesPlugin.class);
+        registerPlugin(HubbiesPlugin.class);
         registerPlugin(PushPlugin.class);
         registerPlugin(LocalStorePlugin.class);
         registerPlugin(ThemePlugin.class);
-        // Which version of each module this session runs (built in, or a downloaded newer one).
-        ModuleStore.get().setup(this);
+        // Which version of each hubby this session runs (built in, or a downloaded newer one).
+        HubbyStore.get().setup(this);
         // The tunnel only carries Private: it starts with private mode (the web side, VpnPlugin).
         // the session of the server's former name, before the WebView loads (SessionPlugin)
         SessionPlugin.carryRefreshCookie();
@@ -67,7 +67,7 @@ public class MainActivity extends BridgeActivity {
         ThemePlugin.applyIcon(this);
     }
 
-    /** Answers the tunnel proxy's 407 for the app's own WebView, and serves the modules' versions. */
+    /** Answers the tunnel proxy's 407 for the app's own WebView, and serves the hubbies' versions. */
     private static class TunnelWebViewClient extends BridgeWebViewClient {
         private final Bridge bridge;
 
@@ -84,12 +84,12 @@ public class MainActivity extends BridgeActivity {
         @Override
         public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
             // an isolated hubby's frame (https://<id>.hubby.localhost/): served from the app, never the network
-            if (ModuleStore.isHubbyHost(request.getUrl().getHost())) {
-                return ModuleStore.get().interceptHubby(request.getUrl().getHost(), request.getUrl().getPath());
+            if (HubbyStore.isHubbyHost(request.getUrl().getHost())) {
+                return HubbyStore.get().interceptHubby(request.getUrl().getHost(), request.getUrl().getPath());
             }
             if (request.getUrl().getHost() != null && request.getUrl().getHost().equals(bridge.getHost())) {
-                WebResourceResponse module = ModuleStore.get().intercept(request.getUrl().getPath());
-                if (module != null) return module;
+                WebResourceResponse hubby = HubbyStore.get().intercept(request.getUrl().getPath());
+                if (hubby != null) return hubby;
             }
             return super.shouldInterceptRequest(view, request);
         }

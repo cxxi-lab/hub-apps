@@ -1,4 +1,4 @@
-// first: the app's name and data folder, before any module reads them
+// first: the app's name and data folder, before any hubby reads them
 import { APP_NAME } from './app/identity'
 export { APP_NAME }
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
@@ -14,7 +14,7 @@ import { setupPlayerBlocklist } from './session/playerBlocklist'
 import { integrationsRegistry } from './session/integrations'
 import { carryRefreshCookie, persistRefreshCookie } from './session/sessions'
 import { checkForUpdateAtStartup } from './network/updater'
-import { setupModules } from './modules/manager'
+import { setupHubbies } from './hubbies/manager'
 import { setupVpn } from './network/vpn'
 import { setupTray } from './app/tray'
 import { setupSystemNotifications } from './app/notifications'
@@ -23,7 +23,7 @@ import { setupTheme } from './app/theme'
 import { createWindow, showMainWindow } from './windows/main'
 import './windows/settings'
 import './windows/oauth'
-import './windows/module'
+import './windows/hubby'
 import './windows/about'
 import { installWebviewHandlers } from './windows/webview'
 
@@ -87,8 +87,8 @@ app.whenReady().then(async () => {
 	// A pending update is installed before the app can be used: only the update window opens.
 	if (app.isPackaged && await checkForUpdateAtStartup()) return
 
-	// the module versions of this session; newer ones download in the background for the next start
-	setupModules()
+	// the hubby versions of this session; newer ones download in the background for the next start
+	setupHubbies()
 	createWindow()
 
 	app.on('activate', () => showMainWindow())

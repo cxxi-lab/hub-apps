@@ -45,7 +45,7 @@ jobs:
           go-version-file: platforms/mobile/tunnel/go.mod
           cache-dependency-path: platforms/mobile/tunnel/go.sum
 
-      # the tunnel's Java side only: its native libraries come with the Private module
+      # the tunnel's Java side only: its native libraries come with the Private hubby
       - name: Build the tunnel's Java side (tunnel.aar)
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"

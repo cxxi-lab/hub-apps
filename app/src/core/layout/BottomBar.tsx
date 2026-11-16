@@ -2,7 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { useLocation } from 'react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
-import { useBackHandler } from '@cxxi-lab/hub-ui'
+import { useBackHandler } from '@cxxi-lab/hubbyware-ui'
 
 /** An entry of a tab's menu. */
 export interface BottomBarEntry {
@@ -41,7 +41,7 @@ const tabClass = (active: boolean) => [
 const Dot = () => <span className="absolute -top-0.5 -right-1.5 size-1.5 rounded-full bg-product-red" />
 
 /**
- * The phone's bottom bar, like Android's: a module's pages (ModuleNav), or a page's own places
+ * The phone's bottom bar, like Android's: a hubby's pages (HubbyNav), or a page's own places
  * (Mail's folders). A menu closes on a choice, on back, on a tap beside it, on navigation.
  */
 export function BottomBar({ tabs }: { tabs: BottomBarTab[] }) {

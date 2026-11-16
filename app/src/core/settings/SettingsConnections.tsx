@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button } from '@cxxi-lab/hub-ui'
+import { Button } from '@cxxi-lab/hubbyware-ui'
 import { connect, fetchConnections, removeConnection, type ConnectProvider, type Connection } from '@core/api/connections'
 import { errorMessage } from '@core/api/client'
 

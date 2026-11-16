@@ -1,5 +1,5 @@
 export interface UserMenuProps {
-	onModules?: () => void
+	onHubbies?: () => void
 	onDevices?: () => void
 	onSettings?: () => void
 	onLogout?: () => void | Promise<void>

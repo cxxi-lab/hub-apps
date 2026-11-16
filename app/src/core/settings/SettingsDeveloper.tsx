@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Switch } from '@cxxi-lab/hub-ui'
+import { Switch } from '@cxxi-lab/hubbyware-ui'
 import { setDeveloperMode, useDeveloperMode } from '@core/settings/developer'
 
 export function SettingsDeveloper() {

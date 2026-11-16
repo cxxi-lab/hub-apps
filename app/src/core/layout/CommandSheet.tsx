@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useBackHandler } from '@cxxi-lab/hub-ui'
+import { useBackHandler } from '@cxxi-lab/hubbyware-ui'
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { inputProps, Output, useConsole } from './CommandConsole'

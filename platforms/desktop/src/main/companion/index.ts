@@ -53,7 +53,7 @@ function open(id: string) {
 }
 
 /**
- * Local AI companion (video module, private). Conversation and memory live on this
+ * Local AI companion (video hubby, private). Conversation and memory live on this
  * machine only; the engine is switched on/off by the user from the Window menu.
  */
 export function setupCompanion(): void {

@@ -123,7 +123,7 @@ jobs:
         run: npm run dist -- --linux AppImage --publish=never
 
       # The tunnel's native libraries for Android: the APK carries none (platforms/mobile/scripts/build-tunnel.sh);
-      # they are attached to this release (GitHub), where the module using the tunnel takes them.
+      # they are attached to this release (GitHub), where the hubby using the tunnel takes them.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -190,7 +190,7 @@ jobs:
           send platforms/desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
           send platforms/desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
 
-      # The tunnel's native libraries, for the module that uses the tunnel (its CI downloads them)
+      # The tunnel's native libraries, for the hubby that uses the tunnel (its CI downloads them)
       - name: GitHub release (tunnel natives)
         env:
           GH_TOKEN: ${{ github.token }}

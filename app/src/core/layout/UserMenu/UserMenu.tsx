@@ -1,10 +1,10 @@
 import { faGear } from '@fortawesome/free-solid-svg-icons'
-import { IconButton, Dropdown } from '@cxxi-lab/hub-ui'
+import { IconButton, Dropdown } from '@cxxi-lab/hubbyware-ui'
 import { type UserMenuProps } from './UserMenu.types'
 import { styles } from './UserMenu.variants'
 import { NotificationsMenu } from './NotificationsMenu'
 
-export function UserMenu({ onModules, onDevices, onSettings, onLogout }: UserMenuProps) {
+export function UserMenu({ onHubbies, onDevices, onSettings, onLogout }: UserMenuProps) {
 	const userHeader = (isOpen: boolean) => (
 		<IconButton
 			size="xl"
@@ -26,9 +26,9 @@ export function UserMenu({ onModules, onDevices, onSettings, onLogout }: UserMen
 				<Dropdown side="right" header={userHeader}>
 					<div className={styles.menu()}>
 						<div className={styles.section()}>
-							{onModules && (
-								<button type="button" onClick={onModules} className={styles.item()}>
-									Modules
+							{onHubbies && (
+								<button type="button" onClick={onHubbies} className={styles.item()}>
+									Hubbies
 								</button>
 							)}
 							{onDevices && (

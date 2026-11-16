@@ -19,16 +19,16 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The device's base for the modules' data (platform.localStore, as desktop/src/main/store/localStore.ts):
- * one SQLite database per account and module (its documents, by scope and collection) —
- * filesDir/store/&lt;account&gt;/&lt;module&gt;.sqlite. The local-first modules keep their replica here
+ * The device's base for the hubbies' data (platform.localStore, as desktop/src/main/store/localStore.ts):
+ * one SQLite database per account and hubby (its documents, by scope and collection) —
+ * filesDir/store/&lt;account&gt;/&lt;hubby&gt;.sqlite. The local-first hubbies keep their replica here
  * (scope `sync`, docs/plan-local-first.md). A document's data crosses the bridge as a JSON string.
  */
 @CapacitorPlugin(name = "LocalStore")
 public class LocalStorePlugin extends Plugin {
 
     private static final Pattern ACCOUNT = Pattern.compile("^[a-f0-9]{16,64}$");
-    private static final Pattern MODULE = Pattern.compile("^[a-z0-9-]{1,40}$");
+    private static final Pattern HUBBY = Pattern.compile("^[a-z0-9-]{1,40}$");
     private static final Pattern SCOPE = Pattern.compile("^[a-z0-9-]{1,40}$");
     private static final Pattern COLLECTION = Pattern.compile("^[a-z0-9_-]{1,40}$");
     private static final Pattern DOC_ID = Pattern.compile("^[A-Za-z0-9._:-]{1,64}$");
@@ -44,14 +44,14 @@ public class LocalStorePlugin extends Plugin {
         return new File(getContext().getFilesDir(), "store");
     }
 
-    private synchronized SQLiteDatabase db(String account, String module) {
-        String key = account + "/" + module;
+    private synchronized SQLiteDatabase db(String account, String hubby) {
+        String key = account + "/" + hubby;
         SQLiteDatabase found = databases.get(key);
         if (found == null) {
             File dir = new File(root(), account);
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();
-            found = SQLiteDatabase.openOrCreateDatabase(new File(dir, module + ".sqlite"), null);
+            found = SQLiteDatabase.openOrCreateDatabase(new File(dir, hubby + ".sqlite"), null);
             found.enableWriteAheadLogging();
             found.execSQL("CREATE TABLE IF NOT EXISTS document (scope TEXT NOT NULL, collection TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (scope, collection, id))");
             databases.put(key, found);
@@ -59,11 +59,11 @@ public class LocalStorePlugin extends Plugin {
         return found;
     }
 
-    /** (account, module, scope) of a call, checked before anything touches the disk. */
+    /** (account, hubby, scope) of a call, checked before anything touches the disk. */
     private String[] at(PluginCall call) {
         return new String[] {
             check(call.getString("account"), ACCOUNT, "account"),
-            check(call.getString("module"), MODULE, "module"),
+            check(call.getString("hubby"), HUBBY, "hubby"),
             check(call.getString("scope"), SCOPE, "scope"),
         };
     }

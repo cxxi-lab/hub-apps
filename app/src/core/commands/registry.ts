@@ -1,5 +1,5 @@
 /**
- * Commands typed in the status bar console. Core and modules register theirs
+ * Commands typed in the status bar console. Core and hubbies register theirs
  * with registerCommand(); the console only parses the line and prints what a
  * command returns.
  */

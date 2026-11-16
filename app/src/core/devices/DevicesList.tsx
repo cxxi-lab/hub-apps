@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button } from '@cxxi-lab/hub-ui'
+import { Button } from '@cxxi-lab/hubbyware-ui'
 import { fetchSessions, revokeSession, type DeviceSession } from '@core/api/sessions'
 import { errorMessage } from '@core/api/client'
 

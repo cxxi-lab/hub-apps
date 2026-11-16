@@ -2,12 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useAmountsBlurred, useBlurEpoch } from '@core/privacy/hidden'
 
 /**
- * An amount of a module (money, a balance…): blurred when the module's Privacy asks for it
+ * An amount of a hubby (money, a balance…): blurred when the hubby's Privacy asks for it
  * (`supports: ['amounts']`), a click shows that one until it is clicked again, the page is left or
  * Ctrl+Alt+Q. Not for an amount being typed (a field): only shown ones.
  */
-export function Amount({ module, children, className = '' }: { module: string, children: ReactNode, className?: string }) {
-	const blurred = useAmountsBlurred(module)
+export function Amount({ hubby, children, className = '' }: { hubby: string, children: ReactNode, className?: string }) {
+	const blurred = useAmountsBlurred(hubby)
 	const epoch = useBlurEpoch()
 	const [shown, setShown] = useState(false)
 

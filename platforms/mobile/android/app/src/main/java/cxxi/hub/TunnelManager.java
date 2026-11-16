@@ -121,13 +121,13 @@ final class TunnelManager {
     private boolean nativeLoaded = false;
 
     /**
-     * Loads the tunnel's native library, which the APK doesn't carry: it comes with the module that
+     * Loads the tunnel's native library, which the APK doesn't carry: it comes with the hubby that
      * uses it (Private, its native/<platform>/libgojni.so, see mobile/scripts/build-tunnel.sh). The
      * Java side (go.Seq, rebuilt) loads the path given in the "cxxi.hub.gojni" property.
      */
     private boolean loadNative() {
         if (nativeLoaded) return true;
-        File lib = ModuleStore.get().findNative("libgojni.so");
+        File lib = HubbyStore.get().findNative("libgojni.so");
         if (lib == null) return false;
         try {
             System.setProperty("cxxi.hub.gojni", lib.getAbsolutePath());

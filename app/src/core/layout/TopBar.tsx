@@ -4,11 +4,11 @@ import { faVolumeHigh, faVolumeXmark } from '@fortawesome/free-solid-svg-icons'
 import { logout } from '@core/auth/logout'
 import { resetAuthState } from '@core/auth/authState'
 import { useAudioMuted } from '@core/contexts/AudioMutedContext'
-import { Brand, IconButton, useMediaQuery } from '@cxxi-lab/hub-ui'
+import { Brand, IconButton, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import { UserMenu } from '@core/layout/UserMenu'
 import type { NavDomain } from '@core/layout/AppLayout'
-import { moduleCount, openNotifications, useNotifications } from '@core/notifications/notifications'
-import { MODULE_MANIFESTS, moduleHomePath } from '@core/module/registry'
+import { hubbyCount, openNotifications, useNotifications } from '@core/notifications/notifications'
+import { HUBBY_MANIFESTS, hubbyHomePath } from '@core/hubby/registry'
 import { platform } from '@platform'
 import { CommandSheet } from '@core/layout/CommandSheet'
 import { useDeveloperMode } from '@core/settings/developer'
@@ -26,7 +26,7 @@ export function TopBar({ domains, activeDomainId }: Props) {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const muted = useAudioMuted()
-	// the open module's tab kept in view (the tabs scroll on a narrow screen)
+	// the open hubby's tab kept in view (the tabs scroll on a narrow screen)
 	const activeTab = useRef<HTMLButtonElement>(null)
 	useEffect(() => {
 		activeTab.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -55,13 +55,13 @@ export function TopBar({ domains, activeDomainId }: Props) {
 	}
 
 	const handleDomainClick = (domain: NavDomain) => {
-		const manifest = MODULE_MANIFESTS.find(m => m.id === domain.id)
-		const path = manifest ? moduleHomePath(manifest) : `/${domain.id}`
+		const manifest = HUBBY_MANIFESTS.find(m => m.id === domain.id)
+		const path = manifest ? hubbyHomePath(manifest) : `/${domain.id}`
 		// Its tab again on the page it opens on: back to the start (e.g. Private's Browse, back to its site picker).
 		navigate(path, location.pathname === path ? { state: { reset: Date.now() } } : undefined)
 	}
 
-	// Mouse wheels only scroll vertically: turn that into horizontal scrolling of the module strip.
+	// Mouse wheels only scroll vertically: turn that into horizontal scrolling of the hubby strip.
 	const handleNavWheel = (e: WheelEvent<HTMLElement>) => {
 		if (e.deltaY === 0 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
 		e.currentTarget.scrollLeft += e.deltaY
@@ -73,14 +73,14 @@ export function TopBar({ domains, activeDomainId }: Props) {
 	}
 
 	return (
-		// One row: brand, modules (not on phones), controls.
+		// One row: brand, hubbies (not on phones), controls.
 		<header className="grid grid-cols-[auto_1fr_auto] max-sm:grid-cols-[auto_1fr] shrink-0 bg-steel-950 border-b border-steel-700">
 			<div className="flex items-center h-14 pl-4">
 				<Brand to="/" onClick={consoleTap ? onBrandClick : undefined} />
 				{consoleTap && <CommandSheet open={consoleOpen} onClose={() => setConsoleOpen(false)} />}
 			</div>
 
-			{/* Module strip (desktop: phones reach the modules from the home page), scrolling horizontally. */}
+			{/* Hubby strip (desktop: phones reach the hubbies from the home page), scrolling horizontally. */}
 			{!phone && (
 			<nav
 				onWheel={handleNavWheel}
@@ -92,9 +92,9 @@ export function TopBar({ domains, activeDomainId }: Props) {
 			>
 				{domains.map(domain => {
 					const active = domain.id === activeDomainId
-					// its dot: it has notifications (a module that supports them)
-					const count = MODULE_MANIFESTS.find(m => m.id === domain.id)?.supports?.includes('notifications')
-						? moduleCount(notifications, domain.id)
+					// its dot: it has notifications (a hubby that supports them)
+					const count = HUBBY_MANIFESTS.find(m => m.id === domain.id)?.supports?.includes('notifications')
+						? hubbyCount(notifications, domain.id)
 						: 0
 					return (
 						<button
@@ -128,7 +128,7 @@ export function TopBar({ domains, activeDomainId }: Props) {
 						</button>
 					)
 				})}
-				{/* Room past the last module, so it clears the fade once scrolled to the end. */}
+				{/* Room past the last hubby, so it clears the fade once scrolled to the end. */}
 				<span aria-hidden className="shrink-0 w-8" />
 			</nav>
 			)}
@@ -149,7 +149,7 @@ export function TopBar({ domains, activeDomainId }: Props) {
 				)}
 
 				<UserMenu
-					onModules={() => navigate('/modules')}
+					onHubbies={() => navigate('/hubbies')}
 					onDevices={() => navigate('/devices')}
 					onSettings={() => platform.openSettings()}
 					onLogout={handleLogout}

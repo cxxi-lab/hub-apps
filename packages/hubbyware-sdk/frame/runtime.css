@@ -1,0 +1,16 @@
+/* A hubby frame's base styles: the design tokens, the base, the design system's utilities (the
+   hubby's own utilities come with it, in its style.css). */
+@layer theme, base, components, utilities;
+@import "@cxxi-lab/hubbyware-ui/theme.css";
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../../../node_modules/@cxxi-lab/hubbyware-ui/src";
+@source "./";
+@import "@cxxi-lab/hubbyware-ui/fonts.css";
+
+html, body {
+	background: var(--color-steel-900);
+	color: var(--color-white);
+	font-family: var(--font-display), sans-serif;
+	font-size: 14px;
+}

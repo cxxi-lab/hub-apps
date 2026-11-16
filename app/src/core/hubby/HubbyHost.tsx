@@ -2,29 +2,29 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api } from '@core/api/client'
 import { collection } from './collections'
-import { hasScope, useModuleScopes } from '@core/modules/scopes'
-import { useBackHandler, useMediaQuery } from '@cxxi-lab/hub-ui'
+import { hasScope, useHubbyScopes } from '@core/hubbies/scopes'
+import { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import { platform } from '@platform'
-import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage } from '@cxxi-lab/hub-sdk/protocol'
+import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage } from '@cxxi-lab/hubbyware-sdk/protocol'
 import { setHubbyNav } from './navs'
 import { currentAccent, currentTheme, useAccent, useTheme } from '@core/theme/theme'
 
 /**
- * An isolated hubby (docs/plan-module-architecture.md § 4 ter): its frame — a sandboxed iframe
+ * An isolated hubby (docs/plan-hubby-architecture.md § 4 ter): its frame — a sandboxed iframe
  * with an opaque origin, loaded from the platform's hubby address (desktop hubby://<id>/, Android
  * https://<id>.hubby.localhost/) — and the host side of its messages: its pages become the app's
  * navigation, its calls are made with the session, only within the scopes the account allowed it.
  */
-export function HubbyHost({ module }: { module: string }) {
+export function HubbyHost({ hubby }: { hubby: string }) {
 	const frame = useRef<HTMLIFrameElement>(null)
 	const navigate = useNavigate()
 	const { pathname } = useLocation()
 	const phone = useMediaQuery('(width < 40rem)')
-	const scopes = useModuleScopes()
+	const scopes = useHubbyScopes()
 	const [backDepth, setBackDepth] = useState(0)
-	const base = `/${module}`
+	const base = `/${hubby}`
 	const inner = pathname === base ? '/' : pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : null
-	const src = platform.hubbyUrl(module)
+	const src = platform.hubbyUrl(hubby)
 
 	// the latest values the message handler reads (it is set up once)
 	const state = useRef({ inner, phone, scopes })
@@ -43,12 +43,12 @@ export function HubbyHost({ module }: { module: string }) {
 	useEffect(() => { send({ type: 'theme', theme, accent }) }, [theme, accent])
 
 	useEffect(() => {
-		const granted = (scope: string) => hasScope(state.current.scopes, module, scope)
+		const granted = (scope: string) => hasScope(state.current.scopes, hubby, scope)
 		// its own collections, through the app's client: their encrypted fields sealed here, by the
 		// host (the frame never sees the data key)
 		const own = (name: unknown) => {
 			if (typeof name !== 'string' || !/^[a-z][a-z0-9_]{0,39}$/.test(name)) throw new Error('invalid collection name')
-			return collection<Record<string, unknown>>(module, name)
+			return collection<Record<string, unknown>>(hubby, name)
 		}
 		// what a hubby may ask its host: its own collections and settings (no scope), the rest by scope
 		const methods: Record<string, (...args: unknown[]) => unknown> = {
@@ -74,10 +74,10 @@ export function HubbyHost({ module }: { module: string }) {
 			const m = data.message
 			switch (m.type) {
 				case 'ready':
-					send({ type: 'init', module, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
+					send({ type: 'init', hubby, module: hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
 					break
 				case 'register':
-					setHubbyNav(module, m.pages, m.sections)
+					setHubbyNav(hubby, m.pages, m.sections)
 					break
 				case 'call': {
 					const method = methods[m.method]
@@ -104,15 +104,15 @@ export function HubbyHost({ module }: { module: string }) {
 		}
 		window.addEventListener('message', onMessage)
 		return () => window.removeEventListener('message', onMessage)
-	}, [module])
+	}, [hubby])
 
 	if (!src) {
-		return <div className="flex-1 flex items-center justify-center text-sm text-steel-400">This module runs isolated: not available on this platform yet.</div>
+		return <div className="flex-1 flex items-center justify-center text-sm text-steel-400">This hubby runs isolated: not available on this platform yet.</div>
 	}
 	return (
 		<iframe
 			ref={frame}
-			title={module}
+			title={hubby}
 			src={src}
 			sandbox="allow-scripts allow-forms"
 			className="flex-1 min-h-0 w-full border-0 bg-steel-900"

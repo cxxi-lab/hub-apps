@@ -3,7 +3,7 @@ import type { UpdateState, Unsubscribe } from './types'
 
 // In-app sideload updater for the Android build. The server publishes, to the
 // same VPN-only /releases/ path as the desktop AppImage, a signed manifest
-// describing the latest APK. This module fetches it, verifies the Ed25519
+// describing the latest APK. This hubby fetches it, verifies the Ed25519
 // signature (same key as the desktop pipeline), and — when a newer versionCode
 // is available — drives the native plugin to download, hash-check and install.
 //

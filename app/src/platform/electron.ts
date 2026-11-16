@@ -39,14 +39,15 @@ export function createElectronPlatform(): Platform {
 		versions: window.api.versions as unknown as Record<string, string>
 	}
 	// persistSession: the main process already writes the refresh cookie as soon as it changes.
-	// moduleStore: in development the modules come from their sources (core/module/registry)
+	// hubbyStore: in development the hubbies come from their sources (core/hubby/registry)
 	return {
 		name: 'electron', client: 'desktop', capabilities, runtime, player, persistSession: () => {},
 		...window.api,
 		push: null,
-		moduleStore: import.meta.env.DEV ? null : window.api.moduleStore,
+		hubbyStore: import.meta.env.DEV ? null : window.api.hubbyStore,
+		openModuleWindow: (hubbyId, windowId) => window.api.openHubbyWindow(hubbyId, windowId),
 		// served by the main process (its hubby:// protocol)
-		hubbyUrl: module => `hubby://${module}/`
+		hubbyUrl: hubby => `hubby://${hubby}/`
 	}
 }
 

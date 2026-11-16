@@ -2,33 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faBell, faCube, faXmark } from '@fortawesome/free-solid-svg-icons'
-import { IconButton, Dropdown } from '@cxxi-lab/hub-ui'
-import { useModules } from '@core/contexts/ModulesContext'
+import { IconButton, Dropdown } from '@cxxi-lab/hubbyware-ui'
+import { useHubbies } from '@core/contexts/HubbiesContext'
 import { dismissNotification, useNotifications, useNotificationsOpening, type AppNotification } from '@core/notifications/notifications'
 
 /**
- * The bell (top right) and its menu: the notifications of the modules shown, newest first. A click
- * opens where one leads, its cross dismisses it. A module's dot in the top bar opens it on that
- * module's notifications.
+ * The bell (top right) and its menu: the notifications of the hubbies shown, newest first. A click
+ * opens where one leads, its cross dismisses it. A hubby's dot in the top bar opens it on that
+ * hubby's notifications.
  */
 export function NotificationsMenu() {
 	const navigate = useNavigate()
-	const modules = useModules()
+	const hubbies = useHubbies()
 	const all = useNotifications()
 	const opening = useNotificationsOpening()
 	const [open, setOpen] = useState(false)
 	const listRef = useRef<HTMLUListElement>(null)
 
-	const byId = new Map(modules.map(m => [m.id, m]))
+	const byId = new Map(hubbies.map(m => [m.id, m]))
 	const shown = all.filter(n => byId.get(n.module)?.supports?.includes('notifications'))
 
-	// opened from a module's dot: on its first notification
+	// opened from a hubby's dot: on its first notification
 	useEffect(() => {
 		if (!opening) return
 		setOpen(true)
-		if (!opening.module) return
+		if (!opening.hubby) return
 		const frame = requestAnimationFrame(() => {
-			listRef.current?.querySelector<HTMLElement>(`[data-module="${opening.module}"]`)?.scrollIntoView({ block: 'nearest' })
+			listRef.current?.querySelector<HTMLElement>(`[data-module="${opening.hubby}"]`)?.scrollIntoView({ block: 'nearest' })
 		})
 		return () => cancelAnimationFrame(frame)
 	}, [opening])
@@ -59,7 +59,7 @@ export function NotificationsMenu() {
 				) : (
 					<ul ref={listRef} className="m-0 p-0 list-none max-h-[60vh] overflow-y-auto pretty-scrollbar">
 						{shown.map(n => {
-							const module = byId.get(n.module)
+							const hubby = byId.get(n.module)
 							return (
 								<li
 									key={n.id}
@@ -68,7 +68,7 @@ export function NotificationsMenu() {
 									onClick={e => { e.stopPropagation(); go(n) }}
 								>
 									<span className="size-8 shrink-0 flex items-center justify-center rounded bg-primary-500 text-steel-800">
-										<FontAwesomeIcon icon={module?.icon ?? faCube} className="text-sm" />
+										<FontAwesomeIcon icon={hubby?.icon ?? faCube} className="text-sm" />
 									</span>
 									<span className="min-w-0 flex-1">
 										<span className="flex items-baseline gap-2">
@@ -76,7 +76,7 @@ export function NotificationsMenu() {
 											<span className="shrink-0 text-[11px] text-steel-500 tabular-nums">{when(n.updatedAt)}</span>
 										</span>
 										{n.body && <span className="block text-xs text-steel-300">{n.body}</span>}
-										<span className="block text-[10px] uppercase tracking-[1.5px] text-steel-500">{module?.label ?? n.module}</span>
+										<span className="block text-[10px] uppercase tracking-[1.5px] text-steel-500">{hubby?.label ?? n.module}</span>
 									</span>
 									<button
 										type="button"

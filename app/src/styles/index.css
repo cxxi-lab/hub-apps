@@ -1,15 +1,15 @@
 @layer theme, base, components, utilities;
-@import "@cxxi-lab/hub-ui/theme.css";
+@import "@cxxi-lab/hubbyware-ui/theme.css";
 @import "tailwindcss/preflight.css" layer(base);
 /* The app's own sources only: each module generates its utilities (modules/<id>/module.css). */
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "../core";
 /* the hub-ui at the root: a single copy (the SDK admits the app's version), else its classes are those of another */
-@source "../../../node_modules/@cxxi-lab/hub-ui/src";
+@source "../../../node_modules/@cxxi-lab/hubbyware-ui/src";
 @source "../shared";
 @source "../platform";
 @source "../main.tsx";
-@import "@cxxi-lab/hub-ui/fonts.css";
+@import "@cxxi-lab/hubbyware-ui/fonts.css";
 
 :root {
 	color-scheme: dark;

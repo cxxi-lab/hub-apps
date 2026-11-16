@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button } from '@cxxi-lab/hub-ui'
+import { Button } from '@cxxi-lab/hubbyware-ui'
 import type { UpdateState } from '@platform'
 import { platform } from '@platform'
 

@@ -5,7 +5,7 @@ import { webSessions } from './sessions'
 
 // Hosts blocked in the webview sessions (ads, trackers): without it a site's
 // player waits on its ad sequence and never starts the video. The list is
-// compiled by the back from public domain blocklists (Video module,
+// compiled by the back from public domain blocklists (Video hubby,
 // PlayerBlocklist) and pushed by the renderer (platform.setPlayerBlocklist);
 // the mobile shell applies the same list. A request to a listed domain or any
 // of its subdomains is cancelled.
