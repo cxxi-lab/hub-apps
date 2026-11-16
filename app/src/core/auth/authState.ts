@@ -1,6 +1,6 @@
 import { AUTH_STATES, STORE_KEY, REFRESH } from '@shared/constants'
 import { get, set, remove } from '@shared/store'
-import { getApiBaseUrl, onBaseUrlChange } from '@core/api/baseUrl'
+import { getApiBaseUrl, onBaseUrlChange, serverIdentity } from '@core/api/baseUrl'
 import { platform } from '@platform'
 import { tryRefreshToken } from './refresh'
 
@@ -9,7 +9,7 @@ let refreshTimeoutId: ReturnType<typeof setTimeout> | null = null
 // Auth data is stored per server so a token issued by one target (local / prod)
 // is never sent to the other one.
 export function authKey(key: string, baseUrl: string = getApiBaseUrl()): string {
-	return `${key}@${baseUrl}`
+	return `${key}@${serverIdentity(baseUrl)}`
 }
 
 function scheduleRefresh(expiresAt: number): void {

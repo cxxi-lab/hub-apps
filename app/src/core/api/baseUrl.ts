@@ -34,3 +34,13 @@ export function onBaseUrlChange(listener: (baseUrl: string) => void): () => void
 		listeners.delete(listener)
 	}
 }
+
+/**
+ * The server's identity in what the device keeps per server (its tokens, its base: authKey, account):
+ * a server's former name, so a rename keeps them. hubbyware.cxxi.io was hub.cxxi.io.
+ */
+const FORMER_NAMES: Record<string, string> = { 'https://hubbyware.cxxi.io': 'https://hub.cxxi.io' }
+
+export function serverIdentity(baseUrl: string = getApiBaseUrl()): string {
+	return FORMER_NAMES[baseUrl] ?? baseUrl
+}
