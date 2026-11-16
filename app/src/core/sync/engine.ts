@@ -1,6 +1,8 @@
 import { platform } from '@platform'
 import { api } from '@core/api/client'
 import { requireDataKeys } from '@core/crypto/dataKey'
+import { open, seal } from '@core/crypto/format'
+import { encryptsAtRest } from '@core/module/declarations'
 import { modelsOf } from '@core/crypto/documents'
 import { uuidv7 } from '@core/crypto/format'
 import { remoteCollection } from '@core/hubby/collections'
@@ -24,6 +26,9 @@ import { openOperation, sealOperation, type Envelope } from './envelope'
  * one takes everything from it; only an empty log is seeded with the module's documents on the
  * server (copying them on every new device would rewrite them with a later clock, and could undo a
  * change the server's copy missed).
+ * A module declaring `encryptAtRest` (module.json) has what is stored here sealed with the data key
+ * (each document, and the state with the operations waiting): the device's base holds no clear
+ * value of it.
  */
 
 const SCOPE = 'sync'
@@ -74,6 +79,8 @@ export class ModuleSync {
 	private again = false
 	private imported = false
 	private caughtUp = false
+	/** the key sealing what is stored here (`encryptAtRest`), else null */
+	private restKey: Uint8Array | null = null
 
 	constructor(readonly module: string) {
 		this.ready = this.start()
@@ -83,7 +90,10 @@ export class ModuleSync {
 		const local = platform.localStore
 		if (!local) throw new Error('No local base on this device')
 		const key = await account()
-		const stored = await local.list(key, this.module, SCOPE)
+		const raw = await local.list(key, this.module, SCOPE)
+		// a base once encrypted stays so, even if the module stops asking
+		if (encryptsAtRest(this.module) || raw.some(d => isSealedAtRest(d.data))) this.restKey = (await requireDataKeys()).fields
+		const stored = raw.map(d => ({ ...d, raw: d.data, data: this.opened(d.collection, d.id, d.data) }))
 		const meta = stored.find(d => d.collection === META && d.id === 'state')?.data as Meta | undefined
 
 		this.replica = new Replica(new Clock(this.device, Date.now, meta?.clock), uuidv7)
@@ -98,6 +108,8 @@ export class ModuleSync {
 		if (meta?.outbox?.length) this.replica.requeue(meta.outbox)
 
 		this.replica.subscribe((collection, doc) => this.markDirty(collection, doc))
+		// stored in clear before the module asked for encryption: sealed at the next save
+		if (this.restKey) for (const d of stored) if (d.collection !== META && !isSealedAtRest(d.raw)) this.markDirty(d.collection, d.id)
 		this.imported = meta?.imported ?? false
 		this.caughtUp = meta?.caughtUp ?? false
 		// a first start: its data before the first screen, when the relay answers (offline: later)
@@ -240,6 +252,21 @@ export class ModuleSync {
 		}
 	}
 
+	private where(collection: string, id: string): string {
+		return `local/${this.module}/${collection}/${id}`
+	}
+
+	/** As stored here: sealed (`encryptAtRest`) or as is. */
+	private sealed(collection: string, id: string, data: unknown): unknown {
+		return this.restKey ? { sealed: seal(this.restKey, this.where(collection, id), JSON.stringify(data)) } : data
+	}
+
+	/** As read back: opened when sealed (a store from before `encryptAtRest`: as is). */
+	private opened(collection: string, id: string, data: unknown): unknown {
+		if (!isSealedAtRest(data)) return data
+		return JSON.parse(open(this.restKey!, this.where(collection, id), data.sealed))
+	}
+
 	private markDirty(collection: string, doc: string): void {
 		this.dirty.add(`${collection}\u0000${doc}`)
 	}
@@ -252,17 +279,20 @@ export class ModuleSync {
 			const now = Date.now()
 			const docs = [...this.dirty].map(entry => {
 				const [collection, id] = entry.split('\u0000')
-				return { collection, id, data: this.replica.state(collection, id), updatedAt: now }
+				return { collection, id, data: this.sealed(collection, id, this.replica.state(collection, id)), updatedAt: now }
 			})
 			this.dirty.clear()
 			const meta: Meta = { clock: this.replica.clock.current(), position: this.position, outbox: this.replica.pending(), imported: this.imported, caughtUp: this.caughtUp }
-			await local.put(key, this.module, SCOPE, [...docs, { collection: META, id: 'state', data: meta, updatedAt: now }])
+			await local.put(key, this.module, SCOPE, [...docs, { collection: META, id: 'state', data: this.sealed(META, 'state', meta), updatedAt: now }])
 		}
 		// one after the other: a later save never lands before an earlier one
 		this.saving = (this.saving ?? Promise.resolve()).then(run, run)
 		return this.saving
 	}
 }
+
+const isSealedAtRest = (data: unknown): data is { sealed: string } =>
+	typeof data === 'object' && data !== null && typeof (data as { sealed?: unknown }).sealed === 'string' && Object.keys(data).length === 1
 
 /** Two field values alike (as JSON; missing and null alike). */
 function same(a: unknown, b: unknown): boolean {

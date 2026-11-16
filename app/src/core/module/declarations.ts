@@ -6,7 +6,9 @@
  *  - `network: "vpn"`: its data and those capabilities are reached under the VPN-only name
  *    (core/api/baseUrl.ts), the server refusing them from elsewhere;
  *  - `formerly`: the ids it had (its values sealed under them are opened, then sealed again under
- *    its id: core/crypto/documents.ts).
+ *    its id: core/crypto/documents.ts);
+ *  - `encryptAtRest`: its data kept on the device (local-first, core/sync/engine.ts) is encrypted
+ *    there too, with the data key, not only on its way through the server.
  */
 
 export interface ModuleDeclaration {
@@ -14,20 +16,26 @@ export interface ModuleDeclaration {
 	capabilities?: string[]
 	network?: 'vpn'
 	formerly?: string[]
+	encryptAtRest?: boolean
 }
 
 const capabilityModules = new Map<string, string>()
 const vpnModules = new Set<string>()
 const vpnCapabilities = new Set<string>()
+const atRest = new Set<string>()
 
 /** Takes a loaded (or installed) module's declarations into account. */
-export function declareModule({ id, capabilities, network }: ModuleDeclaration): void {
+export function declareModule({ id, capabilities, network, encryptAtRest }: ModuleDeclaration): void {
+	if (encryptAtRest === true) atRest.add(id)
 	for (const capability of capabilities ?? []) {
 		capabilityModules.set(capability, id)
 		if (network === 'vpn') vpnCapabilities.add(capability)
 	}
 	if (network === 'vpn') vpnModules.add(id)
 }
+
+/** Whether the module's data on this device is encrypted there (`encryptAtRest`). */
+export const encryptsAtRest = (module: string): boolean => atRest.has(module)
 
 /** The module a capability belongs to (the only one using it), if one declared it. */
 export const moduleOfCapability = (capability: string): string | null => capabilityModules.get(capability) ?? null
