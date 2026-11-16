@@ -58,6 +58,13 @@ public class MainActivity extends BridgeActivity {
         CookieManager.getInstance().flush();
     }
 
+    @Override
+    public void onStop() {
+        super.onStop();
+        // the launcher icon in the accent chosen, now that the app is out of sight (ThemePlugin)
+        ThemePlugin.applyIcon(this);
+    }
+
     /** Answers the tunnel proxy's 407 for the app's own WebView, and serves the modules' versions. */
     private static class TunnelWebViewClient extends BridgeWebViewClient {
         private final Bridge bridge;
