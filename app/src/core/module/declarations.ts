@@ -23,16 +23,21 @@ const capabilityModules = new Map<string, string>()
 const vpnModules = new Set<string>()
 const vpnCapabilities = new Set<string>()
 const atRest = new Set<string>()
+const formerIds = new Map<string, string[]>()
 
 /** Takes a loaded (or installed) module's declarations into account. */
-export function declareModule({ id, capabilities, network, encryptAtRest }: ModuleDeclaration): void {
+export function declareModule({ id, capabilities, network, encryptAtRest, formerly }: ModuleDeclaration): void {
 	if (encryptAtRest === true) atRest.add(id)
+	if (formerly?.length) formerIds.set(id, formerly.filter(f => typeof f === 'string' && f !== id))
 	for (const capability of capabilities ?? []) {
 		capabilityModules.set(capability, id)
 		if (network === 'vpn') vpnCapabilities.add(capability)
 	}
 	if (network === 'vpn') vpnModules.add(id)
 }
+
+/** The ids a module had (`formerly`): its data sealed under them still opens, then moves to its id. */
+export const formerlyOf = (module: string): string[] => formerIds.get(module) ?? []
 
 /** Whether the module's data on this device is encrypted there (`encryptAtRest`). */
 export const encryptsAtRest = (module: string): boolean => atRest.has(module)

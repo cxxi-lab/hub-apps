@@ -2,7 +2,7 @@ import { platform } from '@platform'
 import { api } from '@core/api/client'
 import { requireDataKeys } from '@core/crypto/dataKey'
 import { open, seal } from '@core/crypto/format'
-import { encryptsAtRest } from '@core/module/declarations'
+import { encryptsAtRest, formerlyOf } from '@core/module/declarations'
 import { uuidv7 } from '@core/crypto/format'
 import { onSyncEvent } from '@core/notifications/notifications'
 import { account } from '@core/storage/account'
@@ -65,6 +65,8 @@ export class ModuleSync {
 	private again = false
 	/** the relay's log read once on this device (its first start waits for it, when online) */
 	private imported = false
+	/** a former id whose base was read at start: emptied once saved under this one */
+	private movedFrom: string | null = null
 	/** the key sealing what is stored here (`encryptAtRest`), else null */
 	private restKey: Uint8Array | null = null
 
@@ -76,10 +78,22 @@ export class ModuleSync {
 		const local = platform.localStore
 		if (!local) throw new Error('No local base on this device')
 		const key = await account()
-		const raw = await local.list(key, this.module, SCOPE)
+		let raw = await local.list(key, this.module, SCOPE)
+		// renamed (its module.json `formerly`): its base here still under a former id moves to this one
+		let from = this.module
+		if (raw.length === 0) {
+			for (const former of formerlyOf(this.module)) {
+				const old = await local.list(key, former, SCOPE)
+				if (old.length > 0) {
+					raw = old
+					from = former
+					break
+				}
+			}
+		}
 		// a base once encrypted stays so, even if the module stops asking
 		if (encryptsAtRest(this.module) || raw.some(d => isSealedAtRest(d.data))) this.restKey = (await requireDataKeys()).fields
-		const stored = raw.map(d => ({ ...d, raw: d.data, data: this.opened(d.collection, d.id, d.data) }))
+		const stored = raw.map(d => ({ ...d, raw: d.data, data: this.opened(d.collection, d.id, d.data, from) }))
 		const meta = stored.find(d => d.collection === META && d.id === 'state')?.data as Meta | undefined
 
 		this.replica = new Replica(new Clock(this.device, Date.now, meta?.clock), uuidv7)
@@ -96,6 +110,12 @@ export class ModuleSync {
 		this.replica.subscribe((collection, doc) => this.markDirty(collection, doc))
 		// stored in clear before the module asked for encryption: sealed at the next save
 		if (this.restKey) for (const d of stored) if (d.collection !== META && !isSealedAtRest(d.raw)) this.markDirty(d.collection, d.id)
+		// moved from a former id: everything written again under this one, then the former base emptied
+		if (from !== this.module) {
+			for (const d of stored) if (d.collection !== META) this.markDirty(d.collection, d.id)
+			this.movedFrom = from
+			console.log(`[sync] ${this.module}: its base moved from ${from} (${stored.length} document(s))`)
+		}
 		this.imported = meta?.imported ?? false
 		// a first start: its data before the first screen, when the relay answers (offline: later)
 		if (!this.imported) await this.sync()
@@ -171,7 +191,8 @@ export class ModuleSync {
 				`/api/data/${this.module}/_sync?since=${this.position}`
 			).then(r => r.data)
 			// this device's own come back too: applying them again changes nothing
-			const ops = page.ops.map(e => openOperation(keys.fields, { id: e.id, module: this.module, sealed: e.sealed }))
+			// sealed before a rename (the log moved with the module): under a former id
+			const ops = page.ops.map(e => openOperation(keys.fields, { id: e.id, module: this.module, sealed: e.sealed }, formerlyOf(this.module)))
 			const drifted = this.replica.receive(ops)
 			if (drifted.length) console.warn(`[sync] ${this.module}: ${drifted.length} operation(s) from a clock far ahead`, drifted.map(o => o.hlc))
 			this.position = page.position
@@ -179,8 +200,8 @@ export class ModuleSync {
 		}
 	}
 
-	private where(collection: string, id: string): string {
-		return `local/${this.module}/${collection}/${id}`
+	private where(collection: string, id: string, module = this.module): string {
+		return `local/${module}/${collection}/${id}`
 	}
 
 	/** As stored here: sealed (`encryptAtRest`) or as is. */
@@ -189,9 +210,9 @@ export class ModuleSync {
 	}
 
 	/** As read back: opened when sealed (a store from before `encryptAtRest`: as is). */
-	private opened(collection: string, id: string, data: unknown): unknown {
+	private opened(collection: string, id: string, data: unknown, module = this.module): unknown {
 		if (!isSealedAtRest(data)) return data
-		return JSON.parse(open(this.restKey!, this.where(collection, id), data.sealed))
+		return JSON.parse(open(this.restKey!, this.where(collection, id, module), data.sealed))
 	}
 
 	private markDirty(collection: string, doc: string): void {
@@ -211,6 +232,10 @@ export class ModuleSync {
 			this.dirty.clear()
 			const meta: Meta = { clock: this.replica.clock.current(), position: this.position, outbox: this.replica.pending(), imported: this.imported }
 			await local.put(key, this.module, SCOPE, [...docs, { collection: META, id: 'state', data: this.sealed(META, 'state', meta), updatedAt: now }])
+			if (this.movedFrom) {
+				await local.purge(key, this.movedFrom, SCOPE)
+				this.movedFrom = null
+			}
 		}
 		// one after the other: a later save never lands before an earlier one
 		this.saving = (this.saving ?? Promise.resolve()).then(run, run)

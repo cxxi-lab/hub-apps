@@ -233,3 +233,16 @@ test('a document is checked against its model as the server does', async () => {
 	assert.deepEqual(violations({ items: [{}] }, true), ['items[0].label: Required'])
 	assert.deepEqual(violations({ dueAt: 'tomorrow' }, true), ['dueAt: Must be a date and time (ISO 8601)'])
 })
+
+test('a renamed module still opens the operations sealed under its former id, and nothing else', () => {
+	const time = { now: 1_800_000_000_000 }
+	const a = device('a', time)
+	a.replica.put('video', 'v1', { title: 'kept' })
+	const [op] = a.replica.takeOutbox()
+	const sealed = sealOperation(key, 'nsfw', op)
+	// the log moved with the module (app:modules:rename): the same envelope, under its new id
+	const moved = { ...sealed, module: 'cxxi--nsfw' }
+	assert.throws(() => openOperation(key, moved))
+	assert.deepEqual(openOperation(key, moved, ['nsfw', 'private']).fields, { title: 'kept' })
+	assert.throws(() => openOperation(key, moved, ['planner']))
+})
