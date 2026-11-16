@@ -2,6 +2,7 @@ import { getApiBaseUrl } from './baseUrl'
 import { lockedByServer, unlockHeaders } from '@core/privacy/locks'
 import { getAuthData, resetAuthState } from '@core/auth/authState'
 import { tryRefreshToken } from '@core/auth/refresh'
+import { waitsForTunnel } from '@core/vpn/tunnel'
 
 /**
  * Non-2xx response. `message` stays `HTTP <status>` (callers match on it); `detail`
@@ -19,7 +20,15 @@ export function errorMessage(err: unknown, fallback = 'Request failed'): string 
 	return err instanceof Error ? err.message : fallback
 }
 
+/** A call for the VPN while its tunnel is down: not sent (core/vpn/tunnel.ts). */
+export class TunnelDownError extends ApiError {
+	constructor() {
+		super(503, 'The VPN is not connected')
+	}
+}
+
 export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+	if (waitsForTunnel(path)) throw new TunnelDownError()
 	const { token } = await getAuthData()
 
 	// a FormData body (multipart): the browser sets the type, with its boundary
@@ -62,6 +71,7 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
  * Sends raw bytes (a file) with the session, like api(): PUT by default. For the stores' files.
  */
 export async function apiUpload(path: string, body: Uint8Array | Blob, method = 'PUT'): Promise<void> {
+	if (waitsForTunnel(path)) throw new TunnelDownError()
 	const { token } = await getAuthData()
 	const response = await fetch(`${getApiBaseUrl(path)}${path}`, {
 		method,

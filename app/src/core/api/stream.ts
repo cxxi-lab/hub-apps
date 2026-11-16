@@ -2,6 +2,8 @@ import { getApiBaseUrl } from './baseUrl'
 import { lockedByServer, unlockHeaders } from '@core/privacy/locks'
 import { getAuthData, resetAuthState } from '@core/auth/authState'
 import { tryRefreshToken } from '@core/auth/refresh'
+import { waitsForTunnel } from '@core/vpn/tunnel'
+import { TunnelDownError } from '@core/api/client'
 
 export type StreamEventHandler = (event: string, data: unknown) => void
 
@@ -11,6 +13,7 @@ export type StreamEventHandler = (event: string, data: unknown) => void
  * a 401 refreshes the token once before giving up.
  */
 export async function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
+	if (waitsForTunnel(path)) throw new TunnelDownError()
 	const { token } = await getAuthData()
 
 	const headers = {

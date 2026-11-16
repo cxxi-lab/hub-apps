@@ -1,5 +1,5 @@
 import { platform } from '@platform'
-import { api } from '@core/api/client'
+import { api, TunnelDownError } from '@core/api/client'
 import { requireDataKeys } from '@core/crypto/dataKey'
 import { open, seal } from '@core/crypto/format'
 import { encryptsAtRest, formerlyOf } from '@core/module/declarations'
@@ -153,7 +153,8 @@ export class ModuleSync {
 				} while (this.again)
 			}
 			catch (err) {
-				console.warn(`[sync] ${this.module}: not synced`, err)
+				// a module behind the VPN, its tunnel closed: it syncs when it is open again
+				if (!(err instanceof TunnelDownError)) console.warn(`[sync] ${this.module}: not synced`, err)
 			}
 			finally {
 				this.syncing = null
