@@ -6,14 +6,14 @@ hub's apps: the shared React shell (`app/`), and its platforms (`platforms/`): t
 
 The apps ship no module: each one is installed from the server's signed catalogue when enabled. The
 modules live in their own repositories (`cxxi-lab/hub-module-*`), the design system and the modules'
-CLI in [`cxxi-lab/hub-ui`](https://github.com/cxxi-lab/hub-ui).
+CLI in [`cxxi-lab/hubbyware-ui`](https://github.com/cxxi-lab/hubbyware-ui).
 
 ## Develop
 
 ```
-~/dev/hub/apps         this repository
-~/dev/hub/modules/<id> the modules' repositories (the development build loads their sources from
-                       ../../modules, or HUB_MODULES_DIR)
+~/dev/hubbyware/repos/client   this repository
+~/dev/hubbyware/repos/hubbies  the official modules (the development build loads their sources from
+                              ../hubbies, or HUB_MODULES_DIR)
 ```
 
 ```sh

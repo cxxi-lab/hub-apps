@@ -6,7 +6,7 @@
 	"homepage": "https://hubbyware.cxxi.io",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/cxxi-lab/hub-apps.git",
+		"url": "https://github.com/cxxi-lab/hubbyware-client.git",
 		"directory": "desktop"
 	},
 	"type": "module",

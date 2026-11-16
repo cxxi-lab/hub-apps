@@ -23,13 +23,15 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
  */
 /**
  * Where the modules' sources are, for development (the app loads them from there, hot reload):
- * HUB_MODULES_DIR, else src/modules if there is one, else the modules' folder next to the apps'
- * (~/dev/hub/modules, each module's repository).
+ * HUB_MODULES_DIR, else src/modules if there is one, else the official hubbies' checkout next to the apps'
+ * (repos/hubbies beside repos/client; repos/modules, its former name, still read).
  */
 export function modulesDir(appRoot: string): string {
 	if (process.env.HUB_MODULES_DIR) return resolve(process.env.HUB_MODULES_DIR)
 	const inside = resolve(appRoot, 'src/modules')
-	return existsSync(inside) ? inside : resolve(appRoot, '../../modules')
+	if (existsSync(inside)) return inside
+	const next = resolve(appRoot, '../../hubbies')
+	return existsSync(next) ? next : resolve(appRoot, '../../modules')
 }
 
 export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNullable<UserConfig['build']>, alias: Record<string, string> } {
@@ -77,7 +79,7 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 	const sdk: Plugin = {
 		name: 'hub-sdk-source',
 		enforce: 'pre',
-		// development: the modules' sources live outside this repository (../../modules)
+		// development: the modules' sources live outside this repository (../../hubbies)
 		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), modulesDir(appRoot)] } } }),
 		resolveId(id) {
 			return id === '@cxxi-lab/hub-sdk' ? SOURCES[id] : null

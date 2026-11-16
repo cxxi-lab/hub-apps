@@ -11,7 +11,7 @@ const BIN_NAME = process.platform === 'win32' ? 'wireproxy.exe' : 'wireproxy'
  * The wireproxy binary (the VPN tunnel) for this platform. The app doesn't carry it: it comes with
  * the module that uses the tunnel (native/<platform>/wireproxy in its package). A build run from
  * the sources (modules from their sources) takes HUB_WIREPROXY, else the module's copy next to the
- * apps: ../../modules/<id>/native/wireproxy/<platform>/wireproxy (the first module that has one).
+ * apps: ../../hubbies/<id>/native/wireproxy/<platform>/wireproxy (the first module that has one).
  * Null: not installed (the VPN can't start).
  */
 export function resolveWireproxyBinary(): string | null {
