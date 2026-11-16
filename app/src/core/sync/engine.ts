@@ -6,8 +6,8 @@ import { uuidv7 } from '@core/crypto/format'
 import { remoteCollection } from '@core/hubby/collections'
 import { onSyncEvent } from '@core/notifications/notifications'
 import { account } from '@core/storage/store'
-import { Clock } from './hlc'
-import { LOCAL_FIRST_KEY } from './mode'
+import { Clock, parse } from './hlc'
+import { isMigrated, LOCAL_FIRST_KEY, onTrial } from './mode'
 import { Replica, type DocState, type Operation } from './replica'
 import { openOperation, sealOperation, type Envelope } from './envelope'
 
@@ -16,8 +16,10 @@ import { openOperation, sealOperation, type Envelope } from './envelope'
  * device's base (platform.localStore, scope `sync`), synced through the relay (/api/data/<module>/_sync):
  *  - a write here is applied at once, stored, sent shortly after (sealed whole);
  *  - the relay's new operations are read when it says so (Mercure), on focus, and every minute;
- *  - the trial keeps the server's collections (Mongo) up to date too, so that a device not
- *    local-first yet still reads the same data (its own writes don't come back here).
+ *  - on trial, the server's collections (Mongo) are kept up to date too, so that a device not
+ *    local-first yet still reads the same data (its own writes don't come back here);
+ *  - migrated (mode.ts), each device catches up once with what the server's collections have that
+ *    the log hasn't (written by a device not on trial), then they are no longer written.
  * The first time, the relay's log is read first: when another device already started it, this
  * one takes everything from it; only an empty log is seeded with the module's documents on the
  * server (copying them on every new device would rewrite them with a later clock, and could undo a
@@ -34,6 +36,8 @@ interface Meta {
 	position: number
 	outbox: Operation[]
 	imported: boolean
+	/** the server's collections read once since the module was migrated */
+	caughtUp?: boolean
 }
 
 function deviceId(): string {
@@ -69,6 +73,7 @@ export class ModuleSync {
 	private syncing: Promise<void> | null = null
 	private again = false
 	private imported = false
+	private caughtUp = false
 
 	constructor(readonly module: string) {
 		this.ready = this.start()
@@ -94,6 +99,7 @@ export class ModuleSync {
 
 		this.replica.subscribe((collection, doc) => this.markDirty(collection, doc))
 		this.imported = meta?.imported ?? false
+		this.caughtUp = meta?.caughtUp ?? false
 		// a first start: its data before the first screen, when the relay answers (offline: later)
 		if (!this.imported) await this.sync()
 
@@ -122,6 +128,37 @@ export class ModuleSync {
 		console.log(`[sync] ${this.module}: ${count} document(s) imported from the server`)
 	}
 
+	/**
+	 * Migrated (once per device): what the server's collections have that the log hasn't, written
+	 * there by a device not on trial, written here. Only a document changed there after its last
+	 * change here, and only the fields that differ: the trial's own copies there match and are
+	 * left. Documents gone there are kept here (a deletion there can't be told from a copy that
+	 * failed). Returns whether anything was written.
+	 */
+	private async catchUp(): Promise<boolean> {
+		let changed = 0
+		let missing = 0
+		for (const collection of modelsOf(this.module).keys()) {
+			const docs = await remoteCollection<Record<string, unknown>>(this.module, collection).findAll()
+			const there = new Set<string>()
+			for (const doc of docs) {
+				const { id, _createdAt, _updatedAt, _version, ...fields } = doc
+				void _createdAt; void _version
+				there.add(String(id))
+				const state = this.replica.state(collection, String(id))
+				if (state && Date.parse(String(_updatedAt)) <= parse(state.updated).wall) continue
+				const here = this.replica.get(collection, String(id)) ?? {}
+				const differ = Object.fromEntries(Object.entries(fields).filter(([f, v]) => !same(v, here[f])))
+				if (Object.keys(differ).length === 0) continue
+				this.replica.put(collection, String(id), differ)
+				changed++
+			}
+			missing += this.replica.list(collection).filter(d => !there.has(d.id)).length
+		}
+		console.log(`[sync] ${this.module}: caught up with the server, ${changed} document(s) taken` + (missing ? `, ${missing} not there (kept)` : ''))
+		return changed > 0
+	}
+
 	/** A write made here (localCollection): stored, then sent. */
 	wrote(): void {
 		void this.save()
@@ -145,9 +182,14 @@ export class ModuleSync {
 						// the log read: empty, this device seeds it; else it already has everything
 						if (this.position === 0) {
 							await this.importFromServer()
+							this.caughtUp = true
 							this.again = true
 						}
 						this.imported = true
+					}
+					if (!this.caughtUp && isMigrated(this.module)) {
+						if (await this.catchUp()) this.again = true
+						this.caughtUp = true
 					}
 				} while (this.again)
 			}
@@ -213,7 +255,7 @@ export class ModuleSync {
 				return { collection, id, data: this.replica.state(collection, id), updatedAt: now }
 			})
 			this.dirty.clear()
-			const meta: Meta = { clock: this.replica.clock.current(), position: this.position, outbox: this.replica.pending(), imported: this.imported }
+			const meta: Meta = { clock: this.replica.clock.current(), position: this.position, outbox: this.replica.pending(), imported: this.imported, caughtUp: this.caughtUp }
 			await local.put(key, this.module, SCOPE, [...docs, { collection: META, id: 'state', data: meta, updatedAt: now }])
 		}
 		// one after the other: a later save never lands before an earlier one
@@ -222,8 +264,14 @@ export class ModuleSync {
 	}
 }
 
+/** Two field values alike (as JSON; missing and null alike). */
+function same(a: unknown, b: unknown): boolean {
+	return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
 /** For the trial: the server's collections (Mongo) kept up to date with this device's writes. */
 export async function mirror(module: string, op: Operation, existed: boolean): Promise<void> {
+	if (!onTrial(module)) return
 	const remote = remoteCollection<Record<string, unknown>>(module, op.collection)
 	try {
 		if (op.kind === 'delete') await remote.remove(op.doc)

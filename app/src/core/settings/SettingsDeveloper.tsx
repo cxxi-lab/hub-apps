@@ -3,12 +3,12 @@ import { Switch } from '@cxxi-lab/hub-ui'
 import { setDeveloperMode, useDeveloperMode } from '@core/settings/developer'
 import { isLocalFirst, localFirstAvailable, setLocalFirst } from '@core/sync/mode'
 
-/** The modules the local-first trial covers (docs/plan-local-first.md § 6). */
-const LOCAL_FIRST_TRIAL = [{ id: 'planner', label: 'Planner' }]
+/** The modules the local-first trial covers (docs/plan-local-first.md § 6); Planner migrated (core/sync/mode.ts). */
+const LOCAL_FIRST_TRIAL: Array<{ id: string, label: string }> = []
 
 function LocalFirstTrial() {
 	const [, refresh] = useState(0)
-	if (!localFirstAvailable()) return null
+	if (!localFirstAvailable() || LOCAL_FIRST_TRIAL.length === 0) return null
 	return (
 		<section className="bg-steel-900 border border-steel-700 rounded-md p-5 flex flex-col gap-3">
 			<div>
