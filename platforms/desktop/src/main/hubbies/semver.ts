@@ -27,8 +27,7 @@ export function satisfies(version: string, range: string): boolean {
 
 /**
  * Whether the SDK this app provides fits a hubby's range: its version, or one of the former ones it
- * still serves (version.json `compatible`: SDK 3 serves the hubbies built for SDK 2, their former
- * names kept at run time, until layer 5 of the rename).
+ * still serves (version.json `compatible`: an SDK keeping a former major's names at run time).
  */
 export function fits(sdk: { version: string, compatible?: string[] }, range: string): boolean {
 	return [sdk.version, ...(sdk.compatible ?? [])].some(version => satisfies(version, range))

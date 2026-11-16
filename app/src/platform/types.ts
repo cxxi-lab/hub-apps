@@ -415,8 +415,6 @@ export interface Platform {
 	authorizeOAuth(url: string, redirectUri: string): Promise<string | null>
 	/** Opens a hubby's window (HubbyManifest.windows), registered beforehand. */
 	openHubbyWindow(hubbyId: string, windowId: string): Promise<void>
-	/** @deprecated openHubbyWindow: its SDK 2 name, kept for the hubbies built before the rename */
-	openModuleWindow(hubbyId: string, windowId: string): Promise<void>
 	/** The windows of the active hubbies: what the app menu offers (replaces the previous list). */
 	registerHubbyWindows(windows: HubbyWindowInfo[]): Promise<void>
 	openAbout(): Promise<void>

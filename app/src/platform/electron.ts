@@ -45,7 +45,6 @@ export function createElectronPlatform(): Platform {
 		...window.api,
 		push: null,
 		hubbyStore: import.meta.env.DEV ? null : window.api.hubbyStore,
-		openModuleWindow: (hubbyId, windowId) => window.api.openHubbyWindow(hubbyId, windowId),
 		// served by the main process (its hubby:// protocol)
 		hubbyUrl: hubby => `hubby://${hubby}/`
 	}

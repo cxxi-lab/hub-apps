@@ -45,24 +45,3 @@ export function persistRefreshCookie(): void {
 	})
 }
 
-/**
- * The server is now hubbyware.cxxi.io: the refresh-token cookie of its former name (hub.cxxi.io,
- * host-only) carried over once, so the update keeps the session. To remove with the former name
- * (docs/plan-renommage-hubbyware.md, layer 5).
- */
-export async function carryRefreshCookie(): Promise<void> {
-	const FORMER = 'https://hub.cxxi.io/api/hub/auth', CURRENT = 'https://hubbyware.cxxi.io/api/hub/auth'
-	const cookies = session.defaultSession.cookies
-	try {
-		if ((await cookies.get({ url: CURRENT, name: 'refresh_token' })).length > 0) return
-		const [former] = await cookies.get({ url: FORMER, name: 'refresh_token' })
-		if (!former) return
-		await cookies.set({
-			url: CURRENT, name: former.name, value: former.value, path: former.path ?? '/api/hub/auth',
-			secure: true, httpOnly: true, sameSite: 'no_restriction', expirationDate: former.expirationDate
-		})
-		await cookies.flushStore()
-	} catch (error) {
-		console.warn('[session] the former session could not be carried over', error)
-	}
-}

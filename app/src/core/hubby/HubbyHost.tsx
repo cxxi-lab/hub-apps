@@ -74,7 +74,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			const m = data.message
 			switch (m.type) {
 				case 'ready':
-					send({ type: 'init', hubby, module: hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
+					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
 					break
 				case 'register':
 					setHubbyNav(hubby, m.pages, m.sections)

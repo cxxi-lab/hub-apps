@@ -3,7 +3,7 @@ import type { HubbyManifest } from '@core/hubby/types'
 import { grantScopes, revokeScope, useHubbyScopes } from '@core/hubbies/scopes'
 import { Switch } from '@cxxi-lab/hubbyware-ui'
 
-const FAMILY: Record<string, string> = { app: 'App', hubby: 'Other hubbies', module: 'Other hubbies', user: 'Your account' }
+const FAMILY: Record<string, string> = { app: 'App', hubby: 'Other hubbies', user: 'Your account' }
 
 /**
  * A hubby's permissions (its settings' common part): the scopes it asks for, each allowed or not;

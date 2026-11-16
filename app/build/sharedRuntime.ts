@@ -14,8 +14,6 @@ import type { Plugin, UserConfig } from 'vite'
 export const SHARED: Record<string, string> = createRequire(import.meta.url)('@cxxi-lab/hubbyware-sdk/shared.json')
 
 const VIRTUAL = 'virtual:hub-shared/'
-/** The packages' names before the rename → their current ones. */
-const FORMER: [string, string][] = [['@cxxi-lab/hub-sdk', '@cxxi-lab/hubbyware-sdk'], ['@cxxi-lab/hub-ui', '@cxxi-lab/hubbyware-ui']]
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 
 /**
@@ -26,10 +24,10 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 /**
  * Where the hubbies' sources are, for development (the app loads them from there, hot reload):
  * HUB_HUBBIES_DIR, else src/hubbies if there is one, else the official hubbies' checkout next to the apps'
- * (repos/hubbies beside repos/client; repos/hubbies, its former name, still read).
+ * (repos/hubbies beside repos/client).
  */
 export function hubbiesDir(appRoot: string): string {
-	if (process.env.HUB_HUBBIES_DIR ?? process.env.HUB_MODULES_DIR) return resolve((process.env.HUB_HUBBIES_DIR ?? process.env.HUB_MODULES_DIR)!)
+	if (process.env.HUB_HUBBIES_DIR) return resolve(process.env.HUB_HUBBIES_DIR)
 	const inside = resolve(appRoot, 'src/modules')
 	if (existsSync(inside)) return inside
 	const next = resolve(appRoot, '../../hubbies')
@@ -83,13 +81,8 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 		enforce: 'pre',
 		// development: the hubbies' sources live outside this repository (../../hubbies)
 		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), hubbiesDir(appRoot)] } } }),
-		// a hubby's sources from before the rename import the packages by their former names (until
-		// layer 5): the same SDK, the same design system
-		async resolveId(id, importer) {
-			if (id === '@cxxi-lab/hubbyware-sdk' || id === '@cxxi-lab/hub-sdk') return SOURCES['@cxxi-lab/hubbyware-sdk']
-			const former = FORMER.find(([name]) => id === name || id.startsWith(name + '/'))
-			if (former) return this.resolve(former[1] + id.slice(former[0].length), importer, { skipSelf: true })
-			return null
+		resolveId(id) {
+			return id === '@cxxi-lab/hubbyware-sdk' ? SOURCES[id] : null
 		}
 	}
 

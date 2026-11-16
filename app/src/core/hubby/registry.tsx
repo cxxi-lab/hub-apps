@@ -216,8 +216,7 @@ function manifestOf(exports: Record<string, unknown>): HubbyManifest | null {
 async function fromSources(): Promise<HubbyManifest[]> {
 	// the hubbies' sources, next to the app (@hub-hubbies: build/sharedRuntime.ts, HUB_HUBBIES_DIR)
 	const entries = import.meta.glob<Record<string, unknown>>('@hub-hubbies/*/manifest.tsx')
-	// hubby.json (module.json: a hubby not moved yet, until layer 5 of the rename)
-	const infos = import.meta.glob<HubbyDeclaration & { version: string, icon?: string, label: string, description?: string, isolated?: boolean }>(['@hub-hubbies/*/hubby.json', '@hub-hubbies/*/module.json'], { import: 'default', eager: true })
+	const infos = import.meta.glob<HubbyDeclaration & { version: string, icon?: string, label: string, description?: string, isolated?: boolean }>('@hub-hubbies/*/hubby.json', { import: 'default', eager: true })
 	for (const info of Object.values(infos)) declareHubby(info)
 	const models = import.meta.glob<ModelFile>('@hub-hubbies/*/models/*.json', { import: 'default', eager: true })
 	for (const [path, model] of Object.entries(models)) {

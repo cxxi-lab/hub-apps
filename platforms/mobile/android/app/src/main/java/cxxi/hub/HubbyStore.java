@@ -101,7 +101,7 @@ public final class HubbyStore {
     private File store;
     private boolean ready = false;
     private String sdkVersion = "0.0.0";
-    /** The former SDK versions this APK still serves (version.json `compatible`, until layer 5 of the rename). */
+    /** The former SDK versions this APK still serves (version.json `compatible`). */
     private final java.util.List<String> sdkCompatible = new java.util.ArrayList<>();
     /** id → the version running this session, in the APK catalogue's order; decided at start. */
     private final Map<String, Entry> active = new LinkedHashMap<>();

@@ -26,7 +26,7 @@ export function useContributions<P extends ContributionPoint>(point: P): Contrib
 		() => hubbies.flatMap(m => {
 			const value = m.contributes?.[point]
 			if (value === undefined || !hasScope(scopes, m.id, POINT_SCOPES[point])) return []
-			return [{ hubbyId: m.id, moduleId: m.id, value: value as Contribution<P>['value'] }]
+			return [{ hubbyId: m.id, value: value as Contribution<P>['value'] }]
 		}),
 		[hubbies, point, scopes]
 	)

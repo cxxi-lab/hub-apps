@@ -13,13 +13,8 @@ export interface TimelineItem {
 	id: string
 	date: Date
 	title: string
-	/**
-	 * the hubby that produced it (for grouping / coloring). A hubby built before the rename (SDK 2)
-	 * sets `moduleId` instead: a consumer reads `hubbyId ?? moduleId`.
-	 */
+	/** the hubby that produced it (for grouping / coloring) */
 	hubbyId: string
-	/** @deprecated hubbyId (SDK 2) */
-	moduleId?: string
 	/** where a consumer can send the user for the full item (deep-link fallback) */
 	href: string
 	/** optional presentation hint: a CSS color used as the chip accent (generic) */

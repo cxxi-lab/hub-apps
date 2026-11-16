@@ -4,5 +4,5 @@
 import './runtime.css'
 
 export { call, collection, nav, notifications, settings, useInit, usePath, type Doc } from './sdk'
-export { defineHubby, defineModule, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
+export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
 export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'

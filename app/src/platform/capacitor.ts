@@ -198,7 +198,6 @@ export function createCapacitorPlatform(): Platform {
 		authorizeOAuth: () => unavailable('authorizeOAuth'),
 		onSettingsGoto: () => () => {},
 		openHubbyWindow: () => unavailable('openHubbyWindow'),
-		openModuleWindow: () => unavailable('openHubbyWindow'),
 		registerHubbyWindows: async () => {},
 		systemNotifications: null,
 		push,

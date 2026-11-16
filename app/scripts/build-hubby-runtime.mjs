@@ -29,11 +29,6 @@ export const RUNTIME = {
 	'@cxxi-lab/hubbyware-sdk/frame': 'sdk'
 }
 
-/**
- * The names hubbies built before import (same files): kept for the bundles already published —
- * the monorepo's (@hub/…), then the packages' before the rename (until layer 5 of the rename).
- */
-const LEGACY = { '@hub/ui': 'ui', '@hub/sdk': 'sdk', '@cxxi-lab/hub-ui': 'ui', '@cxxi-lab/hub-sdk/frame': 'sdk' }
 
 const NPM = ['react', 'react/jsx-runtime', 'react-dom/client', '@fortawesome/react-fontawesome']
 
@@ -71,7 +66,7 @@ export async function buildHubbyRuntime(out) {
 	// The frame's page, the same for every hubby (the platform serves it at the hubby's root, the
 	// runtime under /_runtime/, the hubby's files at the root): the import map (allowed by its hash,
 	// nothing else inline), the base styles then the hubby's, the boot script. No network.
-	const importMap = JSON.stringify({ imports: Object.fromEntries(Object.entries({ ...RUNTIME, ...LEGACY }).map(([spec, name]) => [spec, `/_runtime/${name}.js`])) })
+	const importMap = JSON.stringify({ imports: Object.fromEntries(Object.entries(RUNTIME).map(([spec, name]) => [spec, `/_runtime/${name}.js`])) })
 	const mapHash = createHash('sha256').update(importMap).digest('base64')
 	const csp = [
 		"default-src 'none'",

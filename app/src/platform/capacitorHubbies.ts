@@ -176,7 +176,7 @@ function satisfies(version: string, range: string): boolean {
 
 /** The newest published version of each hubby this APK can run. */
 function compatible(published: PublishedEntry[], state: { sdk: string, compatible?: string[] }): Map<string, PublishedEntry> {
-	// its SDK's version, or a former one it still serves (version.json `compatible`, until layer 5)
+	// its SDK's version, or a former one it still serves (version.json `compatible`)
 	const provided = [state.sdk, ...(state.compatible ?? [])]
 	const newest = new Map<string, PublishedEntry>()
 	for (const entry of published) {

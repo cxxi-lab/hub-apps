@@ -6,14 +6,8 @@ import { useAmountsBlurred, useBlurEpoch } from '@core/privacy/hidden'
  * (`supports: ['amounts']`), a click shows that one until it is clicked again, the page is left or
  * Ctrl+Alt+Q. Not for an amount being typed (a field): only shown ones.
  */
-export function Amount({ hubby, module, children, className = '' }: {
-	hubby?: string
-	/** @deprecated hubby: its SDK 2 name, still read for the hubbies built before the rename */
-	module?: string
-	children: ReactNode
-	className?: string
-}) {
-	const blurred = useAmountsBlurred(hubby ?? module ?? '')
+export function Amount({ hubby, children, className = '' }: { hubby: string, children: ReactNode, className?: string }) {
+	const blurred = useAmountsBlurred(hubby)
 	const epoch = useBlurEpoch()
 	const [shown, setShown] = useState(false)
 

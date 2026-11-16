@@ -26,9 +26,6 @@ export function defineHubby(definition: HubbyDefinition): HubbyDefinition {
 	return definition
 }
 
-/** @deprecated defineHubby: its SDK 2 name, kept for the hubbies built before the rename */
-export const defineModule = defineHubby
-
 /** The page matching a path, with its parameters (`:name` segments). */
 export function match(pages: HubbyPageDefinition[], path: string): { page: HubbyPageDefinition, params: Record<string, string> } | null {
 	const parts = path.split('/').filter(Boolean)

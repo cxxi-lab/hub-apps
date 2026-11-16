@@ -53,12 +53,6 @@ const SHORTCUT_KEY = /^[a-z0-9]$/
 export function AppLayout() {
 	const location = useLocation()
 	const navigate = useNavigate()
-	// the hubbies' screen was /modules before the rename: a link kept from then lands on it
-	useEffect(() => {
-		if (location.pathname === '/modules' || location.pathname.startsWith('/modules/')) {
-			navigate({ pathname: '/hubbies' + location.pathname.slice('/modules'.length), search: location.search }, { replace: true })
-		}
-	}, [location.pathname, location.search, navigate])
 	const revealed = useRevealedHubbies()
 	const hidden = useHiddenHubbies()
 

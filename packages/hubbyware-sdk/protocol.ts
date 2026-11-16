@@ -26,12 +26,8 @@ export type GuestMessage =
 
 /** Host → guest. */
 export type HostMessage =
-	/**
-	 * `theme`, `accent`: the app's (a host from before themes sends none: dark, blue). `module`: the
-	 * hubby's id under its SDK 2 name, still sent for the hubbies built before the rename (a host from
-	 * before it sends `module` only).
-	 */
-	| { type: 'init', hubby: string, module: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string }
+	/** `theme`, `accent`: the app's (a host from before themes sends none: dark, blue) */
+	| { type: 'init', hubby: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string }
 	| { type: 'result', id: number, ok: true, value: unknown }
 	| { type: 'result', id: number, ok: false, error: string }
 	| { type: 'back' }

@@ -17,8 +17,6 @@ export type { TimelineItem, TimelineItemsProvider, TimelineDetailRenderer } from
 export { useContributions } from '@core/contexts/HubbiesContext'
 export { useAmountsBlurred, useHubbyVisible, usePrivateMode } from '@core/privacy/hidden'
 export { Amount } from '@core/privacy/Amount'
-/** @deprecated useHubbyVisible: its SDK 2 name, kept for the hubbies built before the rename */
-export { useHubbyVisible as useModuleVisible } from '@core/privacy/hidden'
 
 // The server API (authenticated)
 export { api, ApiError, errorMessage } from '@core/api/client'

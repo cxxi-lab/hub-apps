@@ -22,7 +22,5 @@ export type ContributionPoint = keyof ContributionPoints
 /** One hubby's contribution to a point. */
 export interface Contribution<P extends ContributionPoint> {
 	hubbyId: string
-	/** @deprecated hubbyId: its SDK 2 name, still set for the hubbies built before the rename */
-	moduleId: string
 	value: ContributionPoints[P]
 }
