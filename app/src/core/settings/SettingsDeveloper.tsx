@@ -5,8 +5,8 @@ import { isLocalFirst, localFirstAvailable, setLocalFirst } from '@core/sync/mod
 import { isInstalled, MODULE_MANIFESTS } from '@core/module/registry'
 import { useHiddenModules, useRevealedModules } from '@core/privacy/hidden'
 
-/** The modules the local-first trial covers (docs/plan-local-first.md § 6); Planner, Workouts and Hubby Lab migrated (core/sync/mode.ts). */
-const LOCAL_FIRST_TRIAL: Array<{ id: string, label: string }> = [{ id: 'nsfw', label: 'NSFW' }]
+/** The modules the local-first trial covers (docs/plan-local-first.md § 6); Planner, Workouts, Hubby Lab and NSFW migrated (core/sync/mode.ts). */
+const LOCAL_FIRST_TRIAL: Array<{ id: string, label: string }> = []
 
 function LocalFirstTrial() {
 	const [, refresh] = useState(0)
