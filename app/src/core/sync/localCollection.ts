@@ -5,13 +5,16 @@ import type { BatchOperation, CollectionPage, CollectionQuery, FilterValue, Hubb
 import { engine, mirror, type ModuleSync } from './engine'
 import { parse } from './hlc'
 import type { DocState, FieldValue } from './replica'
+import { decode, InvalidDocument } from './validate'
 
 /**
  * A module's collection served by this device's base (docs/plan-local-first.md § 3.7): the same
  * calls as on the server (core/hubby/collections.ts), answered from the replica. Filters, sorts and
- * pages run here, on every field (encrypted ones included: they are in clear on the device).
- * Defaults, required fields and references (`onDelete`) follow the module's models, as the server
- * does.
+ * pages run here, on every field (encrypted ones included: they are in clear on the device); a
+ * condition on a list field matches when one of its items does (as Mongo). Documents are checked
+ * against the module's models (validate.ts), with their unique indexes (on this device: two
+ * devices offline can still both write the same value) and their references (`onDelete`), as the
+ * server does.
  */
 
 const DEFAULT_LIMIT = 50
@@ -34,23 +37,41 @@ function compare(a: unknown, b: unknown): number {
 	return String(a) < String(b) ? -1 : 1
 }
 
+function matchesValue(value: unknown, condition: FilterValue): boolean {
+	if (condition === null || typeof condition !== 'object') return compare(value, condition) === 0
+	const c = condition
+	if (c.eq !== undefined && compare(value, c.eq) !== 0) return false
+	if (c.ne !== undefined && compare(value, c.ne) === 0) return false
+	if (c.in !== undefined && !c.in.some(v => compare(value, v) === 0)) return false
+	if (c.gt !== undefined && !(value !== null && compare(value, c.gt) > 0)) return false
+	if (c.gte !== undefined && !(value !== null && compare(value, c.gte) >= 0)) return false
+	if (c.lt !== undefined && !(value !== null && compare(value, c.lt) < 0)) return false
+	if (c.lte !== undefined && !(value !== null && compare(value, c.lte) <= 0)) return false
+	if (c.exists !== undefined && (value !== null) !== c.exists) return false
+	if (c.prefix !== undefined && !(typeof value === 'string' && value.startsWith(c.prefix))) return false
+	return true
+}
+
 function matches(doc: Doc, filter: Record<string, FilterValue> = {}): boolean {
 	for (const [field, condition] of Object.entries(filter)) {
 		const value = doc[field] ?? null
-		if (condition === null || typeof condition !== 'object') {
-			if (compare(value, condition) !== 0) return false
+		if (Array.isArray(value)) {
+			// a list: `ne` when no item is equal; `exists` on the list itself; the rest when one item matches
+			if (condition !== null && typeof condition === 'object' && condition.ne !== undefined) {
+				if (value.some(v => compare(v, condition.ne) === 0)) return false
+				const { ne, ...rest } = condition
+				void ne
+				if (Object.keys(rest).length && !value.some(v => matchesValue(v, rest))) return false
+				continue
+			}
+			if (condition !== null && typeof condition === 'object' && condition.exists !== undefined) {
+				if (!condition.exists) return false
+				continue
+			}
+			if (!value.some(v => matchesValue(v, condition))) return false
 			continue
 		}
-		const c = condition
-		if (c.eq !== undefined && compare(value, c.eq) !== 0) return false
-		if (c.ne !== undefined && compare(value, c.ne) === 0) return false
-		if (c.in !== undefined && !c.in.some(v => compare(value, v) === 0)) return false
-		if (c.gt !== undefined && !(value !== null && compare(value, c.gt) > 0)) return false
-		if (c.gte !== undefined && !(value !== null && compare(value, c.gte) >= 0)) return false
-		if (c.lt !== undefined && !(value !== null && compare(value, c.lt) < 0)) return false
-		if (c.lte !== undefined && !(value !== null && compare(value, c.lte) <= 0)) return false
-		if (c.exists !== undefined && (value !== null) !== c.exists) return false
-		if (c.prefix !== undefined && !(typeof value === 'string' && value.startsWith(c.prefix))) return false
+		if (!matchesValue(value, condition)) return false
 	}
 	return true
 }
@@ -78,26 +99,35 @@ export function localCollection<T extends object>(module: string, name: string) 
 		return doc
 	}
 
-	/** Defaults for the fields not given (a new document), then the required ones checked. */
+	/** Checked against the model (defaults for a new document, required fields): as the server would store it. */
 	const complete = (data: Record<string, unknown>, creating: boolean): Record<string, unknown> => {
-		const fields = model()?.fields ?? {}
-		const out = { ...data }
-		if (creating) {
-			for (const [field, spec] of Object.entries(fields)) {
-				if (out[field] === undefined && spec.default !== undefined) out[field] = spec.default
-			}
+		const m = model()
+		if (!m) return data
+		try {
+			return decode(m, data, !creating)
 		}
-		for (const [field, spec] of Object.entries(fields)) {
-			if (spec.required && (creating || field in out) && (out[field] === undefined || out[field] === null || out[field] === '')) {
-				throw new ApiError(422, `${field} is required`)
-			}
+		catch (err) {
+			if (err instanceof InvalidDocument) throw new ApiError(422, err.message)
+			throw err
 		}
-		return out
+	}
+
+	/** The model's unique indexes, among the documents on this device. */
+	const checkUnique = (e: ModuleSync, id: string, fields: Record<string, unknown>): void => {
+		const merged = { ...(e.replica.get(name, id) ?? {}), ...fields }
+		for (const index of model()?.indexes ?? []) {
+			if (!index.unique) continue
+			const keys = index.fields.map(([field]) => field)
+			if (keys.every(k => merged[k] === null || merged[k] === undefined)) continue
+			const taken = e.replica.list(name).some(d => d.id !== id && keys.every(k => compare(d.data[k] ?? null, merged[k] ?? null) === 0))
+			if (taken) throw new ApiError(409, `Already used: ${keys.join(', ')}`)
+		}
 	}
 
 	const write = async (e: ModuleSync, id: string, data: Record<string, unknown>, existed: boolean): Promise<D> => {
 		const { id: _id, _createdAt, _updatedAt, _version, ...fields } = data
 		void _id; void _createdAt; void _updatedAt; void _version
+		checkUnique(e, id, fields)
 		const op = e.replica.put(name, id, fields, model()?.version)
 		e.wrote()
 		void mirror(module, op, existed)

@@ -199,3 +199,37 @@ test('an import keeps the documents\' dates, and a later change still wins', () 
 	a.sync(relay)
 	assert.deepEqual(a.replica.get('event', 'e1'), { title: 'new' })
 })
+
+test('a document is checked against its model as the server does', async () => {
+	const { decode, InvalidDocument } = await import('./validate')
+	const note = {
+		collection: 'note', version: 2,
+		fields: {
+			title: { type: 'string', max: 5, required: true },
+			contact: { type: 'string', format: 'email', encrypted: 'equality' as const },
+			tags: { type: 'array', items: { type: 'string', max: 3 }, maxItems: 2 },
+			pinned: { type: 'bool', default: false },
+			priority: { type: 'enum', values: ['low', 'high'], default: 'low' },
+			dueAt: { type: 'datetime' },
+			amount: { type: 'decimal', scale: 2, min: 0 },
+			items: { type: 'array', items: { type: 'object', fields: { label: { type: 'string', required: true }, done: { type: 'bool', default: false } } } },
+		},
+	}
+	assert.deepEqual(decode(note, { title: 'a', dueAt: '2026-11-16T12:00:00+01:00', amount: '12.5', items: [{ label: 'x' }] }, false),
+		{ title: 'a', pinned: false, priority: 'low', dueAt: '2026-11-16T11:00:00.000Z', amount: '12.50', items: [{ label: 'x', done: false }] })
+	// an update: only what is given
+	assert.deepEqual(decode(note, { amount: 3 }, true), { amount: '3.00' })
+	const violations = (input: Record<string, unknown>, partial = false) => {
+		try { decode(note, input, partial); return [] }
+		catch (err) { assert.ok(err instanceof InvalidDocument); return (err as InstanceType<typeof InvalidDocument>).violations.map(v => `${v.path}: ${v.message}`) }
+	}
+	assert.deepEqual(violations({}), ['title: Required'])
+	assert.deepEqual(violations({ title: 'toolong', contact: 'nope', tags: ['abcd'], priority: 'mid', amount: '1.234', other: 1 }), [
+		'other: Unknown field', 'title: At most 5 characters', 'contact: Not a valid email', 'tags[0]: At most 3 characters',
+		'priority: Must be one of: low, high', 'amount: At most 2 decimals',
+	])
+	assert.deepEqual(violations({ amount: '-1' }, true), ['amount: At least 0'])
+	assert.deepEqual(violations({ title: null }, true), ['title: Required'])
+	assert.deepEqual(violations({ items: [{}] }, true), ['items[0].label: Required'])
+	assert.deepEqual(violations({ dueAt: 'tomorrow' }, true), ['dueAt: Must be a date and time (ISO 8601)'])
+})

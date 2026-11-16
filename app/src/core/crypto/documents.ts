@@ -24,6 +24,7 @@ export interface ModelFile {
 	collection: string
 	version: number
 	fields: Record<string, FieldSpec>
+	indexes?: Array<{ fields: Array<[string, number]>, unique?: boolean }>
 }
 
 export interface EncryptedModel {
