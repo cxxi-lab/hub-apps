@@ -18,9 +18,6 @@ export { useContributions } from '@core/contexts/ModulesContext'
 export { useAmountsBlurred, useModuleVisible, usePrivateMode } from '@core/privacy/hidden'
 export { Amount } from '@core/privacy/Amount'
 
-// The generic store: a module's data, on the server or on each device as the account chose (Data)
-export { openStore, useStorageModes, StoreUnavailableError, type Store, type StoreItem, type StorageMode } from '@core/storage/store'
-
 // The server API (authenticated)
 export { api, ApiError, errorMessage } from '@core/api/client'
 export { getApiBaseUrl } from '@core/api/baseUrl'

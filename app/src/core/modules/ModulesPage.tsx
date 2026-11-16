@@ -9,7 +9,6 @@ import { allModules, enabledIds } from '@core/module/visibility'
 import { ConfirmationModal, Modal } from '@cxxi-lab/hub-ui'
 import { NotificationsSettings } from '@core/modules/common/NotificationsSettings'
 import { PrivacySettings } from '@core/modules/common/PrivacySettings'
-import { DataSettings } from '@core/modules/common/DataSettings'
 import { PinSettings } from '@core/modules/common/PinSettings'
 import { PermissionsSettings } from '@core/modules/common/PermissionsSettings'
 import { grantScopes, missingScopes, useModuleScopes } from '@core/modules/scopes'
@@ -397,7 +396,6 @@ function ModuleSettings({ module: m, removable, pinned, onPin, onUninstall, onBa
 			{!m.local && isInstalled(m) && <PermissionsSettings module={m} />}
 			{m.supports?.includes('notifications') && isInstalled(m) && <NotificationsSettings module={m} />}
 			{!m.local && <PrivacySettings module={m} />}
-			{m.storage && isInstalled(m) && <DataSettings module={m} />}
 
 			{Own
 				? <Own />

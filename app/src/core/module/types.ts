@@ -49,17 +49,6 @@ export interface ModuleRoute {
  */
 export type ModuleSupport = 'notifications' | 'vpn' | 'amounts'
 
-/** A scope of a module's data whose place the account chooses (docs/plan-module-storage.md). */
-export interface StorageScope {
-	id: string
-	/** shown in its settings (Data) */
-	label: string
-	modes: Array<'local' | 'server'>
-	default: 'local' | 'server'
-	/** each item may live elsewhere than the scope says (notes kept local…) */
-	perItem?: boolean
-}
-
 export interface ModuleManifest {
 	id: string
 	label: string
@@ -100,8 +89,6 @@ export interface ModuleManifest {
 	 * module's settings and its plumbing in the app, e.g. 'notifications' (the top bar's badge).
 	 */
 	supports?: ModuleSupport[]
-	/** The scopes of its data that can live on the server or on each device (Data in its settings). */
-	storage?: { scopes: StorageScope[] }
 	/** What this module offers the others, by contribution point (see ContributionPoints). */
 	contributes?: Partial<ContributionPoints>
 	/**

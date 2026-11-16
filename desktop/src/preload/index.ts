@@ -13,7 +13,6 @@ import type {
 	ModulePackage,
 	RestrictedModulePackage,
 	StoredDocument,
-	StoredFile,
 	SystemNotification
 } from '@hub/app/platform'
 
@@ -104,11 +103,7 @@ const api = {
 		get: (account: string, module: string, scope: string, collection: string, id: string): Promise<StoredDocument | null> => ipcRenderer.invoke('store:get', account, module, scope, collection, id),
 		put: (account: string, module: string, scope: string, documents: StoredDocument[]): Promise<void> => ipcRenderer.invoke('store:put', account, module, scope, documents),
 		delete: (account: string, module: string, scope: string, collection: string, id: string): Promise<void> => ipcRenderer.invoke('store:delete', account, module, scope, collection, id),
-		purge: (account: string, module: string, scope: string): Promise<void> => ipcRenderer.invoke('store:purge', account, module, scope),
-		files: (account: string, module: string, scope: string): Promise<StoredFile[]> => ipcRenderer.invoke('store:files', account, module, scope),
-		putFile: (account: string, module: string, scope: string, path: string, body: Uint8Array): Promise<void> => ipcRenderer.invoke('store:file:put', account, module, scope, path, body),
-		getFile: (account: string, module: string, scope: string, path: string): Promise<Uint8Array | null> => ipcRenderer.invoke('store:file:get', account, module, scope, path),
-		deleteFile: (account: string, module: string, scope: string, path: string): Promise<void> => ipcRenderer.invoke('store:file:delete', account, module, scope, path)
+		purge: (account: string, module: string, scope: string): Promise<void> => ipcRenderer.invoke('store:purge', account, module, scope)
 	},
 
 	systemNotifications: {

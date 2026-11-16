@@ -194,15 +194,10 @@ export interface StoredDocument {
 	updatedAt: number
 }
 
-export interface StoredFile {
-	path: string
-	size: number
-	sha256: string
-}
-
 /**
- * The modules' store on this device (SQLite: desktop in the main process, Android a plugin): the scopes the account
- * keeps local. Every call names the account (a hash), the module and the scope.
+ * The device's base for the modules' data (SQLite: desktop in the main process, Android a plugin),
+ * where the local-first sync keeps them (core/sync). Every call names the account (a hash), the
+ * module and the scope.
  */
 export interface LocalStoreApi {
 	list(account: string, module: string, scope: string, collection?: string): Promise<StoredDocument[]>
@@ -210,10 +205,6 @@ export interface LocalStoreApi {
 	put(account: string, module: string, scope: string, documents: StoredDocument[]): Promise<void>
 	delete(account: string, module: string, scope: string, collection: string, id: string): Promise<void>
 	purge(account: string, module: string, scope: string): Promise<void>
-	files(account: string, module: string, scope: string): Promise<StoredFile[]>
-	putFile(account: string, module: string, scope: string, path: string, body: Uint8Array): Promise<void>
-	getFile(account: string, module: string, scope: string, path: string): Promise<Uint8Array | null>
-	deleteFile(account: string, module: string, scope: string, path: string): Promise<void>
 }
 
 /**

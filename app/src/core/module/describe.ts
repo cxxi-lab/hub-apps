@@ -1,6 +1,6 @@
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
 import type { ModulePackage } from '@platform'
-import type { ModuleManifest, StorageScope } from './types'
+import type { ModuleManifest } from './types'
 
 /**
  * A module's module.json: its version, the SDK it needs, and how it is described before it is
@@ -18,11 +18,9 @@ export interface ModuleInfo {
 	requiresCapabilities?: string[]
 	/** shared features (ModuleSupport) */
 	supports?: string[]
-	/** the scopes of its data the account places (local or server) */
-	storage?: { scopes: StorageScope[] }
 }
 
-type Described = Pick<ModuleManifest, 'label' | 'description' | 'local' | 'requires' | 'requiresCapabilities' | 'supports' | 'storage'>
+type Described = Pick<ModuleManifest, 'label' | 'description' | 'local' | 'requires' | 'requiresCapabilities' | 'supports'>
 
 /** The manifest's descriptive part, from its module.json (one source for both). */
 export function describe(info: ModuleInfo): Described {
@@ -32,8 +30,7 @@ export function describe(info: ModuleInfo): Described {
 		local: info.local,
 		requires: info.requires,
 		requiresCapabilities: info.requiresCapabilities as Described['requiresCapabilities'],
-		supports: info.supports as Described['supports'],
-		storage: info.storage
+		supports: info.supports as Described['supports']
 	}
 }
 

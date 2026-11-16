@@ -3,7 +3,6 @@ package cxxi.hub;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.util.Base64;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -15,21 +14,15 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The modules' store on this device (platform.localStore, as desktop/src/main/store/localStore.ts):
- * one SQLite database per account and module (its documents, by scope and collection), its files
- * next to it — filesDir/store/&lt;account&gt;/&lt;module&gt;.sqlite and &lt;module&gt;/&lt;scope&gt;/&lt;path&gt;.
- * The local-first modules keep their replica here (scope `sync`, docs/plan-local-first.md).
- * A document's data crosses the bridge as a JSON string; a file as base64.
+ * The device's base for the modules' data (platform.localStore, as desktop/src/main/store/localStore.ts):
+ * one SQLite database per account and module (its documents, by scope and collection) —
+ * filesDir/store/&lt;account&gt;/&lt;module&gt;.sqlite. The local-first modules keep their replica here
+ * (scope `sync`, docs/plan-local-first.md). A document's data crosses the bridge as a JSON string.
  */
 @CapacitorPlugin(name = "LocalStore")
 public class LocalStorePlugin extends Plugin {
@@ -39,8 +32,6 @@ public class LocalStorePlugin extends Plugin {
     private static final Pattern SCOPE = Pattern.compile("^[a-z0-9-]{1,40}$");
     private static final Pattern COLLECTION = Pattern.compile("^[a-z0-9_-]{1,40}$");
     private static final Pattern DOC_ID = Pattern.compile("^[A-Za-z0-9._:-]{1,64}$");
-    private static final Pattern FILE = Pattern.compile("^[A-Za-z0-9._-]{1,120}(/[A-Za-z0-9._-]{1,120}){0,3}$");
-    private static final int MAX_FILE = 50 * 1024 * 1024;
 
     private final Map<String, SQLiteDatabase> databases = new HashMap<>();
 
@@ -188,125 +179,12 @@ public class LocalStorePlugin extends Plugin {
         }
     }
 
-    /** Empties a scope here: documents and files. */
+    /** Empties a scope here. */
     @PluginMethod
     public void purge(PluginCall call) {
         try {
             String[] a = at(call);
             db(a[0], a[1]).delete("document", "scope = ?", new String[] { a[2] });
-            deleteTree(scopeDir(a));
-            call.resolve();
-        }
-        catch (Exception e) {
-            call.reject(e.getMessage(), e);
-        }
-    }
-
-    // --- files ---
-
-    private File scopeDir(String[] a) {
-        return new File(new File(new File(root(), a[0]), a[1]), a[2]);
-    }
-
-    private File file(String[] a, String path) {
-        check(path, FILE, "path");
-        if (path.contains("..")) throw new IllegalArgumentException("store: bad path");
-        return new File(scopeDir(a), path);
-    }
-
-    private static void deleteTree(File f) {
-        File[] children = f.listFiles();
-        if (children != null) for (File child : children) deleteTree(child);
-        //noinspection ResultOfMethodCallIgnored
-        f.delete();
-    }
-
-    private static byte[] read(File f) throws Exception {
-        try (FileInputStream in = new FileInputStream(f)) {
-            byte[] body = new byte[(int) f.length()];
-            int off = 0;
-            while (off < body.length) {
-                int n = in.read(body, off, body.length - off);
-                if (n < 0) break;
-                off += n;
-            }
-            return body;
-        }
-    }
-
-    @PluginMethod
-    public void files(PluginCall call) {
-        try {
-            File root = scopeDir(at(call));
-            List<JSObject> found = new ArrayList<>();
-            walk(root, root, found);
-            found.sort((x, y) -> x.getString("path").compareTo(y.getString("path")));
-            JSArray list = new JSArray();
-            for (JSObject f : found) list.put(f);
-            JSObject result = new JSObject();
-            result.put("files", list);
-            call.resolve(result);
-        }
-        catch (Exception e) {
-            call.reject(e.getMessage(), e);
-        }
-    }
-
-    private static void walk(File root, File dir, List<JSObject> out) throws Exception {
-        File[] children = dir.listFiles();
-        if (children == null) return;
-        for (File child : children) {
-            if (child.isDirectory()) { walk(root, child, out); continue; }
-            if (child.getName().endsWith(".partial")) continue;
-            byte[] body = read(child);
-            StringBuilder hex = new StringBuilder();
-            for (byte b : MessageDigest.getInstance("SHA-256").digest(body)) hex.append(String.format("%02x", b));
-            JSObject f = new JSObject();
-            f.put("path", root.toURI().relativize(child.toURI()).getPath());
-            f.put("size", body.length);
-            f.put("sha256", hex.toString());
-            out.add(f);
-        }
-    }
-
-    @PluginMethod
-    public void putFile(PluginCall call) {
-        try {
-            File target = file(at(call), call.getString("path"));
-            byte[] body = Base64.decode(call.getString("body", ""), Base64.NO_WRAP);
-            if (body.length > MAX_FILE) throw new IllegalArgumentException("store: file too large");
-            //noinspection ResultOfMethodCallIgnored
-            target.getParentFile().mkdirs();
-            File partial = new File(target.getPath() + ".partial");
-            try (FileOutputStream out = new FileOutputStream(partial)) {
-                out.write(body);
-            }
-            if (!partial.renameTo(target)) throw new IllegalStateException("store: file not written");
-            call.resolve();
-        }
-        catch (Exception e) {
-            call.reject(e.getMessage(), e);
-        }
-    }
-
-    @PluginMethod
-    public void getFile(PluginCall call) {
-        try {
-            File target = file(at(call), call.getString("path"));
-            JSObject result = new JSObject();
-            result.put("body", target.exists() ? Base64.encodeToString(read(target), Base64.NO_WRAP) : JSONObject.NULL);
-            call.resolve(result);
-        }
-        catch (Exception e) {
-            call.reject(e.getMessage(), e);
-        }
-    }
-
-    @PluginMethod
-    public void deleteFile(PluginCall call) {
-        try {
-            //noinspection ResultOfMethodCallIgnored
-            file(at(call), call.getString("path")).delete();
             call.resolve();
         }
         catch (Exception e) {

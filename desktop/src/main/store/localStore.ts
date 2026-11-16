@@ -1,15 +1,13 @@
 import { app, ipcMain } from 'electron'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 /**
- * The modules' generic store, on this device (docs/plan-module-storage.md): a scope whose data the
- * account keeps local lives here, never on the server. One SQLite database per account and module
- * (its documents, by scope and collection), its files next to it:
- *   userData/store/<account>/<module>.sqlite, userData/store/<account>/<module>/<scope>/<path>.
- * The app reaches it through IPC (platform.localStore); the server side is App\Core\Storage\DataStore.
+ * The device's base for the modules' data (docs/plan-local-first.md): what the local-first sync
+ * keeps here (app/src/core/sync, scope `sync`). One SQLite database per account and module, its
+ * documents by scope and collection: userData/store/<account>/<module>.sqlite.
+ * The app reaches it through IPC (platform.localStore).
  */
 
 const ROOT = join(app.getPath('userData'), 'store')
@@ -18,8 +16,6 @@ const MODULE = /^[a-z0-9-]{1,40}$/
 const SCOPE = /^[a-z0-9-]{1,40}$/
 const COLLECTION = /^[a-z0-9_-]{1,40}$/
 const DOC_ID = /^[A-Za-z0-9._:-]{1,64}$/
-const FILE = /^[A-Za-z0-9._-]{1,120}(\/[A-Za-z0-9._-]{1,120}){0,3}$/
-const MAX_FILE = 50 * 1024 * 1024
 
 export interface StoredDocument {
 	collection: string
@@ -55,15 +51,6 @@ function db(account: string, module: string): DatabaseSync {
 		databases.set(key, found)
 	}
 	return found
-}
-
-function scopeDir(account: string, module: string, scope: string): string {
-	return join(ROOT, account, module, scope)
-}
-
-function filePath(account: string, module: string, scope: string, path: string): string {
-	if (path.includes('..')) throw new Error('store: bad path')
-	return join(scopeDir(account, module, scope), path)
 }
 
 type Row = { collection: string, id: string, data: string, updated_at: number }
@@ -105,45 +92,9 @@ function remove(account: string, module: string, scope: string, collection: stri
 	db(account, module).prepare('DELETE FROM document WHERE scope = ? AND collection = ? AND id = ?').run(scope, collection, id)
 }
 
-/** Empties a scope here (its data moved to the server): documents and files. */
+/** Empties a scope here. */
 function purge(account: string, module: string, scope: string): void {
 	db(account, module).prepare('DELETE FROM document WHERE scope = ?').run(scope)
-	rmSync(scopeDir(account, module, scope), { recursive: true, force: true })
-}
-
-function files(account: string, module: string, scope: string): { path: string, size: number, sha256: string }[] {
-	const root = scopeDir(account, module, scope)
-	if (!existsSync(root)) return []
-	const found: { path: string, size: number, sha256: string }[] = []
-	const walk = (dir: string) => {
-		for (const name of readdirSync(dir)) {
-			const full = join(dir, name)
-			if (statSync(full).isDirectory()) walk(full)
-			else if (!name.endsWith('.partial')) {
-				const body = readFileSync(full)
-				found.push({ path: relative(root, full).split('\\').join('/'), size: body.length, sha256: createHash('sha256').update(body).digest('hex') })
-			}
-		}
-	}
-	walk(root)
-	return found.sort((a, b) => a.path.localeCompare(b.path))
-}
-
-function putFile(account: string, module: string, scope: string, path: string, body: Uint8Array): void {
-	if (body.byteLength > MAX_FILE) throw new Error('store: file too large')
-	const target = filePath(account, module, scope, path)
-	mkdirSync(dirname(target), { recursive: true })
-	writeFileSync(`${target}.partial`, body)
-	renameSync(`${target}.partial`, target)
-}
-
-function readFile(account: string, module: string, scope: string, path: string): Uint8Array | null {
-	const target = filePath(account, module, scope, path)
-	return existsSync(target) ? new Uint8Array(readFileSync(target)) : null
-}
-
-function removeFile(account: string, module: string, scope: string, path: string): void {
-	rmSync(filePath(account, module, scope, path), { force: true })
 }
 
 export function setupLocalStore(): void {
@@ -162,11 +113,4 @@ export function setupLocalStore(): void {
 	ipcMain.handle('store:delete', (_e, account, module, scope, collection, id) =>
 		remove(...at(account, module, scope), check(collection, COLLECTION, 'collection'), check(id, DOC_ID, 'id')))
 	ipcMain.handle('store:purge', (_e, account, module, scope) => purge(...at(account, module, scope)))
-	ipcMain.handle('store:files', (_e, account, module, scope) => files(...at(account, module, scope)))
-	ipcMain.handle('store:file:put', (_e, account, module, scope, path, body: unknown) => {
-		if (!(body instanceof Uint8Array)) throw new Error('store: bad file')
-		putFile(...at(account, module, scope), check(path, FILE, 'path'), body)
-	})
-	ipcMain.handle('store:file:get', (_e, account, module, scope, path) => readFile(...at(account, module, scope), check(path, FILE, 'path')))
-	ipcMain.handle('store:file:delete', (_e, account, module, scope, path) => removeFile(...at(account, module, scope), check(path, FILE, 'path')))
 }
