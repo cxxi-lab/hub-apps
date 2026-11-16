@@ -12,7 +12,7 @@ import './app/deviceSecrets'
 import { setupCompanion } from './companion'
 import { setupPlayerBlocklist } from './session/playerBlocklist'
 import { integrationsRegistry } from './session/integrations'
-import { persistRefreshCookie } from './session/sessions'
+import { carryRefreshCookie, persistRefreshCookie } from './session/sessions'
 import { checkForUpdateAtStartup } from './network/updater'
 import { setupModules } from './modules/manager'
 import { setupVpn } from './network/vpn'
@@ -72,6 +72,7 @@ app.whenReady().then(async () => {
 	if (!(await singleInstance)) return
 	// before any window: they open in the theme's colours
 	setupTheme()
+	await carryRefreshCookie()
 	persistRefreshCookie()
 	setupPlayerBlocklist()
 	setupVpn()

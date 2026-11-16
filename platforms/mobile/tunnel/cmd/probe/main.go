@@ -55,8 +55,8 @@ func main() {
 	get("YT iframe_api     ", proxied, "https://www.youtube.com/iframe_api")
 	get("YT embed page     ", proxied, "https://www.youtube.com/embed/"+*video)
 	get("YT player JS      ", proxied, playerJS(proxied, *video))
-	get("hub API (tunnel)  ", proxied, "https://hub.cxxi.io/")
-	get("hub API (direct)  ", direct, "https://hub.cxxi.io/")
+	get("hub API (tunnel)  ", proxied, "https://hubbyware.cxxi.io/")
+	get("hub API (direct)  ", direct, "https://hubbyware.cxxi.io/")
 }
 
 func client(ep *tunnel.Endpoint, withAuth bool) *http.Client {

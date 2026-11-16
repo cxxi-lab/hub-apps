@@ -3,7 +3,7 @@
 	"private": true,
 	"version": "0.103.1",
 	"description": "hub, the desktop app",
-	"homepage": "https://hub.cxxi.io",
+	"homepage": "https://hubbyware.cxxi.io",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/cxxi-lab/hub-apps.git",
@@ -79,7 +79,7 @@
 		"publish": [
 			{
 				"provider": "generic",
-				"url": "https://hub.cxxi.io/releases/",
+				"url": "https://hubbyware.cxxi.io/releases/",
 				"channel": "latest"
 			}
 		],

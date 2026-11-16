@@ -44,12 +44,12 @@ import cxxi.hub.tunnel.Tunnel;
  * It runs only while Private is open (the web side's TunnelGate starts it on entering, stops it on
  * leaving): the whole app then goes through it, Private's sites and its API (vpn.cxxi.io, refused
  * by the server from anywhere else); while it comes up or if it fails, every request is blocked.
- * Otherwise, no override: the app talks to hub.cxxi.io directly.
+ * Otherwise, no override: the app talks to hubbyware.cxxi.io directly.
  *
  * The config is the device's wg-quick file, copied to the app's private files
  * dir (filesDir/vpn.conf) by "Replace config". It must route everything
  * (AllowedIPs = 0.0.0.0/0): the tunnel is userspace, a split-tunnel config
- * drops DNS and the public hub.cxxi.io address.
+ * drops DNS and the public hubbyware.cxxi.io address.
  */
 final class TunnelManager {
 

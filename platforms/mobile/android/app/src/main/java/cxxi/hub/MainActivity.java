@@ -30,6 +30,8 @@ public class MainActivity extends BridgeActivity {
         // Which version of each module this session runs (built in, or a downloaded newer one).
         ModuleStore.get().setup(this);
         // The tunnel only carries Private: it starts with private mode (the web side, VpnPlugin).
+        // the session of the server's former name, before the WebView loads (SessionPlugin)
+        SessionPlugin.carryRefreshCookie();
         super.onCreate(savedInstanceState);
         // reopened after an update: its "tap to open" notification goes
         UpdatedReceiver.opened(this);

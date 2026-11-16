@@ -9,7 +9,7 @@ import { openUpdateWindow } from '../windows/update'
 
 const { autoUpdater } = pkg
 
-export const RELEASES_URL = 'https://hub.cxxi.io/releases/'
+export const RELEASES_URL = 'https://hubbyware.cxxi.io/releases/'
 
 /** Longest the app window waits on the startup check before opening anyway. */
 const CHECK_DEADLINE_MS = 15_000

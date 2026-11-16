@@ -7,10 +7,10 @@ import type { UpdateState, Unsubscribe } from './types'
 // signature (same key as the desktop pipeline), and — when a newer versionCode
 // is available — drives the native plugin to download, hash-check and install.
 //
-// Reaching hub.cxxi.io requires the embedded tunnel; without it the fetch just
+// Reaching hubbyware.cxxi.io requires the embedded tunnel; without it the fetch just
 // fails and no update is surfaced (handled gracefully).
 
-export const RELEASES_URL = 'https://hub.cxxi.io/releases/'
+export const RELEASES_URL = 'https://hubbyware.cxxi.io/releases/'
 const MANIFEST_FILE = 'latest-android.json'
 const SIGNATURE_FILE = 'latest-android.json.sig'
 const PERIODIC_CHECK_MS = 15 * 60_000
