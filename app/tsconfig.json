@@ -18,7 +18,7 @@
 			"@platform": ["src/platform"],
 			"@platform/*": ["src/platform/*"],
 			"@platform-impl": ["src/platform/electron.ts"],
-			"@preload": ["../desktop/src/preload"]
+			"@preload": ["../platforms/desktop/src/preload"]
 		}
 	},
 	"include": ["src"]

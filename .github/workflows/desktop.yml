@@ -6,7 +6,7 @@ on:
     paths:
       - 'app/**'
       - 'packages/**'
-      - 'desktop/**'
+      - 'platforms/desktop/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/desktop.yml'
@@ -14,7 +14,7 @@ on:
     paths:
       - 'app/**'
       - 'packages/**'
-      - 'desktop/**'
+      - 'platforms/desktop/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/desktop.yml'
@@ -47,11 +47,11 @@ jobs:
         run: npm run types:sdk -w @hub/app -- --check
 
       - name: Typecheck desktop
-        working-directory: desktop
+        working-directory: platforms/desktop
         run: npx tsc --noEmit
 
       - name: Build
-        run: npm run build -w desktop
+        run: npm run build -w platforms/desktop
 
   audit:
     name: deps security audit

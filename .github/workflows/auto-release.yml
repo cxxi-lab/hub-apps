@@ -6,7 +6,7 @@ on:
     paths:
       - 'app/**'
       - 'packages/**'
-      - 'desktop/**'
+      - 'platforms/desktop/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/auto-release.yml'
@@ -36,11 +36,11 @@ jobs:
           else
             range="$last_tag..HEAD"
           fi
-          echo "Analyzing $range for app/ + desktop/ commits"
+          echo "Analyzing $range for app/ + platforms/desktop/ commits"
 
-          commits=$(git log "$range" --pretty='%B%n---END---' -- app/ desktop/)
+          commits=$(git log "$range" --pretty='%B%n---END---' -- app/ platforms/desktop/)
           if [ -z "$commits" ]; then
-            echo "No commits touching app/ or desktop/, skipping."
+            echo "No commits touching app/ or platforms/desktop/, skipping."
             echo "bump=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -65,7 +65,7 @@ jobs:
       - name: Compute new version
         id: version
         if: steps.bump.outputs.bump != ''
-        working-directory: desktop
+        working-directory: platforms/desktop
         run: |
           set -e
           current=$(node -p "require('./package.json').version")
@@ -95,9 +95,9 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Bump desktop/package.json
+      - name: Bump platforms/desktop/package.json
         run: |
-          npm version "${{ needs.check.outputs.new_version }}" --no-git-tag-version -w desktop
+          npm version "${{ needs.check.outputs.new_version }}" --no-git-tag-version -w platforms/desktop
           # Keep the root lockfile's workspace version in sync, or the later
           # `npm ci` fails on a package.json / lockfile mismatch.
           npm install --package-lock-only
@@ -108,7 +108,7 @@ jobs:
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add desktop/package.json package-lock.json
+          git add platforms/desktop/package.json package-lock.json
           git commit -m "chore: release v$NEW [skip ci]"
           git tag "v$NEW"
           # One atomic push: a separate tag push right after main was once rejected by GitHub
@@ -119,10 +119,10 @@ jobs:
         run: npm ci
 
       - name: Build AppImage
-        working-directory: desktop
+        working-directory: platforms/desktop
         run: npm run dist -- --linux AppImage --publish=never
 
-      # The tunnel's native libraries for Android: the APK carries none (mobile/scripts/build-tunnel.sh);
+      # The tunnel's native libraries for Android: the APK carries none (platforms/mobile/scripts/build-tunnel.sh);
       # they are attached to this release (GitHub), where the module using the tunnel takes them.
       - uses: actions/setup-java@v4
         with:
@@ -138,14 +138,14 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: mobile/tunnel/go.mod
-          cache-dependency-path: mobile/tunnel/go.sum
+          go-version-file: platforms/mobile/tunnel/go.mod
+          cache-dependency-path: platforms/mobile/tunnel/go.sum
 
       - name: Build the tunnel's native libraries
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
           go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
-          mobile/scripts/build-tunnel.sh
+          platforms/mobile/scripts/build-tunnel.sh
 
       - name: Sign update manifest
         env:
@@ -156,12 +156,12 @@ jobs:
           umask 077
           printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update-signing-key.pem"
           openssl pkeyutl -sign -inkey "$RUNNER_TEMP/update-signing-key.pem" -rawin \
-            -in desktop/dist/latest-linux.yml -out desktop/dist/latest-linux.yml.sig
-          test -s desktop/dist/latest-linux.yml.sig
+            -in platforms/desktop/dist/latest-linux.yml -out platforms/desktop/dist/latest-linux.yml.sig
+          test -s platforms/desktop/dist/latest-linux.yml.sig
           rm -f "$RUNNER_TEMP/update-signing-key.pem"
           # The umask above is for the key: the signature is public, and rsync keeps
           # its mode on the VPS, where Apache must be able to read it.
-          chmod 644 desktop/dist/latest-linux.yml.sig
+          chmod 644 platforms/desktop/dist/latest-linux.yml.sig
 
       - name: Setup SSH
         env:
@@ -186,9 +186,9 @@ jobs:
           # one upload at a time on the server (rrsync locks the directory): another release
           # uploading at the same moment is waited for
           send() { for i in 1 2 3 4 5 6 7 8; do rsync -e "ssh -i ~/.ssh/id_release" "$@" && return 0; echo "upload busy, again in 15 s"; sleep 15; done; return 1; }
-          send desktop/dist/hub-*.AppImage "$SSH_USER@$SSH_HOST:"
-          send desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
-          send desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
+          send platforms/desktop/dist/hub-*.AppImage "$SSH_USER@$SSH_HOST:"
+          send platforms/desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
+          send platforms/desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
 
       # The tunnel's native libraries, for the module that uses the tunnel (its CI downloads them)
       - name: GitHub release (tunnel natives)
@@ -198,7 +198,7 @@ jobs:
         run: |
           set -e
           mkdir -p dist-natives
-          for abi in arm64-v8a x86_64; do cp "mobile/build/tunnel/jni/$abi/libgojni.so" "dist-natives/libgojni-$abi.so"; done
+          for abi in arm64-v8a x86_64; do cp "platforms/mobile/build/tunnel/jni/$abi/libgojni.so" "dist-natives/libgojni-$abi.so"; done
           gh release create "v$NEW" dist-natives/* --title "v$NEW" --notes "Desktop v$NEW. Assets: the tunnel's native libraries for Android (libgojni-<abi>.so)."
 
       - name: Clean up SSH key

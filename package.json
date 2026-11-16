@@ -4,14 +4,14 @@
 	"workspaces": [
 		"packages/hub-sdk",
 		"app",
-		"desktop",
-		"mobile"
+		"platforms/desktop",
+		"platforms/mobile"
 	],
 	"scripts": {
-		"dev": "npm run dev -w desktop",
-		"build": "npm run build -w desktop",
-		"dist": "npm run dist -w desktop",
-		"lint": "npm run lint -w desktop",
+		"dev": "npm run dev -w platforms/desktop",
+		"build": "npm run build -w platforms/desktop",
+		"dist": "npm run dist -w platforms/desktop",
+		"lint": "npm run lint -w platforms/desktop",
 		"sync:mobile": "npm run sync -w @hub/mobile"
 	}
 }

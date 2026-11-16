@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: 'Version bump for mobile/package.json'
+        description: 'Version bump for platforms/mobile/package.json'
         type: choice
         default: patch
         options: [patch, minor, major]
@@ -42,15 +42,15 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: mobile/tunnel/go.mod
-          cache-dependency-path: mobile/tunnel/go.sum
+          go-version-file: platforms/mobile/tunnel/go.mod
+          cache-dependency-path: platforms/mobile/tunnel/go.sum
 
       # the tunnel's Java side only: its native libraries come with the Private module
       - name: Build the tunnel's Java side (tunnel.aar)
         run: |
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
           go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
-          mobile/scripts/build-tunnel.sh
+          platforms/mobile/scripts/build-tunnel.sh
 
       - uses: actions/setup-node@v4
         with:
@@ -62,7 +62,7 @@ jobs:
         id: version
         run: |
           set -e
-          current=$(node -p "require('./mobile/package.json').version")
+          current=$(node -p "require('./platforms/mobile/package.json').version")
           IFS=. read -r maj min pat <<< "$current"
           case "${{ inputs.bump }}" in
             major) maj=$((maj+1)); min=0; pat=0 ;;
@@ -76,7 +76,7 @@ jobs:
           echo "name=$new"  >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
-      - name: Bump mobile/package.json
+      - name: Bump platforms/mobile/package.json
         run: |
           npm version "${{ steps.version.outputs.name }}" --no-git-tag-version -w @hub/mobile
           # Keep the root lockfile's workspace version in sync for `npm ci`.
@@ -92,7 +92,7 @@ jobs:
       - name: Firebase config
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > platforms/mobile/android/app/google-services.json
 
       - name: Configure signing
         env:
@@ -103,7 +103,7 @@ jobs:
         run: |
           umask 077
           echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/hub-release.keystore"
-          cat > mobile/android/keystore.properties <<EOF
+          cat > platforms/mobile/android/keystore.properties <<EOF
           storeFile=$RUNNER_TEMP/hub-release.keystore
           storePassword=$KS_PASS
           keyAlias=$KEY_ALIAS
@@ -111,7 +111,7 @@ jobs:
           EOF
 
       - name: Build signed APK
-        working-directory: mobile/android
+        working-directory: platforms/mobile/android
         run: |
           ./gradlew :app:assembleRelease \
             -PversionCode=${{ steps.version.outputs.code }} \
@@ -125,7 +125,7 @@ jobs:
           name="${{ steps.version.outputs.name }}"
           code="${{ steps.version.outputs.code }}"
           apk="hub-$name.apk"
-          cp mobile/android/app/build/outputs/apk/release/app-release.apk "dist/$apk"
+          cp platforms/mobile/android/app/build/outputs/apk/release/app-release.apk "dist/$apk"
           sha=$(sha256sum "dist/$apk" | cut -d' ' -f1)
           # Manifest the app checks against: newer versionCode => update offered.
           cat > dist/latest-android.json <<EOF
@@ -153,7 +153,7 @@ jobs:
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add mobile/package.json package-lock.json
+          git add platforms/mobile/package.json package-lock.json
           git commit -m "chore: release android v$NAME [skip ci]"
           # another release (desktop) may have pushed meanwhile: on top of it, a few tries; the
           # branch and the tag in one push (a tag pushed alone after a rebase in this shallow clone

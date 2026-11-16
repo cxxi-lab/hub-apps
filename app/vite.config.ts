@@ -8,7 +8,7 @@ import { sharedRuntime } from './build/sharedRuntime'
 const shared = sharedRuntime(__dirname)
 
 // Standalone build of the shared UI for the mobile (Capacitor) shell. The
-// Electron build goes through desktop/electron.vite.config.ts instead; the only
+// Electron build goes through platforms/desktop/electron.vite.config.ts instead; the only
 // deliberate difference is `@platform-impl`, mapped here to the Capacitor
 // adapter so the Electron adapter and its `@preload` import never enter this
 // bundle.

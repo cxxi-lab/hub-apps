@@ -1,7 +1,7 @@
 # hub-apps
 
-hub's apps: the shared React shell (`app/`), the desktop app (`desktop/`, Electron) and the Android app
-(`mobile/`, Capacitor), and the module SDK they implement (`packages/hub-sdk`, published as
+hub's apps: the shared React shell (`app/`), and its platforms (`platforms/`): the desktop app
+(`platforms/desktop/`, Electron) and the Android app (`platforms/mobile/`, Capacitor), and the module SDK they implement (`packages/hub-sdk`, published as
 `@cxxi-lab/hub-sdk`).
 
 The apps ship no module: each one is installed from the server's signed catalogue when enabled. The

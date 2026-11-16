@@ -3,13 +3,13 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import svgr from 'vite-plugin-svgr'
 import { resolve } from 'path'
-import { sharedRuntime } from '../app/build/sharedRuntime'
+import { sharedRuntime } from '../../app/build/sharedRuntime'
 
 // The renderer (shared UI) lives in the sibling `app/` workspace so the same
 // React code can also be packaged by the mobile (Capacitor) shell. The Electron
 // main/preload stay here; `@preload` still resolves into this package until the
 // platform abstraction replaces window.api.
-const appRoot = resolve(__dirname, '../app')
+const appRoot = resolve(__dirname, '../../app')
 const shared = sharedRuntime(appRoot)
 
 export default defineConfig({

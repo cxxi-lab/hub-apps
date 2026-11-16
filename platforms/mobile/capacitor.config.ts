@@ -4,7 +4,7 @@ const config: CapacitorConfig = {
 	appId: 'cxxi.hub',
 	appName: 'hub',
 	// The shared UI is built by the @hub/app workspace (vite build → app/dist).
-	webDir: '../app/dist',
+	webDir: '../../app/dist',
 	// The UI's background (steel-900), so the WebView doesn't flash grey before
 	// its first paint; matches the native splash (android res/values/colors.xml).
 	backgroundColor: '#1E2025',
