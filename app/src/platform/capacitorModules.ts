@@ -158,13 +158,18 @@ function compare(a: string, b: string): number {
 	return (x[0] - y[0]) || (x[1] - y[1]) || (x[2] - y[2])
 }
 
-function satisfies(version: string, range: string): boolean {
+function satisfiesOne(version: string, range: string): boolean {
 	if (!range.startsWith('^')) return compare(version, range) === 0
 	const base = range.slice(1)
 	const [major, minor] = parts(base)
 	const [vMajor, vMinor] = parts(version)
 	if (compare(version, base) < 0) return false
 	return major > 0 ? vMajor === major : vMajor === 0 && vMinor === minor
+}
+
+function satisfies(version: string, range: string): boolean {
+	// alternatives (`^1.12.0 || ^2.0.0`): a module running on two majors of the SDK
+	return range.split('||').some(part => satisfiesOne(version, part.trim()))
 }
 
 /** The newest published version of each module this APK can run. */
