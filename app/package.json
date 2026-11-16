@@ -13,6 +13,7 @@
 		"build": "vite build",
 		"build:mobile": "vite build",
 		"types:sdk": "node scripts/emit-sdk-types.mjs",
+		"test:crypto": "esbuild src/core/crypto/files.test.ts --bundle --platform=node --format=esm --tsconfig=tsconfig.json --outfile=build/test/files.test.mjs --log-level=warning && node --test build/test/files.test.mjs",
 		"test:sync": "esbuild src/core/sync/sync.test.ts --bundle --platform=node --format=esm --tsconfig=tsconfig.json --outfile=build/test/sync.test.mjs --log-level=warning && node --test build/test/sync.test.mjs"
 	},
 	"dependencies": {

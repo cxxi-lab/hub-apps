@@ -6,8 +6,8 @@ import { sha256 } from '@noble/hashes/sha2.js'
 /**
  * The formats of the data encryption (docs/plan-storage-encryption.md § 2–3), all on the device:
  *  - the account's data key: 32 bytes from the system's CSPRNG (crypto.getRandomValues);
- *  - its subkeys (HKDF-SHA256): one seals the fields, one makes the blind indexes, one names the
- *    key (its fingerprint, the only thing the server knows of it);
+ *  - its subkeys (HKDF-SHA256): one seals the fields, one makes the blind indexes, one encrypts the
+ *    files (files.ts, f1), one names the key (its fingerprint, the only thing the server knows of it);
  *  - a sealed value: `v1:` + base64url(nonce ‖ ciphertext ‖ tag), XChaCha20-Poly1305 with a random
  *    24-byte nonce, and where the value belongs as associated data (`module/collection/id/field`:
  *    a value copied to another document, field or account doesn't open);
@@ -23,6 +23,8 @@ const decoder = new TextDecoder('utf-8', { fatal: true })
 export interface DataKeys {
 	fields: Uint8Array
 	index: Uint8Array
+	/** the files' (files.ts) */
+	files: Uint8Array
 	/** the key's fingerprint (16 bytes, base64url) */
 	id: string
 }
@@ -39,7 +41,7 @@ export const newDataKey = (): Uint8Array => randomBytes(32)
 export function deriveKeys(key: Uint8Array): DataKeys {
 	if (key.length !== 32) throw new Error('A data key is 32 bytes')
 	const sub = (info: string, length = 32) => hkdf(sha256, key, undefined, encoder.encode(info), length)
-	return { fields: sub('hub-data/fields'), index: sub('hub-data/index'), id: base64url(sub('hub-data/key-id', 16)) }
+	return { fields: sub('hub-data/fields'), index: sub('hub-data/index'), files: sub('hub-data/files'), id: base64url(sub('hub-data/key-id', 16)) }
 }
 
 export const isSealed = (value: unknown): value is string => typeof value === 'string' && SEALED.test(value)
