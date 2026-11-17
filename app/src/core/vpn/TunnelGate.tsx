@@ -24,7 +24,7 @@ export function TunnelGate({ hubby, active, children }: { hubby: string, active:
 		if (!active) return
 		openGates++
 		void platform.getVpnStatus().then(info => {
-			if (info.status !== 'connected' && info.status !== 'starting') void platform.startVpn()
+			if (info.hubby !== hubby || (info.status !== 'connected' && info.status !== 'starting')) void platform.startVpn(hubby)
 		})
 		return () => {
 			openGates--
@@ -48,7 +48,7 @@ export function TunnelGate({ hubby, active, children }: { hubby: string, active:
 					<span className="text-white">The VPN isn't connected</span>
 					{vpn.error && <span className="max-w-md text-center text-xs text-red-300 break-words">{vpn.error}</span>}
 					<div className="flex gap-2">
-						<Button label="Retry" onClick={() => void platform.startVpn()} />
+						<Button label="Retry" onClick={() => void platform.startVpn(hubby)} />
 						<Button label="VPN settings" color="secondary" onClick={() => navigate(`/hubbies/${hubby}`)} />
 					</div>
 				</>

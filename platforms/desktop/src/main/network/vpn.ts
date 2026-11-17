@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { resolveWireproxyBinary } from './wireproxy'
+import { configInfo, defaultVpnHubby, readConfig, removeConfig, validHubby, writeConfig } from './vpnConfig'
 import { BROWSE_PARTITION } from '../session/sessions'
 
 export type VpnStatus = 'disabled' | 'starting' | 'connected' | 'error'
@@ -18,6 +19,8 @@ export interface VpnInfo {
 	port: number | null
 	error: string | null
 	endpoint: string | null
+	/** the hubby the tunnel runs for (its config, ./vpnConfig.ts) */
+	hubby: string | null
 }
 
 // First port tried; the next ones are used when it is taken (another hub instance,
@@ -35,7 +38,7 @@ const READY_TIMEOUT_MS = 10_000
 
 class VpnManager extends EventEmitter {
 	private child: ChildProcess | null = null
-	private _info: VpnInfo = { status: 'disabled', port: null, error: null, endpoint: null }
+	private _info: VpnInfo = { status: 'disabled', port: null, error: null, endpoint: null, hubby: null }
 	private proxyConfigDir: string | null = null
 	private proxyPort: number | null = null
 
@@ -48,7 +51,7 @@ class VpnManager extends EventEmitter {
 	}
 
 	private setStatus(status: VpnStatus, port: number | null = null, error: string | null = null, endpoint: string | null = this._info.endpoint): void {
-		this._info = { status, port, error, endpoint }
+		this._info = { status, port, error, endpoint, hubby: this._info.hubby }
 		console.log('[vpn] status:', this._info)
 		this.emit('status', this._info)
 	}
@@ -60,14 +63,22 @@ class VpnManager extends EventEmitter {
 
 	private starting: Promise<void> | null = null
 
-	/** Starts the tunnel (once: a start already under way is the one awaited). */
-	start(): Promise<void> {
-		if (this.child) return Promise.resolve()
-		this.starting ??= this.launch().finally(() => { this.starting = null })
+	/**
+	 * Starts the tunnel for a hubby, with its config (none named: the first hubby going out through
+	 * the VPN). Once: a start already under way is the one awaited; one tunnel at a time, so one
+	 * running for another hubby is stopped first.
+	 */
+	async start(hubby?: string): Promise<void> {
+		const wanted = hubby ?? defaultVpnHubby()
+		if (this.starting) await this.starting
+		if (this.child && this._info.hubby === wanted) return
+		if (this.child) await this.stop()
+		this.starting ??= this.launch(wanted).finally(() => { this.starting = null })
 		return this.starting
 	}
 
-	private async launch(): Promise<void> {
+	private async launch(hubby: string | null): Promise<void> {
+		this._info = { ...this._info, hubby }
 		this.setStatus('starting')
 		const binary = await resolveWireproxyBinary()
 		if (!binary) {
@@ -75,9 +86,9 @@ class VpnManager extends EventEmitter {
 			return
 		}
 
-		const wgConfigPath = this.resolveWireguardConfig()
-		if (!wgConfigPath) {
-			this.setStatus('disabled', null, `no WireGuard config (expected at ${this.expectedConfigPath()})`)
+		const config = hubby ? readConfig(hubby) : null
+		if (!config) {
+			this.setStatus('disabled', null, 'no WireGuard config: add yours in the hubby\'s settings (VPN)')
 			return
 		}
 
@@ -89,7 +100,7 @@ class VpnManager extends EventEmitter {
 
 		let proxyConfigPath: string
 		try {
-			proxyConfigPath = this.buildProxyConfig(wgConfigPath, port)
+			proxyConfigPath = this.buildProxyConfig(config, port)
 		}
 		catch (err) {
 			this.setStatus('error', null, err instanceof Error ? err.message : 'failed to build wireproxy config')
@@ -165,24 +176,7 @@ class VpnManager extends EventEmitter {
 		}, 2_000)
 	}
 
-	private expectedConfigPath(): string {
-		return path.join(app.getPath('userData'), 'vpn.conf')
-	}
-
-	private resolveWireguardConfig(): string | null {
-		const userPath = this.expectedConfigPath()
-		if (existsSync(userPath)) return userPath
-
-		if (!app.isPackaged) {
-			const devPath = path.join(process.cwd(), 'vpn.conf')
-			if (existsSync(devPath)) return devPath
-		}
-
-		return null
-	}
-
-	private buildProxyConfig(wgConfigPath: string, port: number): string {
-		const original = readFileSync(wgConfigPath, 'utf8')
+	private buildProxyConfig(original: string, port: number): string {
 		this._info = { ...this._info, endpoint: this.parseEndpoint(original) }
 		const withoutProxies = original
 			.replace(/(^|\n)\[(Socks5|http)\][\s\S]*?(?=\n\[|$)/gi, '')
@@ -342,11 +336,40 @@ export function setupVpn(): void {
 	})
 
 	ipcMain.handle('vpn:status:get', () => vpnManager.getInfo())
-	ipcMain.handle('vpn:start', () => vpnManager.start())
+	ipcMain.handle('vpn:start', (_event, hubby: unknown) => vpnManager.start(validHubby(hubby) ? hubby : undefined))
 	ipcMain.handle('vpn:stop', () => vpnManager.stop())
+	ipcMain.handle('vpn:config:get', (_event, hubby: unknown) => validHubby(hubby) ? configInfo(hubby) : { configured: false, endpoint: null })
+	ipcMain.handle('vpn:config:set', (_event, hubby: unknown, text: unknown) => {
+		if (!validHubby(hubby) || typeof text !== 'string') return { ok: false, error: 'invalid config' }
+		return saveConfig(hubby, text)
+	})
+	ipcMain.handle('vpn:config:remove', async (_event, hubby: unknown) => {
+		if (!validHubby(hubby)) return
+		removeConfig(hubby)
+		if (vpnManager.getInfo().hubby === hubby) await vpnManager.stop()
+	})
 }
 
-ipcMain.handle('vpn:config:replace', async event => {
+/** Saves a hubby's config; its tunnel, running, restarts with it. */
+async function saveConfig(hubby: string, text: string): Promise<{ ok: boolean, error?: string }> {
+	try {
+		writeConfig(hubby, text)
+	}
+	catch (err) {
+		return { ok: false, error: err instanceof Error ? err.message : String(err) }
+	}
+	const info = vpnManager.getInfo()
+	if (info.hubby === hubby && info.status !== 'disabled') {
+		await vpnManager.stop()
+		await vpnManager.start(hubby)
+	}
+	return { ok: true }
+}
+
+/** Picks a config file for a hubby (none named: the first going out through the VPN), and saves it. */
+ipcMain.handle('vpn:config:replace', async (event, named: unknown) => {
+	const hubby = validHubby(named) ? named : defaultVpnHubby()
+	if (!hubby) return { ok: false, path: null, error: 'no hubby goes out through the VPN' }
 	const win = BrowserWindow.fromWebContents(event.sender)
 	const result = await dialog.showOpenDialog(win ?? undefined as never, {
 		title: 'Select WireGuard config',
@@ -361,12 +384,9 @@ ipcMain.handle('vpn:config:replace', async event => {
 		return { ok: false, path: null }
 	}
 
-	const dest = path.join(app.getPath('userData'), 'vpn.conf')
 	try {
-		await fsp.copyFile(result.filePaths[0], dest)
-		await vpnManager.stop()
-		await vpnManager.start()
-		return { ok: true, path: dest }
+		const saved = await saveConfig(hubby, await fsp.readFile(result.filePaths[0], 'utf8'))
+		return { ...saved, path: null }
 	}
 	catch (err) {
 		console.error('[vpn] config replace failed', err)

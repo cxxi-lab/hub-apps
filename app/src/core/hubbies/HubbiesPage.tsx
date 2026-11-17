@@ -11,6 +11,7 @@ import { NotificationsSettings } from '@core/hubbies/common/NotificationsSetting
 import { PrivacySettings } from '@core/hubbies/common/PrivacySettings'
 import { PinSettings } from '@core/hubbies/common/PinSettings'
 import { PermissionsSettings } from '@core/hubbies/common/PermissionsSettings'
+import { VpnSettings } from '@core/hubbies/common/VpnSettings'
 import { grantScopes, missingScopes, useHubbyScopes } from '@core/hubbies/scopes'
 import { useRevealedHubbies } from '@core/privacy/hidden'
 import { platform } from '@platform'
@@ -387,6 +388,7 @@ function HubbySettings({ hubby: m, removable, pinned, onPin, onUninstall, onBack
 			{pinned !== undefined && <PinSettings hubby={m} pinned={pinned} onChange={onPin} />}
 			{!m.local && isInstalled(m) && <PermissionsSettings hubby={m} />}
 			{m.supports?.includes('notifications') && isInstalled(m) && <NotificationsSettings hubby={m} />}
+			{m.supports?.includes('vpn') && platform.capabilities.vpn && isInstalled(m) && <VpnSettings hubby={m} />}
 			{!m.local && <PrivacySettings hubby={m} />}
 
 			{Own

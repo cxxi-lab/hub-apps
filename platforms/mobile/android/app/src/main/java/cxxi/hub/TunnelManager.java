@@ -46,15 +46,14 @@ import cxxi.hub.tunnel.Tunnel;
  * process's), its sites and the API alike; while it comes up or if it fails, every request is
  * blocked. Otherwise, no override: the app talks to hubbyware.cxxi.io directly.
  *
- * The config is the device's wg-quick file, copied to the app's private files
- * dir (filesDir/vpn.conf) by "Replace config". It must route everything
+ * The config is the user's own wg-quick file, one per hubby going out through the VPN, kept
+ * encrypted by VpnConfigs (the hubby's settings › VPN). It must route everything
  * (AllowedIPs = 0.0.0.0/0): the tunnel is userspace, a split-tunnel config
  * drops DNS and the public hubbyware.cxxi.io address.
  */
 final class TunnelManager {
 
     static final String TAG = "hub-tunnel";
-    private static final String CONFIG_FILE = "vpn.conf";
     /** Realm sent by mobile/tunnel/proxy.go in its 407. */
     private static final String PROXY_REALM = "hub";
 
@@ -67,12 +66,15 @@ final class TunnelManager {
         final Integer port;
         final String error;
         final String endpoint;
+        /** the hubby the tunnel runs for (its config, VpnConfigs) */
+        final String hubby;
 
-        Status(String status, Integer port, String error, String endpoint) {
+        Status(String status, Integer port, String error, String endpoint, String hubby) {
             this.status = status;
             this.port = port;
             this.error = error;
             this.endpoint = endpoint;
+            this.hubby = hubby;
         }
     }
 
@@ -85,7 +87,9 @@ final class TunnelManager {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
-    private volatile Status status = new Status("disabled", null, null, null);
+    private volatile Status status = new Status("disabled", null, null, null, null);
+    /** the hubby the tunnel runs (or last ran) for */
+    private volatile String hubby;
     private volatile Endpoint endpoint;
 
     private TunnelManager() {
@@ -113,10 +117,6 @@ final class TunnelManager {
         listeners.remove(l);
     }
 
-    static File configFile(Context context) {
-        return new File(context.getFilesDir(), CONFIG_FILE);
-    }
-
     /** the tunnel's native library is loaded (once per process) */
     private boolean nativeLoaded = false;
 
@@ -142,10 +142,23 @@ final class TunnelManager {
         }
     }
 
-    /** Starts the tunnel from the stored config (async). No config → disabled. */
-    void start(Context context) {
-        if ("connected".equals(status.status) || "starting".equals(status.status)) return;
-        final File conf = configFile(context);
+    /**
+     * Starts the tunnel for a hubby, with its config (VpnConfigs; null: the first hubby going out
+     * through the VPN), async. One tunnel at a time: one running for another hubby is stopped
+     * first. No config → disabled.
+     */
+    void start(Context context, String named) {
+        start(context, named, false);
+    }
+
+    /** `restart`: even when it runs for that hubby already (its config changed). */
+    void start(Context context, String named, boolean restart) {
+        final String wanted = named != null ? named : VpnConfigs.defaultHubby();
+        boolean running = "connected".equals(status.status) || "starting".equals(status.status);
+        if (running && !restart && wanted != null && wanted.equals(hubby)) return;
+        if (running) stop();
+        hubby = wanted;
+        final Context app = context.getApplicationContext();
         executor.execute(() -> {
             // Nothing goes out before the tunnel is up (Private's sites, its API): blocked meanwhile,
             // and still blocked if it can't come up.
@@ -154,16 +167,16 @@ final class TunnelManager {
             } catch (Exception e) {
                 Log.e(TAG, "blackhole failed", e);
             }
-            if (!conf.exists()) {
-                setStatus("disabled", null, "no WireGuard config: import one with Replace config", null);
+            final String text = wanted != null ? VpnConfigs.read(app, wanted) : null;
+            if (text == null) {
+                setStatus("disabled", null, "no WireGuard config: add yours in the hubby's settings (VPN)", null);
                 return;
             }
-            if (!loadNative(context.getApplicationContext())) {
+            if (!loadNative(app)) {
                 setStatus("error", null, "the VPN tunnel couldn't be installed on this device", null);
                 return;
             }
             try {
-                String text = readFile(conf);
                 String peer = parseEndpoint(text);
                 setStatus("starting", null, null, peer);
                 Endpoint ep = Tunnel.start(text);
@@ -284,7 +297,7 @@ final class TunnelManager {
     }
 
     private void setStatus(String s, Integer port, String error, String peer) {
-        status = new Status(s, port, error, peer);
+        status = new Status(s, port, error, peer, hubby);
         Log.i(TAG, "status " + s + (error != null ? " (" + error + ")" : ""));
         for (Listener l : listeners) l.onChange(status);
     }

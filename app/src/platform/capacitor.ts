@@ -46,9 +46,12 @@ interface PluginListener { remove(): Promise<void> }
 
 interface VpnPlugin {
 	getStatus(): Promise<VpnInfo>
-	start(): Promise<void>
+	start(options: { hubby?: string }): Promise<void>
 	stop(): Promise<void>
-	replaceConfig(): Promise<{ ok: boolean; path: string | null; error?: string }>
+	replaceConfig(options: { hubby?: string }): Promise<{ ok: boolean; path: string | null; error?: string }>
+	getConfig(options: { hubby: string }): Promise<{ configured: boolean; endpoint: string | null }>
+	setConfig(options: { hubby: string; text: string }): Promise<{ ok: boolean; error?: string }>
+	removeConfig(options: { hubby: string }): Promise<void>
 	addListener(event: 'statusChange', cb: (info: VpnInfo) => void): Promise<PluginListener>
 }
 
@@ -187,10 +190,13 @@ export function createCapacitorPlatform(): Platform {
 		onMutedChange: noSubscription,
 
 		getVpnStatus: () => Vpn.getStatus(),
-		startVpn: () => Vpn.start(),
+		startVpn: hubby => Vpn.start({ hubby }),
 		stopVpn: () => Vpn.stop(),
 		onVpnStatusChange: cb => subscribe(Vpn.addListener('statusChange', cb)),
-		replaceVpnConfig: () => Vpn.replaceConfig(),
+		replaceVpnConfig: hubby => Vpn.replaceConfig({ hubby }),
+		getVpnConfig: hubby => Vpn.getConfig({ hubby }),
+		setVpnConfig: (hubby, text) => Vpn.setConfig({ hubby, text }),
+		removeVpnConfig: hubby => Vpn.removeConfig({ hubby }),
 
 		// no Settings window here: a page of the app
 		setTheme: (_mode, theme, accent) => { void Theme.set({ theme, accent }).catch(() => {}) },

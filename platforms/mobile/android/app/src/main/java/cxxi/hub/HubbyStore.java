@@ -168,6 +168,13 @@ public final class HubbyStore {
         return false;
     }
 
+    /** The installed hubbies going out through the VPN (their configs, VpnConfigs). */
+    public synchronized List<String> vpnHubbies() {
+        List<String> ids = new ArrayList<>();
+        for (Entry hubby : active.values()) if (needsVpn(hubby)) ids.add(hubby.id);
+        return ids;
+    }
+
     /** The tunnel (a platform component, TunnelComponent) stays only while a hubby needs it. */
     private synchronized void pruneTunnel() {
         if (appContext == null) return;

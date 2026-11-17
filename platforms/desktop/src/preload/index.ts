@@ -68,7 +68,7 @@ const api = {
 
 	getVpnStatus: (): Promise<VpnInfo> => ipcRenderer.invoke('vpn:status:get'),
 
-	startVpn: (): Promise<void> => ipcRenderer.invoke('vpn:start'),
+	startVpn: (hubby?: string): Promise<void> => ipcRenderer.invoke('vpn:start', hubby),
 
 	stopVpn: (): Promise<void> => ipcRenderer.invoke('vpn:stop'),
 
@@ -139,8 +139,13 @@ const api = {
 
 	quitApp: (): Promise<void> => ipcRenderer.invoke('update:quit'),
 
-	replaceVpnConfig: (): Promise<{ ok: boolean; path: string | null; error?: string }> =>
-		ipcRenderer.invoke('vpn:config:replace'),
+	replaceVpnConfig: (hubby?: string): Promise<{ ok: boolean; path: string | null; error?: string }> =>
+		ipcRenderer.invoke('vpn:config:replace', hubby),
+	getVpnConfig: (hubby: string): Promise<{ configured: boolean; endpoint: string | null }> =>
+		ipcRenderer.invoke('vpn:config:get', hubby),
+	setVpnConfig: (hubby: string, text: string): Promise<{ ok: boolean; error?: string }> =>
+		ipcRenderer.invoke('vpn:config:set', hubby, text),
+	removeVpnConfig: (hubby: string): Promise<void> => ipcRenderer.invoke('vpn:config:remove', hubby),
 
 	listIntegrations: (): Promise<Array<{ host: string; updatedAt: number }>> =>
 		ipcRenderer.invoke('integrations:list'),

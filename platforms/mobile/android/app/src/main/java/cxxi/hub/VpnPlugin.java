@@ -15,16 +15,13 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONObject;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 /**
- * Web-side control of the embedded tunnel ({@link TunnelManager}), mirroring
- * desktop's vpn:* IPC: status + statusChange events, start/stop, and
- * replaceConfig which picks a wg-quick file, copies it into the app's private
- * files dir and restarts the tunnel.
+ * Web-side control of the embedded tunnel ({@link TunnelManager}), mirroring desktop's vpn:* IPC:
+ * status + statusChange events, start/stop for a hubby, and each hubby's config (VpnConfigs):
+ * replaceConfig picks a wg-quick file, setConfig takes a pasted one, getConfig says whether there
+ * is one and its endpoint (never the config), removeConfig drops it.
  */
 @CapacitorPlugin(name = "Vpn")
 public class VpnPlugin extends Plugin {
@@ -48,8 +45,60 @@ public class VpnPlugin extends Plugin {
 
     @PluginMethod
     public void start(PluginCall call) {
-        TunnelManager.get().start(getContext());
+        String hubby = call.getString("hubby");
+        TunnelManager.get().start(getContext(), VpnConfigs.validHubby(hubby) ? hubby : null);
         call.resolve();
+    }
+
+    @PluginMethod
+    public void getConfig(PluginCall call) {
+        String hubby = call.getString("hubby");
+        String text = VpnConfigs.validHubby(hubby) ? VpnConfigs.read(getContext(), hubby) : null;
+        JSObject ret = new JSObject();
+        ret.put("configured", text != null);
+        ret.put("endpoint", orNull(text != null ? VpnConfigs.endpointOf(text) : null));
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setConfig(PluginCall call) {
+        String hubby = call.getString("hubby");
+        String text = call.getString("text");
+        if (!VpnConfigs.validHubby(hubby) || text == null) {
+            call.resolve(saveResult(false, "invalid config"));
+            return;
+        }
+        call.resolve(save(hubby, text));
+    }
+
+    @PluginMethod
+    public void removeConfig(PluginCall call) {
+        String hubby = call.getString("hubby");
+        if (VpnConfigs.validHubby(hubby)) {
+            VpnConfigs.remove(getContext(), hubby);
+            TunnelManager.Status s = TunnelManager.get().status();
+            if (hubby.equals(s.hubby)) TunnelManager.get().stop();
+        }
+        call.resolve();
+    }
+
+    /** Saves a hubby's config; its tunnel, running, restarts with it. */
+    private JSObject save(String hubby, String text) {
+        try {
+            VpnConfigs.write(getContext(), hubby, text);
+        } catch (Exception e) {
+            return saveResult(false, e.getMessage());
+        }
+        TunnelManager.Status s = TunnelManager.get().status();
+        if (hubby.equals(s.hubby) && !"disabled".equals(s.status)) TunnelManager.get().start(getContext(), hubby, true);
+        return saveResult(true, null);
+    }
+
+    private static JSObject saveResult(boolean ok, String error) {
+        JSObject ret = new JSObject();
+        ret.put("ok", ok);
+        if (error != null) ret.put("error", error);
+        return ret;
     }
 
     @PluginMethod
@@ -60,6 +109,13 @@ public class VpnPlugin extends Plugin {
 
     @PluginMethod
     public void replaceConfig(PluginCall call) {
+        String hubby = call.getString("hubby");
+        if (!VpnConfigs.validHubby(hubby)) hubby = VpnConfigs.defaultHubby();
+        if (hubby == null) {
+            call.resolve(replaceResult(false, null, "no hubby goes out through the VPN"));
+            return;
+        }
+        call.getData().put("hubby", hubby);
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         // .conf has no registered MIME type; the picker would grey it out otherwise.
@@ -75,23 +131,17 @@ public class VpnPlugin extends Plugin {
             call.resolve(replaceResult(false, null, "cancelled"));
             return;
         }
-        File dest = TunnelManager.configFile(getContext());
+        String hubby = call.getString("hubby");
+        String text;
         try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
             if (in == null) throw new Exception("cannot read " + uri);
-            String text = TunnelManager.readAll(in);
-            if (!text.contains("[Interface]") || !text.contains("[Peer]")) {
-                throw new Exception("not a WireGuard config (no [Interface]/[Peer] section)");
-            }
-            try (FileOutputStream out = new FileOutputStream(dest)) {
-                out.write(text.getBytes(StandardCharsets.UTF_8));
-            }
+            text = TunnelManager.readAll(in);
         } catch (Exception e) {
             call.resolve(replaceResult(false, null, e.getMessage()));
             return;
         }
-        TunnelManager.get().stop();
-        TunnelManager.get().start(getContext());
-        call.resolve(replaceResult(true, dest.getAbsolutePath(), null));
+        JSObject saved = save(hubby, text);
+        call.resolve(replaceResult(saved.optBoolean("ok"), null, saved.has("error") ? saved.optString("error") : null));
     }
 
     private static JSObject replaceResult(boolean ok, String path, String error) {
@@ -108,6 +158,7 @@ public class VpnPlugin extends Plugin {
         ret.put("port", orNull(s.port));
         ret.put("error", orNull(s.error));
         ret.put("endpoint", orNull(s.endpoint));
+        ret.put("hubby", orNull(s.hubby));
         return ret;
     }
 

@@ -14,6 +14,8 @@ export interface VpnInfo {
 	port: number | null
 	error: string | null
 	endpoint: string | null
+	/** the hubby the tunnel runs for (its config); older shells don't say */
+	hubby?: string | null
 }
 
 export type UpdatePhase = 'available' | 'downloading' | 'verifying' | 'installing' | 'error'
@@ -399,10 +401,20 @@ export interface Platform {
 	onMutedChange(cb: (value: boolean) => void): Unsubscribe
 
 	getVpnStatus(): Promise<VpnInfo>
-	startVpn(): Promise<void>
+	/** Starts the tunnel for a hubby, with its config (none named: the first hubby going out through the VPN). */
+	startVpn(hubby?: string): Promise<void>
 	stopVpn(): Promise<void>
 	onVpnStatusChange(cb: (info: VpnInfo) => void): Unsubscribe
-	replaceVpnConfig(): Promise<{ ok: boolean; path: string | null; error?: string }>
+	/** Picks a WireGuard config file for a hubby (none named: the first going out through the VPN). */
+	replaceVpnConfig(hubby?: string): Promise<{ ok: boolean; path: string | null; error?: string }>
+	/**
+	 * A hubby's VPN config, kept by the shell (server docs/plan-reseau-vpn.md): only whether there is
+	 * one and its endpoint; the config itself never comes back to the web side.
+	 */
+	getVpnConfig(hubby: string): Promise<{ configured: boolean; endpoint: string | null }>
+	/** Saves a hubby's WireGuard config (pasted); its tunnel, running, restarts with it. */
+	setVpnConfig(hubby: string, text: string): Promise<{ ok: boolean; error?: string }>
+	removeVpnConfig(hubby: string): Promise<void>
 
 	/** Opens the Settings window, on a screen when given (e.g. 'security'). */
 	openSettings(target?: string): Promise<void>

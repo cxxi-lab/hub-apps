@@ -8,6 +8,7 @@ import { UPDATE_SIGNING_PUBLIC_KEY } from '../network/updateSigningKey'
 import { fetchBuffer, RELEASES_URL } from '../network/updater'
 import { registerNativeLookup } from './natives'
 import { removeTunnel } from '../network/component'
+import { registerVpnHubbies } from '../network/vpnConfig'
 import { compareVersions, fits } from './semver'
 import { HUBBY_SCHEME } from '../app/schemes'
 
@@ -575,6 +576,7 @@ export function setupHubbies(): void {
 	if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) return // dev server: hubbies from their sources
 	loadRestricted()
 	registerNativeLookup(findNative)
+	registerVpnHubbies(() => [...active.values()].filter(needsVpn).map(h => h.id))
 	resolveActive()
 	pruneTunnel()
 	serve()
