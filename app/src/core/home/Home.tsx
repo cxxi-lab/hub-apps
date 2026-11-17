@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCube } from '@fortawesome/free-solid-svg-icons'
 import { useHubbies } from '@core/contexts/HubbiesContext'
-import { INSTALLS, isComingSoon, isInstalled, HUBBY_MANIFESTS, hubbyHomePath, useRegistry, type InstallState } from '@core/hubby/registry'
+import { INSTALLS, isInstalled, HUBBY_MANIFESTS, hubbyHomePath, useRegistry, type InstallState } from '@core/hubby/registry'
 import type { HubbyManifest } from '@core/hubby/types'
 
 /** The home page: the enabled hubbies as cards, in their order (pinning one to the top bar: its settings). */
@@ -17,7 +17,7 @@ export function Home() {
 		<div className="flex-1 min-h-0 overflow-y-auto">
 			<div className="max-w-[70rem] px-20 max-lg:px-10 max-sm:px-4">
 				<ul className="mt-12 mb-12 max-sm:mt-4 p-0 list-none grid grid-cols-2 gap-3 sm:gap-6">
-					{hubbies.filter(m => !isComingSoon(m)).map(m => (
+					{hubbies.map(m => (
 						<li key={m.id}>
 							<HubbyCard hubby={m} />
 						</li>
@@ -37,8 +37,8 @@ export function Home() {
 
 function HubbyCard({ hubby: m, install }: { hubby: HubbyManifest, install?: InstallState }) {
 	const navigate = useNavigate()
-	const soon = isComingSoon(m) || !!install
-	const badge = install?.phase === 'installing' ? 'Installing…' : install?.phase === 'error' ? 'Install failed' : 'Coming soon'
+	const soon = !!install
+	const badge = install?.phase === 'error' ? 'Install failed' : 'Installing…'
 
 	const open = () => { if (!soon) navigate(hubbyHomePath(m)) }
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

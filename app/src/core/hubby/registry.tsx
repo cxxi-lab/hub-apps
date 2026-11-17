@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from 'react'
-import { faMusic, faNoteSticky, faShareNodes, faWallet } from '@fortawesome/free-solid-svg-icons'
 import { platform, type HubbyPackage, type RestrictedHubbyPackage } from '@platform'
 import { api } from '@core/api/client'
 import { entryIcon } from './describe'
@@ -13,17 +12,9 @@ export type { HubbyManifest, HubbyNavItem, HubbyRoute } from './types'
 /** The catalogue order (top bar, home page, Settings); hubbies not listed come after. */
 const ORDER = ['mail', 'ai', 'planner', 'memo', 'file-sharing', 'music', 'business', 'budget', 'workout']
 
-/** Hubbies announced ahead of their pages, declared here. */
-const PLACEHOLDERS: HubbyManifest[] = [
-	{ id: 'memo', label: 'Memo', icon: faNoteSticky, description: 'Notes and reminders', navItems: [], routes: [] },
-	{ id: 'file-sharing', label: 'File Sharing', icon: faShareNodes, description: 'Send and receive files', navItems: [], routes: [] },
-	{ id: 'budget', label: 'Budget', icon: faWallet, description: 'Expenses and accounts', navItems: [], routes: [] },
-	{ id: 'music', label: 'Music', icon: faMusic, description: 'Your music library', navItems: [], routes: [] }
-]
-
 /**
  * The hubby catalogue, in display order: the loaded hubbies, the ones published but not installed
- * on this device (stand-ins, see isInstalled), and the placeholders. Filled by loadHubbies() before
+ * on this device (stand-ins, see isInstalled). Filled by loadHubbies() before
  * the app renders (every window awaits it); it changes as hubbies get installed (useRegistry).
  */
 export const HUBBY_MANIFESTS: HubbyManifest[] = []
@@ -62,7 +53,7 @@ let loading: Promise<void> | null = null
 export function loadHubbies(): Promise<void> {
 	loading ??= (async () => {
 		const loaded = import.meta.env.DEV ? await fromSources() : await fromBundles()
-		place([...loaded, ...PLACEHOLDERS.filter(p => !loaded.some(m => m.id === p.id))])
+		place(loaded)
 		void refreshStore()
 	})()
 	return loading
@@ -303,18 +294,11 @@ async function loadBundle(entry: HubbyDeclaration & { css: boolean, models?: boo
 }
 
 /**
- * Front/server integrity enforcement. Every hubby (incl. the placeholders) now declares
- * a server HubbyInterface, so the diff is enforced: a manifest without server support is
- * hidden and logged (guards against desktop/server version skew). Placeholders still show
- * "coming soon" because their server stub advertises the capability. Local hubbies
- * (`local: true`) have no server side and are exempt.
+ * Front/server integrity enforcement: a manifest the server doesn't list (its registry) is
+ * hidden (guards against app/server version skew). Local hubbies (`local: true`) have no server
+ * side and are exempt.
  */
 export const HUBBY_INTEGRITY_ENFORCE = true
-
-/** A hubby declared ahead of its pages: shown, but nothing to open yet. */
-export function isComingSoon(m: HubbyManifest): boolean {
-	return isInstalled(m) && m.navItems.length === 0 && m.routes.length === 0
-}
 
 /** Where a hubby opens: its home nav item, else its first page. */
 export function hubbyHomePath(m: HubbyManifest): string {

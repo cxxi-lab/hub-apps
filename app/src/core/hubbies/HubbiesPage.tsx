@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faArrowLeft, faCube, faGear, faMagnifyingGlass, faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons'
 import { announceHubbiesChange, fetchHubbiesState, setEnabledModules, setPinnedModules, updateHubbies, type HubbiesState } from '@core/api/hubbies'
-import { INSTALLS, isComingSoon, isInstalled, HUBBY_MANIFESTS, HUBBY_VERSIONS, uninstallHubby, useRegistry } from '@core/hubby/registry'
+import { INSTALLS, isInstalled, HUBBY_MANIFESTS, HUBBY_VERSIONS, uninstallHubby, useRegistry } from '@core/hubby/registry'
 import type { HubbyManifest } from '@core/hubby/types'
 import { allHubbies, enabledIds } from '@core/hubby/visibility'
 import { ConfirmationModal, Modal } from '@cxxi-lab/hubbyware-ui'
@@ -77,7 +77,7 @@ function HubbiesScreen() {
 
 	// Hubbies not listed here (hidden ones not revealed…) keep their place and their state.
 	const stored = enabledIds(state)
-	const enabled = stored.filter(id => byId.has(id) && !isComingSoon(byId.get(id)!))
+	const enabled = stored.filter(id => byId.has(id))
 	const disabled = hubbies.filter(m => !enabled.includes(m.id))
 	// requirements (`requires`) not enabled: the hubby stays off until they are
 	const needs = (m: HubbyManifest) => (m.requires ?? [])
@@ -264,9 +264,9 @@ function AddHubbies({ hubbies, needs, onEnable, onSettings, onClose }: {
 }) {
 	const [query, setQuery] = useState('')
 	const needle = query.trim().toLowerCase()
-	// stable sort: equal scores keep the catalogue order, hubbies to come last
+	// stable sort: equal scores keep the catalogue order
 	const ranked = [...hubbies].sort((a, b) =>
-		(needle ? matchScore(b, needle) - matchScore(a, needle) : 0) || Number(isComingSoon(a)) - Number(isComingSoon(b)))
+		needle ? matchScore(b, needle) - matchScore(a, needle) : 0)
 
 	return (
 		<Modal title="Add a hubby" size="lg" onClose={onClose}>
@@ -305,18 +305,14 @@ function DisabledCard({ hubby: m, missing, onSettings, onEnable }: {
 	onSettings: () => void
 	onEnable: () => void
 }) {
-	const soon = isComingSoon(m)
 	return (
 		<div
-			role={soon ? undefined : 'button'}
-			tabIndex={soon ? undefined : 0}
-			onClick={soon ? undefined : onEnable}
-			onKeyDown={e => { if (!soon && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onEnable() } }}
-			title={soon ? undefined : `Add ${m.label}`}
-			className={[
-				'h-full flex flex-col gap-3 p-4 rounded bg-steel-900 shadow-raised outline-none transition-shadow duration-200',
-				soon ? 'opacity-50' : 'cursor-pointer hover:shadow-raised-hover focus-visible:shadow-raised-focus'
-			].join(' ')}
+			role="button"
+			tabIndex={0}
+			onClick={onEnable}
+			onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onEnable() } }}
+			title={`Add ${m.label}`}
+			className="h-full flex flex-col gap-3 p-4 rounded bg-steel-900 shadow-raised outline-none transition-shadow duration-200 cursor-pointer hover:shadow-raised-hover focus-visible:shadow-raised-focus"
 		>
 			<div className="flex items-start gap-3">
 				<span className="size-10 shrink-0 flex items-center justify-center rounded bg-primary-500 text-steel-800">
@@ -324,20 +320,16 @@ function DisabledCard({ hubby: m, missing, onSettings, onEnable }: {
 				</span>
 				<div className="min-w-0 flex-1">
 					<div className="text-sm font-medium text-white truncate">{m.label}</div>
-					{soon
-						? <div className="text-[10px] uppercase tracking-[1.5px] text-steel-300">Coming soon</div>
-						: !isInstalled(m) && <div className="text-[10px] uppercase tracking-[1.5px] text-steel-500">Not installed</div>}
+					{!isInstalled(m) && <div className="text-[10px] uppercase tracking-[1.5px] text-steel-500">Not installed</div>}
 					<p className="mt-1 mb-0 text-xs text-steel-300">
 						{missing.length > 0
 							? <span className="text-product-yellow">Needs {missing.join(', ')} enabled</span>
 							: m.description}
 					</p>
 				</div>
-				{!soon && (
-					<span onClick={e => e.stopPropagation()}>
-						<RowButton icon={faGear} label={`${m.label} settings`} onClick={onSettings} />
-					</span>
-				)}
+				<span onClick={e => e.stopPropagation()}>
+					<RowButton icon={faGear} label={`${m.label} settings`} onClick={onSettings} />
+				</span>
 			</div>
 			{HUBBY_VERSIONS[m.id] && <div className="mt-auto text-xs text-steel-500 tabular-nums">v{HUBBY_VERSIONS[m.id]}</div>}
 		</div>

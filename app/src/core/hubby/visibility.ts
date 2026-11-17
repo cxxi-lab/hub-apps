@@ -1,5 +1,5 @@
 import type { HubbiesState } from '@core/api/hubbies'
-import { isComingSoon, isInstalled, HUBBY_INTEGRITY_ENFORCE, HUBBY_MANIFESTS } from '@core/hubby/registry'
+import { isInstalled, HUBBY_INTEGRITY_ENFORCE, HUBBY_MANIFESTS } from '@core/hubby/registry'
 import type { HubbyManifest } from '@core/hubby/types'
 import { platform } from '@platform'
 
@@ -16,17 +16,17 @@ function usable(state: HubbiesState, revealed: string[]): HubbyManifest[] {
 	})
 }
 
-/** The enabled list as stored, spelled out when it is the default (every hubby with pages or to install, catalogue order). */
+/** The enabled list as stored, spelled out when it is the default (every hubby, catalogue order). */
 export function enabledIds(state: HubbiesState): string[] {
-	return state.enabled ?? HUBBY_MANIFESTS.filter(m => !isComingSoon(m)).map(m => m.id)
+	return state.enabled ?? HUBBY_MANIFESTS.map(m => m.id)
 }
 
 /**
  * The hubbies shown here, in the user's order: the top bar, the home page and the routes. Hubbies
- * without pages yet, or not installed here yet, are not shown.
+ * not installed here yet are not shown.
  */
 export function enabledModules(state: HubbiesState, revealed: string[]): HubbyManifest[] {
-	const byId = new Map(usable(state, revealed).filter(m => isInstalled(m) && !isComingSoon(m)).map(m => [m.id, m]))
+	const byId = new Map(usable(state, revealed).filter(isInstalled).map(m => [m.id, m]))
 	return withRequirements(enabledIds(state).flatMap(id => byId.get(id) ?? []))
 }
 
@@ -36,7 +36,7 @@ export function enabledModules(state: HubbiesState, revealed: string[]): HubbyMa
  * not have answered).
  */
 export function wantedIds(state: HubbiesState, revealed: string[]): string[] {
-	const ids = new Set(usable(state, revealed).filter(m => !isComingSoon(m)).map(m => m.id))
+	const ids = new Set(usable(state, revealed).map(m => m.id))
 	return enabledIds(state).filter(id => ids.has(id) || !HUBBY_MANIFESTS.some(m => m.id === id))
 }
 
