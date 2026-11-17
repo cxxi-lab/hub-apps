@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # Builds the WireGuard tunnel (mobile/tunnel, Go) for Android, split in two:
 #  - the Java side the app links against: mobile/android/app/libs/tunnel.aar, WITHOUT its native
-#    libraries (the APK carries no tunnel: only the module using it does);
-#  - the native libraries: mobile/build/tunnel/jni/<abi>/libgojni.so, published as native files of
-#    the module that uses the tunnel (its module.json `native`; attached to the desktop release, its CI
-#    takes them from there), installed with it and
-#    loaded from there (TunnelManager).
+#    libraries (the APK carries no tunnel);
+#  - the native libraries: mobile/build/tunnel/jni/<abi>/libgojni.so, a component of the platform
+#    published by the tunnel-release workflow (platforms/tunnel/README.md), downloaded by the app
+#    when a hubby needs the VPN and loaded from there (TunnelComponent, TunnelManager).
 # gomobile's Java glue loads the library from the APK (System.loadLibrary("gojni") in go.Seq): it is
 # rebuilt here to load the path the app sets in the "cxxi.hub.gojni" system property.
 # (Both files gitignored, rebuilt locally and in CI.)
 #
 # Needs Go, a JDK, ANDROID_HOME, ANDROID_NDK_HOME and gomobile/gobind:
-#   go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
+#   go install golang.org/x/mobile/cmd/gomobile@<x/mobile's version in tunnel/go.mod> (and gobind)
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")/.." && pwd)"

@@ -122,14 +122,12 @@ final class TunnelManager {
 
     /**
      * Loads the tunnel's native library, which the APK doesn't carry: the platform downloads it
-     * (TunnelComponent, pinned by its sha256). Until the hubby using the tunnel stops bringing its
-     * own copy (native/<platform>/libgojni.so in its package), that copy is the fallback. The Java
-     * side (go.Seq, rebuilt) loads the path given in the "cxxi.hub.gojni" property.
+     * (TunnelComponent, pinned by its sha256). The Java side (go.Seq, rebuilt) loads the path given
+     * in the "cxxi.hub.gojni" property.
      */
     private boolean loadNative(Context context) {
         if (nativeLoaded) return true;
         File lib = TunnelComponent.ensure(context);
-        if (lib == null) lib = HubbyStore.get().findNative("libgojni.so");
         if (lib == null) return false;
         try {
             System.setProperty("cxxi.hub.gojni", lib.getAbsolutePath());

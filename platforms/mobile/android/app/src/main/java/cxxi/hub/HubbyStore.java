@@ -46,22 +46,10 @@ public final class HubbyStore {
     private static final Pattern ID = Pattern.compile("^[a-z0-9-]{1,40}$");
     private static final Pattern VERSION = Pattern.compile("^\\d+\\.\\d+\\.\\d+$");
     private static final Pattern FILE = Pattern.compile("^[A-Za-z0-9._-]{1,80}$");
-    /** a published file: a bundle file, or a native one (native/<platform>/<name>) */
     /** an isolated hubby's frame host: https://<id>.hubby.localhost/ (docs/plan-hubby-architecture.md § 4 ter) */
     private static final Pattern HUBBY_HOST = Pattern.compile("^([a-z0-9-]{1,40})\\.hubby\\.localhost$");
     private static final Pattern RUNTIME_PATH = Pattern.compile("^chunks/[A-Za-z0-9._-]{1,120}$|^[A-Za-z0-9._-]{1,80}$");
     private static final Pattern PUBLISHED_FILE = Pattern.compile("^[A-Za-z0-9._-]{1,80}(/[A-Za-z0-9._-]{1,80}){0,2}$");
-    /** this device, as the native files are tagged (its main ABI) */
-    static final String PLATFORM = platform();
-
-    private static String platform() {
-        String abi = android.os.Build.SUPPORTED_ABIS.length > 0 ? android.os.Build.SUPPORTED_ABIS[0] : "";
-        switch (abi) {
-            case "arm64-v8a": return "android-arm64";
-            case "x86_64": return "android-x86_64";
-            default: return "android-" + abi;
-        }
-    }
     private static final Pattern SHA256 = Pattern.compile("^[a-f0-9]{64}$");
 
     private static final HubbyStore INSTANCE = new HubbyStore();
@@ -287,24 +275,6 @@ public final class HubbyStore {
         return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", hubbyHeaders(), new ByteArrayInputStream(new byte[0]));
     }
 
-    /** A native file of whichever installed hubby brings it (this device's platform), or null. */
-    public synchronized File findNative(String name) {
-        for (Entry hubby : active.values()) {
-            if (hubby.dir == null) continue;
-            File file = new File(hubby.dir, "native/" + PLATFORM + "/" + name);
-            if (file.isFile()) return file;
-        }
-        return null;
-    }
-
-    /** A native file of an installed hubby (this device's platform), or null: e.g. Private's tunnel. */
-    public synchronized File nativeFile(String id, String name) {
-        Entry hubby = active.get(id);
-        if (hubby == null || hubby.dir == null) return null;
-        File file = new File(hubby.dir, "native/" + PLATFORM + "/" + name);
-        return file.isFile() ? file : null;
-    }
-
     /** The SDK version and what runs, for the web layer's update check. */
     public synchronized JSONObject state() throws Exception {
         JSONObject running = new JSONObject();
@@ -452,7 +422,9 @@ public final class HubbyStore {
                 String name = f.getString("path");
                 String sha = f.getString("sha256");
                 String platform = f.optString("platform", "");
-                if (!platform.isEmpty() && !platform.equals(PLATFORM)) continue;
+                // a hubby brings no native file (an older version's: not downloaded; the VPN
+                // tunnel is the platform's, TunnelComponent)
+                if (!platform.isEmpty()) continue;
                 if (!PUBLISHED_FILE.matcher(name).matches() || name.contains("..") || !SHA256.matcher(sha).matches()) throw new Exception("bad file entry " + name);
                 File dest = new File(partial, name);
                 File parent = dest.getParentFile();
@@ -461,8 +433,6 @@ public final class HubbyStore {
                 if (url.isEmpty()) throw new Exception(name + ": no download URL (restricted hubbe, list it again)");
                 String actual = fetch(url, dest);
                 if (!actual.equals(sha)) throw new Exception(name + ": checksum mismatch");
-                // native code loaded later (System.load): read-only, as Android wants it
-                if (!platform.isEmpty() && !dest.setReadOnly()) throw new Exception(name + ": cannot make it read-only");
             }
             JSONObject meta = new JSONObject(entry.toString());
             meta.remove("files");

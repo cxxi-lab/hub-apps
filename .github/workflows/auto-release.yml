@@ -123,31 +123,6 @@ jobs:
         working-directory: platforms/desktop
         run: npm run dist -- --linux AppImage --publish=never
 
-      # The tunnel's native libraries for Android: the APK carries none (platforms/mobile/scripts/build-tunnel.sh);
-      # they are attached to this release (GitHub), where the hubby using the tunnel takes them.
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-
-      - name: Install SDK packages
-        run: sdkmanager "platforms;android-36" "ndk;30.0.16248370"
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: platforms/mobile/tunnel/go.mod
-          cache-dependency-path: platforms/mobile/tunnel/go.sum
-
-      - name: Build the tunnel's native libraries
-        run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
-          go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
-          platforms/mobile/scripts/build-tunnel.sh
-
       - name: Sign update manifest
         env:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
@@ -190,17 +165,6 @@ jobs:
           send platforms/desktop/dist/hubbyware-*.AppImage "$SSH_USER@$SSH_HOST:"
           send platforms/desktop/dist/latest-linux.yml.sig "$SSH_USER@$SSH_HOST:"
           send platforms/desktop/dist/latest-linux.yml "$SSH_USER@$SSH_HOST:"
-
-      # The tunnel's native libraries, for the hubby that uses the tunnel (its CI downloads them)
-      - name: GitHub release (tunnel natives)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NEW: ${{ needs.check.outputs.new_version }}
-        run: |
-          set -e
-          mkdir -p dist-natives
-          for abi in arm64-v8a x86_64; do cp "platforms/mobile/build/tunnel/jni/$abi/libgojni.so" "dist-natives/libgojni-$abi.so"; done
-          gh release create "v$NEW" dist-natives/* --title "v$NEW" --notes "Desktop v$NEW. Assets: the tunnel's native libraries for Android (libgojni-<abi>.so)."
 
       - name: Clean up SSH key
         if: always()

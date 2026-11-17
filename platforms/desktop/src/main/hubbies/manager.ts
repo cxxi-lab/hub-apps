@@ -1,12 +1,11 @@
 import { app, ipcMain, net, protocol } from 'electron'
 import { createHash, createPublicKey, verify } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import sdk from '@cxxi-lab/hubbyware-sdk/version.json'
 import { UPDATE_SIGNING_PUBLIC_KEY } from '../network/updateSigningKey'
 import { fetchBuffer, RELEASES_URL } from '../network/updater'
-import { registerNativeLookup } from './natives'
 import { removeTunnel } from '../network/component'
 import { registerVpnHubbies } from '../network/vpnConfig'
 import { hubbyPartition, webSession } from '../session/sessions'
@@ -28,8 +27,8 @@ import { HUBBY_SCHEME } from '../app/schemes'
  *  - the restricted hubbies (offered only to the accounts given them) are not in that catalogue: the
  *    renderer hands their entries over (setRestricted, from the server's authenticated list), each
  *    signed alone with the same key, with signed URLs for their files;
- *  - a hubby's native files (native/<platform>/…, e.g. the VPN's wireproxy for Private) come with
- *    it, this platform's only, and stay here (nativeFile), never served to the renderer.
+ *  - a hubby brings no native file: one an older version lists (native/<platform>/…) isn't
+ *    downloaded (the VPN tunnel is the platform's, network/component.ts).
  * The renderer loads hubbies/<id>/… at the app's own address, whichever copy it is (the file
  * protocol is answered here): their relative imports of shared/*.js reach the app's files, so
  * there is one React, one SDK.
@@ -45,7 +44,7 @@ interface HubbyEntry {
 }
 
 interface RemoteEntry extends HubbyEntry {
-	/** `platform`: a native file, only for that platform */
+	/** `platform`: a native file of an older version (never downloaded) */
 	files: { path: string, sha256: string, platform?: string }[]
 }
 
@@ -102,10 +101,8 @@ const TYPES: Record<string, string> = { js: 'text/javascript', css: 'text/css', 
 const ID = /^[a-z0-9-]{1,40}$/
 const VERSION = /^\d+\.\d+\.\d+$/
 const FILE = /^[A-Za-z0-9._-]{1,80}$/
-/** a published file: a bundle file, or a native one (native/<platform>/<name>) */
+/** a published file (an older version's native one: native/<platform>/<name>, skipped) */
 const PUBLISHED_FILE = /^[A-Za-z0-9._-]{1,80}(\/[A-Za-z0-9._-]{1,80}){0,2}$/
-/** this machine, as the native files are tagged */
-const PLATFORM = `${process.platform}-${process.arch}`
 /**
  * Builds run from the sources only (never an installed app): a local release folder and its key,
  * to try hubby updates end to end without publishing (HUB_HUBBIES_URL, its registry.json in the
@@ -300,16 +297,6 @@ function prepareVpnSessions(): void {
 	for (const hubby of active.values()) if (needsVpn(hubby)) webSession(hubbyPartition(hubby.id))
 }
 
-/** A native file of whichever installed hubby brings it (this platform's), or null: e.g. Private's wireproxy. */
-function findNative(name: string): string | null {
-	for (const hubby of active.values()) {
-		if (!hubby.dir) continue
-		const path = join(hubby.dir, 'native', PLATFORM, name)
-		if (existsSync(path)) return path
-	}
-	return null
-}
-
 /** The server's hubby registry: each published hubby's entry, signed alone by CI (null: none usable). */
 const REGISTRY_URL = TESTING ? `${HUBBIES_URL}registry.json` : new URL('/api/hub/hubbies/catalog', RELEASES_URL).href
 
@@ -374,7 +361,8 @@ async function download(published: RemoteEntry): Promise<void> {
 	try {
 		const urls = restricted.get(published.id)?.entry.version === published.version ? restricted.get(published.id)!.urls : null
 		for (const file of published.files) {
-			if (file.platform && file.platform !== PLATFORM) continue
+			// a hubby brings no native file (an older version's: not downloaded)
+			if (file.platform) continue
 			const url = urls ? urls[file.path] : `${HUBBIES_URL}${published.id}/${published.version}/${file.path}`
 			if (!url) throw new Error(`${file.path}: no download URL (restricted hubby, list it again)`)
 			const { status, body } = await fetchBuffer(url)
@@ -382,8 +370,6 @@ async function download(published: RemoteEntry): Promise<void> {
 			if (createHash('sha256').update(body).digest('hex') !== file.sha256) throw new Error(`${file.path}: checksum mismatch`)
 			mkdirSync(dirname(join(partial, file.path)), { recursive: true })
 			writeFileSync(join(partial, file.path), body)
-			// native files are run (the VPN's wireproxy)
-			if (file.platform) chmodSync(join(partial, file.path), 0o755)
 		}
 		const { files: _files, ...hubby } = published
 		writeFileSync(join(partial, 'module.json'), JSON.stringify(hubby))
@@ -586,7 +572,6 @@ export function setupHubbies(): void {
 	serveHubbies()
 	if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) return // dev server: hubbies from their sources
 	loadRestricted()
-	registerNativeLookup(findNative)
 	registerVpnHubbies(() => [...active.values()].filter(needsVpn).map(h => h.id))
 	resolveActive()
 	pruneTunnel()

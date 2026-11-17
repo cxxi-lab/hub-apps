@@ -55,7 +55,10 @@ final class TunnelComponent {
         File lib = file(context);
         try {
             if (lib.isFile()) {
-                if (pinned[1].equals(sha256(lib))) return lib;
+                if (pinned[1].equals(sha256(lib))) {
+                    readOnly(lib);
+                    return lib;
+                }
                 Log.e(TAG, "the installed tunnel does not match its pinned sha256: downloaded again");
             }
             deleteTree(root(context));
@@ -80,12 +83,21 @@ final class TunnelComponent {
                 throw new IOException("sha256 " + sum + ", expected " + pinned[1]);
             }
             if (!part.renameTo(lib)) throw new IOException("couldn't install the tunnel");
+            readOnly(lib);
             Log.i(TAG, "tunnel v" + BuildConfig.TUNNEL_VERSION + " installed");
             return lib;
         } catch (Exception e) {
             Log.e(TAG, "the tunnel couldn't be installed", e);
             return null;
         }
+    }
+
+    /**
+     * Android loads dynamic code only from a file the app can't write (a writable one is refused by
+     * the coming versions): the library is made read-only once in place.
+     */
+    private static void readOnly(File lib) throws IOException {
+        if (lib.canWrite() && !lib.setReadOnly()) throw new IOException("couldn't make the tunnel read-only");
     }
 
     /** No installed hubby needs the VPN any more: the tunnel goes. */
