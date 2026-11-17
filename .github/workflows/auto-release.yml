@@ -39,7 +39,7 @@ jobs:
           fi
           echo "Analyzing $range for app/ + platforms/desktop/ commits"
 
-          commits=$(git log "$range" --pretty='%B%n---END---' -- app/ platforms/desktop/)
+          commits=$(git log "$range" --pretty='%B%n---END---' -- app/ platforms/desktop/ platforms/tunnel/)
           if [ -z "$commits" ]; then
             echo "No commits touching app/ or platforms/desktop/, skipping."
             echo "bump=" >> "$GITHUB_OUTPUT"
