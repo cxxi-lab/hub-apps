@@ -121,13 +121,15 @@ final class TunnelManager {
     private boolean nativeLoaded = false;
 
     /**
-     * Loads the tunnel's native library, which the APK doesn't carry: it comes with the hubby that
-     * uses it (Private, its native/<platform>/libgojni.so, see mobile/scripts/build-tunnel.sh). The
-     * Java side (go.Seq, rebuilt) loads the path given in the "cxxi.hub.gojni" property.
+     * Loads the tunnel's native library, which the APK doesn't carry: the platform downloads it
+     * (TunnelComponent, pinned by its sha256). Until the hubby using the tunnel stops bringing its
+     * own copy (native/<platform>/libgojni.so in its package), that copy is the fallback. The Java
+     * side (go.Seq, rebuilt) loads the path given in the "cxxi.hub.gojni" property.
      */
-    private boolean loadNative() {
+    private boolean loadNative(Context context) {
         if (nativeLoaded) return true;
-        File lib = HubbyStore.get().findNative("libgojni.so");
+        File lib = TunnelComponent.ensure(context);
+        if (lib == null) lib = HubbyStore.get().findNative("libgojni.so");
         if (lib == null) return false;
         try {
             System.setProperty("cxxi.hub.gojni", lib.getAbsolutePath());
@@ -156,8 +158,8 @@ final class TunnelManager {
                 setStatus("disabled", null, "no WireGuard config: import one with Replace config", null);
                 return;
             }
-            if (!loadNative()) {
-                setStatus("error", null, "the VPN isn't installed on this device: it comes with Private (open it once to get it)", null);
+            if (!loadNative(context.getApplicationContext())) {
+                setStatus("error", null, "the VPN tunnel couldn't be installed on this device", null);
                 return;
             }
             try {

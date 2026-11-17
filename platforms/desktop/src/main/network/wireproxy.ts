@@ -3,18 +3,21 @@ import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
 import { findNative } from '../hubbies/natives'
+import { ensureTunnel } from './component'
 
 const PLATFORM_DIR = `${process.platform}-${process.arch}`
 const BIN_NAME = process.platform === 'win32' ? 'wireproxy.exe' : 'wireproxy'
 
 /**
- * The wireproxy binary (the VPN tunnel) for this platform. The app doesn't carry it: it comes with
- * the hubby that uses the tunnel (native/<platform>/wireproxy in its package). A build run from
- * the sources (hubbies from their sources) takes HUB_WIREPROXY, else the hubby's copy next to the
- * apps: ../../hubbies/<id>/native/wireproxy/<platform>/wireproxy (the first hubby that has one).
- * Null: not installed (the VPN can't start).
+ * The wireproxy binary (the VPN tunnel) for this platform. The app doesn't carry it: the platform
+ * downloads it (./component.ts, pinned by its sha256). Until the hubby using the tunnel stops
+ * bringing its own copy (native/<platform>/wireproxy in its package), that copy is the fallback.
+ * A build run from the sources takes HUB_WIREPROXY, else the hubby's copy next to the apps:
+ * ../../hubbies-user/<id>/native/wireproxy/<platform>/wireproxy. Null: none (the VPN can't start).
  */
-export function resolveWireproxyBinary(): string | null {
+export async function resolveWireproxyBinary(): Promise<string | null> {
+	const component = await ensureTunnel()
+	if (component) return component
 	const installed = findNative(BIN_NAME)
 	if (installed) return installed
 	if (app.isPackaged) return null

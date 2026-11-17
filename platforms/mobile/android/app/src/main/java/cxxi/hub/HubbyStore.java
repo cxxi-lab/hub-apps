@@ -155,6 +155,24 @@ public final class HubbyStore {
             if (best.dir != null) updated.add(id + " " + best.version);
         }
         if (!updated.isEmpty()) Log.i(TAG, "running downloaded versions: " + String.join(", ", updated));
+        pruneTunnel();
+    }
+
+    /** Whether a hubby goes out through the VPN (hubby.json `network`, formerly `supports: ['vpn']`). */
+    private static boolean needsVpn(Entry hubby) {
+        Object network = hubby.json.opt("network");
+        if ("vpn".equals(network)) return true;
+        if (network instanceof JSONObject && "vpn".equals(((JSONObject) network).optString("egress"))) return true;
+        JSONArray supports = hubby.json.optJSONArray("supports");
+        for (int i = 0; supports != null && i < supports.length(); i++) if ("vpn".equals(supports.optString(i))) return true;
+        return false;
+    }
+
+    /** The tunnel (a platform component, TunnelComponent) stays only while a hubby needs it. */
+    private synchronized void pruneTunnel() {
+        if (appContext == null) return;
+        for (Entry hubby : active.values()) if (needsVpn(hubby)) return;
+        TunnelComponent.remove(appContext);
     }
 
     /**
@@ -329,6 +347,7 @@ public final class HubbyStore {
             if (running != null && running.dir != null) active.remove(id);
         }
         Log.i(TAG, id + " removed from this device");
+        pruneTunnel();
     }
 
     /** The newest copy of a hubby this APK can run (shipped or downloaded), null: none. */

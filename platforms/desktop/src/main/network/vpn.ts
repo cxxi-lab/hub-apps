@@ -58,12 +58,20 @@ class VpnManager extends EventEmitter {
 		return match ? match[1].trim() : null
 	}
 
-	async start(): Promise<void> {
-		if (this.child) return
+	private starting: Promise<void> | null = null
 
-		const binary = resolveWireproxyBinary()
+	/** Starts the tunnel (once: a start already under way is the one awaited). */
+	start(): Promise<void> {
+		if (this.child) return Promise.resolve()
+		this.starting ??= this.launch().finally(() => { this.starting = null })
+		return this.starting
+	}
+
+	private async launch(): Promise<void> {
+		this.setStatus('starting')
+		const binary = await resolveWireproxyBinary()
 		if (!binary) {
-			this.setStatus('disabled', null, `the VPN isn't installed on this device: it comes with Private (${process.platform}-${process.arch})`)
+			this.setStatus('error', null, `the VPN tunnel couldn't be installed on this device (${process.platform}-${process.arch})`)
 			return
 		}
 

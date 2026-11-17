@@ -7,6 +7,7 @@ import sdk from '@cxxi-lab/hubbyware-sdk/version.json'
 import { UPDATE_SIGNING_PUBLIC_KEY } from '../network/updateSigningKey'
 import { fetchBuffer, RELEASES_URL } from '../network/updater'
 import { registerNativeLookup } from './natives'
+import { removeTunnel } from '../network/component'
 import { compareVersions, fits } from './semver'
 import { HUBBY_SCHEME } from '../app/schemes'
 
@@ -276,6 +277,19 @@ function restrictedEntries(): RemoteEntry[] {
 	return [...restricted.values()].map(r => r.entry)
 }
 
+/** Whether a hubby goes out through the VPN (hubby.json `network`, formerly `supports: ['vpn']`). */
+function needsVpn(hubby: HubbyEntry): boolean {
+	const network = hubby['network'] as unknown
+	return network === 'vpn'
+		|| (typeof network === 'object' && network !== null && (network as { egress?: unknown }).egress === 'vpn')
+		|| (Array.isArray(hubby['supports']) && (hubby['supports'] as unknown[]).includes('vpn'))
+}
+
+/** The tunnel (a platform component, network/component.ts) stays only while a hubby needs it. */
+function pruneTunnel(): void {
+	if (![...active.values()].some(needsVpn)) removeTunnel()
+}
+
 /** A native file of whichever installed hubby brings it (this platform's), or null: e.g. Private's wireproxy. */
 function findNative(name: string): string | null {
 	for (const hubby of active.values()) {
@@ -435,6 +449,7 @@ function uninstallHubby(id: string): void {
 	rmSync(join(STORE, id), { recursive: true, force: true })
 	if (active.get(id)?.dir) active.delete(id)
 	console.log(`[hubbies] ${id} removed from this device`)
+	pruneTunnel()
 }
 
 /**
@@ -561,6 +576,7 @@ export function setupHubbies(): void {
 	loadRestricted()
 	registerNativeLookup(findNative)
 	resolveActive()
+	pruneTunnel()
 	serve()
 	if (app.isPackaged || TESTING) {
 		void checkHubbyUpdates()

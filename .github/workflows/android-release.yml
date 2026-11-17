@@ -45,12 +45,24 @@ jobs:
           go-version-file: platforms/mobile/tunnel/go.mod
           cache-dependency-path: platforms/mobile/tunnel/go.sum
 
-      # the tunnel's Java side only: its native libraries come with the Private hubby
-      - name: Build the tunnel's Java side (tunnel.aar)
+      # The tunnel's Java side only (its native library is a platform component the app downloads,
+      # platforms/tunnel/README.md): the one of the pinned tunnel release, so the Java glue and the
+      # library come from the same build; built here while none is pinned yet.
+      - name: The tunnel's Java side (tunnel.aar)
         run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
-          go install golang.org/x/mobile/cmd/gomobile@latest golang.org/x/mobile/cmd/gobind@latest
-          platforms/mobile/scripts/build-tunnel.sh
+          set -e
+          sum=$(jq -r .aar.sha256 platforms/tunnel/component.json)
+          if [ -n "$sum" ]; then
+            url="$(jq -r .url platforms/tunnel/component.json)$(jq -r .aar.asset platforms/tunnel/component.json)"
+            mkdir -p platforms/mobile/android/app/libs
+            curl -fsSL "$url" -o platforms/mobile/android/app/libs/tunnel.aar
+            echo "$sum  platforms/mobile/android/app/libs/tunnel.aar" | sha256sum -c -
+          else
+            export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+            mobile=$(cd platforms/mobile/tunnel && go list -m -f '{{.Version}}' golang.org/x/mobile)
+            go install "golang.org/x/mobile/cmd/gomobile@$mobile" "golang.org/x/mobile/cmd/gobind@$mobile"
+            platforms/mobile/scripts/build-tunnel.sh
+          fi
 
       - uses: actions/setup-node@v4
         with:
