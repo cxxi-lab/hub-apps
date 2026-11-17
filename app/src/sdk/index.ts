@@ -1,52 +1,29 @@
 /**
- * The hubby SDK (@cxxi-lab/hubbyware-sdk): everything a hubby (its own repository) may use from the app
- * around it. The app implements it here and provides it to the hubby bundles at run time
- * (@cxxi-lab/hubbyware-sdk/shared.json); the package publishes its types (packages/hubbyware-sdk/types,
- * scripts/emit-sdk-types.mjs).
- * A hubby imports its own files, this, the design system and npm packages, nothing else
- * (scripts/check-boundaries.mjs checks it). What is not here is the app's own business: to give
- * hubbies something more, export it here on purpose, as part of the contract they build on (then
- * regenerate the types: npm run types:sdk -w @hub/app).
+ * The hubby SDK (@cxxi-lab/hubbyware-sdk), as one hubby gets it. Everything is the contract's
+ * (contract.ts, one instance shared by all, `shared/sdk-contract.js`) but the API calls: they are
+ * made as the hubby, with its token (core/hubby/tokens.ts), so the server knows which hubby makes
+ * each one. This entry is instantiated once per hubby: a hubby bundle imports
+ * `shared/sdk.js?hubby=<id>` (hubby-cli), its sources in development the same (build/sharedRuntime.ts).
+ * Imported without a hubby (an older bundle, the app itself): the calls are the account's.
  */
+import { api as accountApi } from '@core/api/client'
+import { apiStream as accountStream, type StreamEventHandler } from '@core/api/stream'
+import { hubbyApi } from '@core/hubby/tokens'
 
-// The hubby contract: its manifest, and what hubbies offer each other (contributions)
-export type { HubbyManifest, HubbyNavItem, HubbyRoute, HubbyWindow } from '@core/hubby/types'
-export { describe, type HubbyInfo } from '@core/hubby/describe'
-export type { Contribution, ContributionPoint, ContributionPoints, TimelineContribution } from '@core/hubby/contributions'
-export type { TimelineItem, TimelineItemsProvider, TimelineDetailRenderer } from '@core/hubby/capabilities/timeline'
-export { useContributions } from '@core/contexts/HubbiesContext'
-export { useAmountsBlurred, useHubbyVisible, usePrivateMode } from '@core/privacy/hidden'
-export { Amount } from '@core/privacy/Amount'
+export * from './contract'
 
-// The server API (authenticated)
-export { api, ApiError, errorMessage } from '@core/api/client'
-export { getApiBaseUrl } from '@core/api/baseUrl'
-export { apiStream, readEventStream, type StreamEventHandler } from '@core/api/stream'
-export { fetchSettings, updateSettings } from '@core/api/settings'
-export type { ListResponse, PaginatedResponse, SingleResponse } from '@shared/apiResponse'
+const hubby = new URL(import.meta.url).searchParams.get('hubby')
+const bound = hubby && /^[a-z0-9-]{1,80}$/.test(hubby) ? hubbyApi(hubby) : null
 
-// The host (desktop or phone shell) and its native capabilities
-export { platform } from '@platform'
-export type {
-	CompanionActivity, CompanionEngineInfo, CompanionLogEntry, CompanionMessage, CompanionProfile,
-	NativeIcon, NativePlayerAction, VpnInfo, VpnStatus
-} from '@platform'
+/** A call to the server's API, as the hubby: its JSON (nothing on a 204), an ApiError otherwise. */
+export function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+	return bound ? bound.api<T>(path, options, retry) : accountApi<T>(path, options, retry)
+}
 
-// The web socle: sites' integrations (cookies and referer rules applied before a site loads) and
-// their embedded players (scripts per site, ad/tracker blocklist)
-export { ensureIntegrationForUrl, isIntegrationKnownSync } from '@shared/web/integrations'
-export { getPlayerConfig, type PlayerConfig, type PlayerScripts } from '@shared/web/players'
-export { syncPlayerBlocklist } from '@shared/web/playerBlocklist'
-
-// UI kit (@cxxi-lab/hubbyware-ui: a hubby may also import the design system directly)
-export {
-	Button, IconButton, Checkbox, ChoiceSwitch, Form, InputField, Switch, Dropdown, ConfirmationModal, Modal,
-	Table, TableCell, TableHead, TableHeadGroup, TableRow, TableRowGroup, type FormData
-} from '@cxxi-lab/hubbyware-ui'
-
-// Helpers
-export { useMediaQuery, useBackHandler } from '@cxxi-lab/hubbyware-ui'
-export { BottomBar, type BottomBarEntry, type BottomBarTab } from '@core/layout/BottomBar'
-export { collection, type BatchOperation, type CollectionPage, type CollectionQuery, type FilterValue, type HubbyDocument } from '@core/hubby/collections'
-export { useVpnStatus } from '@shared/hooks/useVpnStatus'
-export { formatDate, formatDuration } from '@shared/utils'
+/**
+ * Opens an authenticated server-sent event stream, as the hubby — over fetch, so it can POST a
+ * body and carry the token — and resolves once the server closes it.
+ */
+export function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
+	return bound ? bound.apiStream(path, options, onEvent, retry) : accountStream(path, options, onEvent, retry)
+}

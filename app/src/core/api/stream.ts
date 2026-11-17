@@ -1,37 +1,33 @@
 import { getApiBaseUrl } from './baseUrl'
-import { lockedByServer, unlockHeaders } from '@core/privacy/locks'
-import { getAuthData, resetAuthState } from '@core/auth/authState'
-import { tryRefreshToken } from '@core/auth/refresh'
+import { resetAuthState } from '@core/auth/authState'
 import { waitsForTunnel } from '@core/vpn/tunnel'
-import { TunnelDownError } from '@core/api/client'
+import { accountCaller, TunnelDownError, type Caller } from '@core/api/client'
 
 export type StreamEventHandler = (event: string, data: unknown) => void
 
 /**
  * Opens an authenticated server-sent event stream — over fetch, so it can POST a
  * body and carry the token — and resolves once the server closes it. Like api(),
- * a 401 refreshes the token once before giving up.
+ * a 401 renews the credentials once before giving up.
  */
-export async function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
+export async function stream(caller: Caller, path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
 	if (waitsForTunnel(path)) throw new TunnelDownError()
-	const { token } = await getAuthData()
 
 	const headers = {
 		'Content-Type': 'application/json',
 		...options.headers,
-		...unlockHeaders(path),
-		...(token ? { Authorization: `Bearer ${token}` } : {})
+		...await caller.headers(path)
 	}
 
 	const response = await fetch(`${getApiBaseUrl(path)}${path}`, { ...options, headers })
 
-	if (response.status === 423) lockedByServer(path)
+	if (response.status === 423) caller.locked(path)
 
 	if (response.status === 401) {
-		if (retry && await tryRefreshToken()) {
-			return apiStream(path, options, onEvent, false)
+		if (retry && await caller.unauthorized()) {
+			return stream(caller, path, options, onEvent, false)
 		}
-		await resetAuthState()
+		if (!retry && caller === accountCaller) await resetAuthState()
 		throw new Error('Unauthorized')
 	}
 
@@ -40,6 +36,11 @@ export async function apiStream(path: string, options: RequestInit, onEvent: Str
 	}
 
 	await readEventStream(response.body, onEvent)
+}
+
+/** A stream as the account (the app itself). */
+export function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
+	return stream(accountCaller, path, options, onEvent, retry)
 }
 
 /**

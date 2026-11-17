@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Plugin, UserConfig } from 'vite'
 
@@ -42,6 +42,9 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 	for (const [specifier, name] of Object.entries(SHARED)) {
 		inputs[`shared/${name}`] = SOURCES[specifier] ?? VIRTUAL + specifier
 	}
+	// the SDK's entry is instantiated once per hubby (sdk.js?hubby=<id>, src/sdk/index.ts): all
+	// but its API calls in an entry of their own, so nothing else is duplicated with it
+	inputs['shared/sdk-contract'] = resolve(appRoot, 'src/sdk/contract.ts')
 
 	let outDir = ''
 	const plugin: Plugin = {
@@ -81,8 +84,12 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 		enforce: 'pre',
 		// development: the hubbies' sources live outside this repository (../../hubbies)
 		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), hubbiesDir(appRoot)] } } }),
-		resolveId(id) {
-			return id === '@cxxi-lab/hubbyware-sdk' ? SOURCES[id] : null
+		resolveId(id, importer) {
+			if (id !== '@cxxi-lab/hubbyware-sdk') return null
+			// a hubby's sources (development): its own instance, as its bundle gets (src/sdk/index.ts)
+			const rel = importer ? relative(hubbiesDir(appRoot), importer.split('?')[0]) : '..'
+			const hubby = rel.startsWith('..') || isAbsolute(rel) ? null : rel.split(sep)[0]
+			return hubby ? `${SOURCES[id]}?hubby=${hubby}` : SOURCES[id]
 		}
 	}
 

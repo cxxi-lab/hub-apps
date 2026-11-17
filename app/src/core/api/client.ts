@@ -27,35 +27,52 @@ export class TunnelDownError extends ApiError {
 	}
 }
 
-export async function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+/**
+ * Who a call is made as: the account (the app itself) or a hubby (its token,
+ * core/hubby/tokens.ts). `headers` gives its credentials for a path; `unauthorized` answers a 401
+ * (true: send it again, once); `locked` a 423.
+ */
+export interface Caller {
+	headers(path: string): Promise<Record<string, string>>
+	unauthorized(): Promise<boolean>
+	locked(path: string): void
+}
+
+/** The account: its token, refreshed on a 401 (signed out when it can't be), the unlock tokens. */
+export const accountCaller: Caller = {
+	async headers(path) {
+		const { token } = await getAuthData()
+		return { ...unlockHeaders(path), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+	},
+	async unauthorized() {
+		if (await tryRefreshToken()) return true
+		await resetAuthState()
+		return false
+	},
+	locked: lockedByServer
+}
+
+/** A call to the API, as the account or a hubby: its JSON (nothing on a 204), an ApiError otherwise. */
+export async function request<T>(caller: Caller, path: string, options: RequestInit = {}, retry = true): Promise<T> {
 	if (waitsForTunnel(path)) throw new TunnelDownError()
-	const { token } = await getAuthData()
 
 	// a FormData body (multipart): the browser sets the type, with its boundary
 	const headers = {
 		...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
 		Accept: 'application/json',
 		...options.headers,
-		...unlockHeaders(path),
-		...(token ? { Authorization: `Bearer ${token}` } : {})
+		...await caller.headers(path)
 	}
 
 	const response = await fetch(`${getApiBaseUrl(path)}${path}`, { ...options, headers })
 
 	if (response.status === 401) {
-		if (retry) {
-			const refreshed = await tryRefreshToken()
-			if (!refreshed) {
-				await resetAuthState()
-				throw new Error('Unauthorized')
-			}
-			return api<T>(path, options, false)
-		}
-		await resetAuthState()
+		if (retry && await caller.unauthorized()) return request<T>(caller, path, options, false)
+		if (retry === false && caller === accountCaller) await resetAuthState()
 		throw new Error('Unauthorized')
 	}
 
-	if (response.status === 423) lockedByServer(path)
+	if (response.status === 423) caller.locked(path)
 
 	if (!response.ok) {
 		const body = await response.json().catch(() => null)
@@ -67,17 +84,25 @@ export async function api<T>(path: string, options: RequestInit = {}, retry = tr
 	return response.json()
 }
 
+/** A call as the account (the app itself). */
+export function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+	return request<T>(accountCaller, path, options, retry)
+}
+
 /**
- * Sends raw bytes (a file) with the session, like api(): PUT by default. For the stores' files.
+ * Sends raw bytes (a file), like api(): PUT by default. For the stores' files.
  */
-export async function apiUpload(path: string, body: Uint8Array | Blob, method = 'PUT'): Promise<void> {
+export async function upload(caller: Caller, path: string, body: Uint8Array | Blob, method = 'PUT'): Promise<void> {
 	if (waitsForTunnel(path)) throw new TunnelDownError()
-	const { token } = await getAuthData()
 	const response = await fetch(`${getApiBaseUrl(path)}${path}`, {
 		method,
 		body: body as BodyInit,
-		headers: { 'Content-Type': 'application/octet-stream', ...unlockHeaders(path), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+		headers: { 'Content-Type': 'application/octet-stream', ...await caller.headers(path) }
 	})
-	if (response.status === 423) lockedByServer(path)
+	if (response.status === 423) caller.locked(path)
 	if (!response.ok) throw new ApiError(response.status, null)
+}
+
+export function apiUpload(path: string, body: Uint8Array | Blob, method = 'PUT'): Promise<void> {
+	return upload(accountCaller, path, body, method)
 }

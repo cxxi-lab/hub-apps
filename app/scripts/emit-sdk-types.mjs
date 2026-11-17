@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The types of @cxxi-lab/hubbyware-sdk (packages/hubbyware-sdk/types/index.d.ts): the module contract as the app
-// implements it (src/sdk/index.ts), in one declaration file, the design system and npm packages
+// implements it (src/sdk/index.ts, over src/sdk/contract.ts), in one declaration file, the design system and npm packages
 // left as imports. A module's repository builds against them; at run time the host provides the SDK.
 //   node scripts/emit-sdk-types.mjs           writes them
 //   node scripts/emit-sdk-types.mjs --check   fails when they are not up to date (CI)

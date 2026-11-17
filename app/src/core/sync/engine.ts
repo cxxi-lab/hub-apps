@@ -1,5 +1,6 @@
 import { platform } from '@platform'
-import { api, TunnelDownError } from '@core/api/client'
+import { TunnelDownError } from '@core/api/client'
+import { hubbyApi } from '@core/hubby/tokens'
 import { requireDataKeys } from '@core/crypto/dataKey'
 import { open, seal } from '@core/crypto/format'
 import { encryptsAtRest, formerlyOf } from '@core/hubby/declarations'
@@ -172,7 +173,7 @@ export class HubbySync {
 			for (let i = 0; i < ops.length; i += 500) {
 				const batch = ops.slice(i, i + 500)
 				const envelopes = batch.map(op => sealOperation(keys.fields, this.module, op))
-				await api(`/api/data/${this.module}/_sync`, {
+				await hubbyApi(this.module).api(`/api/data/${this.module}/_sync`, {
 					method: 'POST',
 					body: JSON.stringify({ device: this.device, ops: envelopes.map(({ id, sealed }) => ({ id, sealed })) })
 				})
@@ -188,7 +189,7 @@ export class HubbySync {
 		const keys = await requireDataKeys()
 		let more = true
 		while (more) {
-			const page = await api<{ data: { ops: Array<Envelope & { device: string, position: number }>, position: number, more: boolean } }>(
+			const page = await hubbyApi(this.module).api<{ data: { ops: Array<Envelope & { device: string, position: number }>, position: number, more: boolean } }>(
 				`/api/data/${this.module}/_sync?since=${this.position}`
 			).then(r => r.data)
 			// this device's own come back too: applying them again changes nothing

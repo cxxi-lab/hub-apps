@@ -33,10 +33,15 @@ export function hubbyOfPath(path: string): string | null {
 /** The headers unlocking the hubby a call goes to, if it is unlocked here. */
 export function unlockHeaders(path: string): Record<string, string> {
 	const hubby = hubbyOfPath(path)
-	const unlocked = hubby ? tokens.get(hubby) : undefined
+	return hubby ? unlockHeadersOf(hubby) : {}
+}
+
+/** The headers unlocking a hubby, if it is unlocked here. */
+export function unlockHeadersOf(hubby: string): Record<string, string> {
+	const unlocked = tokens.get(hubby)
 	if (!unlocked) return {}
 	if (unlocked.expires <= Date.now()) {
-		lock(hubby!)
+		lock(hubby)
 		return {}
 	}
 	return { [UNLOCK_HEADER]: unlocked.token }
