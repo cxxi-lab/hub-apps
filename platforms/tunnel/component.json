@@ -3,9 +3,24 @@
 	"wireproxy": "v1.1.2",
 	"url": "https://github.com/cxxi-lab/hubbyware-client/releases/download/tunnel-v1/",
 	"files": {
-		"linux-x64": { "name": "wireproxy", "asset": "wireproxy-linux-x64", "sha256": "" },
-		"android-arm64-v8a": { "name": "libgojni.so", "asset": "libgojni-arm64-v8a.so", "sha256": "" },
-		"android-x86_64": { "name": "libgojni.so", "asset": "libgojni-x86_64.so", "sha256": "" }
+		"linux-x64": {
+			"name": "wireproxy",
+			"asset": "wireproxy-linux-x64",
+			"sha256": "66809dc49025b26f922704932361a99b60d7d0da0cf7a3cf0682e42a19253898"
+		},
+		"android-arm64-v8a": {
+			"name": "libgojni.so",
+			"asset": "libgojni-arm64-v8a.so",
+			"sha256": "2e63517016701a22d735495a7a6d0f2b149fa25b0f6457bb4dcfc5d1c644de1b"
+		},
+		"android-x86_64": {
+			"name": "libgojni.so",
+			"asset": "libgojni-x86_64.so",
+			"sha256": "8ab9cb0c52d303ba318cca7663ec0aa6ab8cda0e709bd28c60897fb41be779a2"
+		}
 	},
-	"aar": { "asset": "tunnel.aar", "sha256": "" }
+	"aar": {
+		"asset": "tunnel.aar",
+		"sha256": "55903f51566bff17889921060bddfa856c9c007c401388c2e63e79d8e3c0ec27"
+	}
 }
