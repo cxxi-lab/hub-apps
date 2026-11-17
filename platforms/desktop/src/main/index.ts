@@ -11,7 +11,7 @@ import './app/state'
 import './app/deviceSecrets'
 import { setupCompanion } from './companion'
 import { setupPlayerBlocklist } from './session/playerBlocklist'
-import { setupBrowseMigration } from './session/migrateBrowse'
+import { dropBrowseSession } from './session/dropBrowse'
 import { integrationsRegistry } from './session/integrations'
 import { persistRefreshCookie } from './session/sessions'
 import { checkForUpdateAtStartup } from './network/updater'
@@ -70,12 +70,12 @@ installWebviewHandlers()
 
 app.whenReady().then(async () => {
 	if (!(await singleInstance)) return
+	dropBrowseSession()
 	// before any window: they open in the theme's colours
 	setupTheme()
 	persistRefreshCookie()
 	setupPlayerBlocklist()
 	setupVpn()
-	setupBrowseMigration()
 	setupCompanion()
 	applyMenu()
 	setupTray()

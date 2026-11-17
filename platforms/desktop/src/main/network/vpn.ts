@@ -268,12 +268,12 @@ const LOCAL_BYPASS = '<local>;localhost;127.0.0.1;::1'
 /**
  * A webview session's way out (server docs/plan-reseau-vpn.md, phase 4): a hubby going out through
  * the VPN, through its own tunnel only (blocked while it isn't up, or runs for another hubby);
- * any other hubby, direct. The former shared session (persist:browse), through the tunnel as before.
+ * any other hubby, direct.
  */
 function proxyOf(partition: string, info: VpnInfo): Electron.ProxyConfig | null {
 	const hubby = hubbyOfPartition(partition)
 	if (hubby !== null && !isVpnHubby(hubby)) return null
-	const ours = hubby === null || hubby === info.hubby
+	const ours = hubby !== null && hubby === info.hubby
 	const proxy = ours && info.status === 'connected' && info.port !== null ? `127.0.0.1:${info.port}` : BLACKHOLE_PROXY
 	return { proxyRules: `http://${proxy}`, proxyBypassRules: LOCAL_BYPASS }
 }

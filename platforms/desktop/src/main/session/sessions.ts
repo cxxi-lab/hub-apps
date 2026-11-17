@@ -3,22 +3,20 @@ import { session } from 'electron'
 /**
  * The webviews' sessions (server docs/plan-reseau-vpn.md, phase 4): each hubby's own,
  * `persist:hubby:<id>` (its sites' cookies and storage, its way out: through the VPN for a hubby
- * going out through it, else direct). `persist:browse`, the former session shared by every webview,
- * stays for the hubby bundles that still ask for it (through the VPN, as before).
+ * going out through it, else direct). The former shared one (persist:browse) is gone.
  */
-export const BROWSE_PARTITION = 'persist:browse'
 
 const HUBBY_PARTITION = /^persist:hubby:([a-z0-9-]{1,80})$/
 
 /** A hubby's webview partition. */
 export const hubbyPartition = (hubby: string): string => `persist:hubby:${hubby}`
 
-/** The partition a webview asked for, as allowed: a hubby's own, else the former shared one. */
-export function webviewPartition(asked: string | undefined): string {
-	return asked && HUBBY_PARTITION.test(asked) ? asked : BROWSE_PARTITION
+/** The partition a webview asked for, if allowed: a hubby's own (null: refused). */
+export function webviewPartition(asked: string | undefined): string | null {
+	return asked && HUBBY_PARTITION.test(asked) ? asked : null
 }
 
-/** The hubby of a webview partition (null: the former shared one). */
+/** The hubby of a webview partition. */
 export function hubbyOfPartition(partition: string): string | null {
 	return HUBBY_PARTITION.exec(partition)?.[1] ?? null
 }

@@ -45,9 +45,10 @@ export function getApiBaseUrl(_path?: string): string {
 /**
  * The partition of the hubby's <webview>s (desktop): its own session, its sites' cookies and storage
  * apart from the other hubbies', going out through the VPN when it declares so (server
- * docs/plan-reseau-vpn.md). `<webview partition={webviewPartition} …>`.
+ * docs/plan-reseau-vpn.md). `<webview partition={webviewPartition} …>`. A webview outside its
+ * hubby's partition is refused (an SDK imported without a hubby: none).
  */
-export const webviewPartition = bound ? `persist:hubby:${hubby}` : 'persist:browse'
+export const webviewPartition = bound ? `persist:hubby:${hubby}` : ''
 
 /**
  * For a hubby going out through the VPN: whether its tunnel is up, so its webviews and players can

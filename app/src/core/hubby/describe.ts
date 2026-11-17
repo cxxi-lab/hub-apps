@@ -18,6 +18,18 @@ export interface HubbyInfo {
 	requiresCapabilities?: string[]
 	/** shared features (HubbySupport) */
 	supports?: string[]
+	/**
+	 * its way out (server docs/plan-reseau-vpn.md): `{"egress": "vpn"}`, its webviews and players
+	 * through the user's VPN (the platform's 'vpn' support then; formerly `supports: ['vpn']`)
+	 */
+	network?: { egress?: string } | string
+}
+
+/** Whether a hubby.json says it goes out through the VPN (`network`, or formerly `supports`). */
+export function goesThroughVpn(info: Pick<HubbyInfo, 'network' | 'supports'>): boolean {
+	const network = info.network
+	return network === 'vpn' || (typeof network === 'object' && network !== null && network.egress === 'vpn')
+		|| (info.supports ?? []).includes('vpn')
 }
 
 type Described = Pick<HubbyManifest, 'label' | 'description' | 'local' | 'requires' | 'requiresCapabilities' | 'supports'>
@@ -30,7 +42,8 @@ export function describe(info: HubbyInfo): Described {
 		local: info.local,
 		requires: info.requires,
 		requiresCapabilities: info.requiresCapabilities as Described['requiresCapabilities'],
-		supports: info.supports as Described['supports']
+		// going out through the VPN: the platform's 'vpn' support (its tunnel, its VPN settings)
+		supports: (goesThroughVpn(info) ? [...new Set([...(info.supports ?? []), 'vpn'])] : info.supports) as Described['supports']
 	}
 }
 

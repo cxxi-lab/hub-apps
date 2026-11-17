@@ -1,5 +1,5 @@
 import { app, session, shell, type Session, type WebContents } from 'electron'
-import { BROWSE_PARTITION, webSession, webviewPartition } from '../session/sessions'
+import { webSession, webviewPartition } from '../session/sessions'
 
 // Only what the app and the embedded players actually use. Everything else
 // (camera, microphone, geolocation, notifications, MIDI, USB/HID/serial,
@@ -38,9 +38,8 @@ function isAppUrl(url: string): boolean {
  * - no new windows from any web contents (app windows may hand https links to
  *   the system browser, pages inside webviews get nothing);
  * - app windows can only show the app itself;
- * - webviews can't smuggle a preload or Node, and always run in a webview partition (their
- *   hubby's, persist:hubby:<id>, or the former shared persist:browse), never in the app's own
- *   session (which holds the API cookie).
+ * - webviews can't smuggle a preload or Node, and run only in their hubby's partition
+ *   (persist:hubby:<id>), never in the app's own session (which holds the API cookie).
  */
 export function installSecurityHandlers(): void {
 	app.on('session-created', hardenSession)
@@ -64,10 +63,13 @@ export function installSecurityHandlers(): void {
 			webPreferences.nodeIntegration = false
 			webPreferences.nodeIntegrationInSubFrames = false
 			webPreferences.contextIsolation = true
-			// A webview partition, whatever its tag says (its hubby's, or the former shared one), set
-			// up before the guest loads (its way out, its blocklist, its integrations):
-			// webPreferences decide the guest's session (params.partition is only read).
+			// Its hubby's partition, or no webview: set up before the guest loads (its way out, its
+			// blocklist, its integrations); webPreferences decide the guest's session.
 			const partition = webviewPartition(params.partition)
+			if (!partition) {
+				event.preventDefault()
+				return
+			}
 			webSession(partition)
 			webPreferences.partition = partition
 			params.partition = partition
@@ -81,6 +83,5 @@ export function installSecurityHandlers(): void {
 
 	app.whenReady().then(() => {
 		hardenSession(session.defaultSession)
-		hardenSession(webSession(BROWSE_PARTITION))
 	})
 }
