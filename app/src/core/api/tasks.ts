@@ -18,6 +18,8 @@ export interface TaskProgress {
 	done: number
 	total: number | null
 	message: string | null
+	/** what the operation adds (its own shape: an import's job, its counts…) */
+	data?: unknown
 }
 
 /** A task, as its hubby sees it. */

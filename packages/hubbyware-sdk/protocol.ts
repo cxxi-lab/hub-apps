@@ -20,7 +20,7 @@ export interface TaskState {
 	id: string
 	operation: string
 	status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
-	progress: { done: number, total: number | null, message: string | null } | null
+	progress: { done: number, total: number | null, message: string | null, data?: unknown } | null
 	httpStatus: number | null
 	error: string | null
 	createdAt: string
