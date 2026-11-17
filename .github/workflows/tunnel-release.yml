@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p dist
           GOBIN="$PWD/build/bin" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go install -trimpath -ldflags "-s -w" "github.com/pufferffish/wireproxy/cmd/wireproxy@$WIREPROXY"
+            go install -trimpath -ldflags "-s -w" "github.com/windtf/wireproxy/cmd/wireproxy@$WIREPROXY"
           cp build/bin/wireproxy dist/wireproxy-linux-x64
 
       - name: Build the Android tunnel (libgojni.so, tunnel.aar)

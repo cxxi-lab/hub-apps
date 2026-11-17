@@ -7,7 +7,7 @@ the one written here (server docs/plan-reseau-vpn.md, phase 2).
 - `component.json`: the tunnel version this app expects, where to get it, and each file's sha256.
   Read by the desktop (`platforms/desktop/src/main/network/component.ts`) and by the Android build
   (BuildConfig, `TunnelComponent.java`; the Java side, `tunnel.aar`, comes from the same release).
-- Files: `wireproxy` (desktop, pufferffish/wireproxy built from source) and `libgojni.so` (Android,
+- Files: `wireproxy` (desktop, windtf/wireproxy, formerly pufferffish, built from source) and `libgojni.so` (Android,
   `platforms/mobile/tunnel` built by gomobile, `scripts/build-tunnel.sh`).
 
 ## A new tunnel version
