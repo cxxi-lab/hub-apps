@@ -41,10 +41,10 @@ import cxxi.hub.tunnel.Tunnel;
  * ProxyController, answers the proxy's 407 and exposes the same status shape as
  * desktop's VpnManager (disabled / starting / connected / error).
  *
- * It runs only while Private is open (the web side's TunnelGate starts it on entering, stops it on
- * leaving): the whole app then goes through it, Private's sites and its API (vpn.cxxi.io, refused
- * by the server from anywhere else); while it comes up or if it fails, every request is blocked.
- * Otherwise, no override: the app talks to hubbyware.cxxi.io directly.
+ * It runs only while a hubby going out through the VPN is open (the web side's TunnelGate starts it
+ * on entering, stops it on leaving): the whole app then goes through it (ProxyController is the
+ * process's), its sites and the API alike; while it comes up or if it fails, every request is
+ * blocked. Otherwise, no override: the app talks to hubbyware.cxxi.io directly.
  *
  * The config is the device's wg-quick file, copied to the app's private files
  * dir (filesDir/vpn.conf) by "Replace config". It must route everything

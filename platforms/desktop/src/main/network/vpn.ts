@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { resolveWireproxyBinary } from './wireproxy'
-import { BROWSE_PARTITION, PRIVATE_HOST } from '../session/sessions'
+import { BROWSE_PARTITION } from '../session/sessions'
 
 export type VpnStatus = 'disabled' | 'starting' | 'connected' | 'error'
 
@@ -264,25 +264,22 @@ const BLACKHOLE_PROXY = '127.0.0.1:1'
 const LOCAL_BYPASS = '<local>;localhost;127.0.0.1;::1'
 
 /**
- * Only Private goes through the VPN:
- *  - the app's own session: direct, but for the VPN-only name of the server (Private's API and
- *    media), sent through the tunnel by a PAC script (it can only route by host: Chromium hands it
- *    no path for https);
- *  - the embedded browser and players (Private's sites): everything through the tunnel.
- * Anything else (the OAuth windows, the updater) is direct.
+ * Only the embedded browser and players (the sites a hubby going out through the VPN opens) go
+ * through the tunnel. Everything else is direct: the app's own session (the API, on its public
+ * name), the updater (server docs/plan-reseau-vpn.md).
  */
 async function applyVpnProxy(info: VpnInfo): Promise<void> {
 	const connected = info.status === 'connected' && info.port !== null
 	const proxy = connected ? `127.0.0.1:${info.port}` : BLACKHOLE_PROXY
-	const pac = `function FindProxyForURL(url, host) { return host === ${JSON.stringify(PRIVATE_HOST)} ? "PROXY ${proxy}" : "DIRECT"; }`
 
 	await Promise.all([
-		session.defaultSession.setProxy({ mode: 'pac_script', pacScript: `data:application/x-ns-proxy-autoconfig;base64,${Buffer.from(pac).toString('base64')}` }),
+		// a PAC script from before (the former VPN-only name of the server): direct again
+		session.defaultSession.setProxy({ mode: 'direct' }),
 		session.fromPartition(BROWSE_PARTITION).setProxy({ proxyRules: `http://${proxy}`, proxyBypassRules: LOCAL_BYPASS })
 	])
 
-	if (connected) console.log('[vpn] proxy applied:', info.port, `(${PRIVATE_HOST} and the browser)`)
-	else console.log(`[vpn] tunnel down: ${PRIVATE_HOST} and the browser blocked`)
+	if (connected) console.log('[vpn] proxy applied:', info.port, '(the browser)')
+	else console.log('[vpn] tunnel down: the browser blocked')
 }
 
 // Before the private temp dir, the config was left behind as <tmp>/wireproxy-<pid>.conf.

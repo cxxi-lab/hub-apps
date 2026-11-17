@@ -68,7 +68,6 @@ export function forgetHubbyToken(hubby: string): void {
 /** Calls made as the hubby: with its token. */
 export function hubbyCaller(hubby: string): Caller {
 	return {
-		hubby,
 		async headers() {
 			return { Authorization: `Bearer ${await hubbyToken(hubby)}` }
 		},

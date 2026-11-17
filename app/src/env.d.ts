@@ -24,7 +24,6 @@ declare global {
 interface ImportMetaEnv {
 	readonly VITE_SERVER_URL_DEV?: string
 	readonly VITE_SERVER_URL_PROD?: string
-	readonly VITE_SERVER_URL_PRIVATE?: string
 }
 
 interface ImportMeta {

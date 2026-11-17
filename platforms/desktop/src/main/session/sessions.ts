@@ -1,13 +1,7 @@
 import { session } from 'electron'
 
-/** The embedded browser and players (Private's sites): entirely through the VPN. */
+/** The embedded browser and players (the sites of a hubby going out through the VPN): entirely through it. */
 export const BROWSE_PARTITION = 'persist:browse'
-
-/**
- * The name of the server only reachable through the VPN: Private's API and media (the app's
- * VITE_SERVER_URL_PRIVATE). The app's own session sends only this name through the tunnel.
- */
-export const PRIVATE_HOST = 'vpn.cxxi.io'
 
 /** The sessions whose requests the player blocklist (ads, trackers) filters. */
 export function webSessions(): Electron.Session[] {

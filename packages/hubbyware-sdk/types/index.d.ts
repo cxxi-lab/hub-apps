@@ -1024,10 +1024,10 @@ export declare function api<T>(path: string, options?: RequestInit, retry?: bool
  */
 export declare function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry?: boolean): Promise<void>;
 /**
- * The server's base URL for a path, as the hubby reaches it (a hubby requiring the VPN: the name
- * only reachable through it). For the URLs it hands an <img>, a <video>, a player: signed media.
+ * The server's base URL, for the URLs a hubby hands an <img>, a <video>, a player (signed media).
+ * The same for every path (`path`: kept for the hubbies passing it).
  */
-export declare function getApiBaseUrl(path?: string): string;
+export declare function getApiBaseUrl(_path?: string): string;
 /** Applies the website integration (cookies, CDN referer) of a URL's site before a webview or the native player loads it. */
 export declare function ensureIntegrationForUrl(rawUrl: string): Promise<void>;
 /**

@@ -2,7 +2,6 @@ import { getApiBaseUrl } from './baseUrl'
 import { lockedByServer, unlockHeaders } from '@core/privacy/locks'
 import { getAuthData, resetAuthState } from '@core/auth/authState'
 import { tryRefreshToken } from '@core/auth/refresh'
-import { waitsForTunnel } from '@core/vpn/tunnel'
 
 /**
  * Non-2xx response. `message` stays `HTTP <status>` (callers match on it); `detail`
@@ -20,21 +19,12 @@ export function errorMessage(err: unknown, fallback = 'Request failed'): string 
 	return err instanceof Error ? err.message : fallback
 }
 
-/** A call for the VPN while its tunnel is down: not sent (core/vpn/tunnel.ts). */
-export class TunnelDownError extends ApiError {
-	constructor() {
-		super(503, 'The VPN is not connected')
-	}
-}
-
 /**
  * Who a call is made as: the account (the app itself) or a hubby (its token,
  * core/hubby/tokens.ts). `headers` gives its credentials for a path; `unauthorized` answers a 401
- * (true: send it again, once); `locked` a 423. `hubby`: the hubby's id (its calls go where it
- * declares: the VPN-only name for one requiring the VPN, core/api/baseUrl.ts).
+ * (true: send it again, once); `locked` a 423.
  */
 export interface Caller {
-	hubby?: string
 	headers(path: string): Promise<Record<string, string>>
 	unauthorized(): Promise<boolean>
 	locked(path: string): void
@@ -56,8 +46,6 @@ export const accountCaller: Caller = {
 
 /** A call to the API, as the account or a hubby: its JSON (nothing on a 204), an ApiError otherwise. */
 export async function request<T>(caller: Caller, path: string, options: RequestInit = {}, retry = true): Promise<T> {
-	if (waitsForTunnel(path, caller.hubby)) throw new TunnelDownError()
-
 	// a FormData body (multipart): the browser sets the type, with its boundary
 	const headers = {
 		...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
@@ -66,7 +54,7 @@ export async function request<T>(caller: Caller, path: string, options: RequestI
 		...await caller.headers(path)
 	}
 
-	const response = await fetch(`${getApiBaseUrl(path, caller.hubby)}${path}`, { ...options, headers })
+	const response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers })
 
 	if (response.status === 401) {
 		if (retry && await caller.unauthorized()) return request<T>(caller, path, options, false)
@@ -98,8 +86,7 @@ export function api<T>(path: string, options: RequestInit = {}, retry = true): P
  * Sends raw bytes (a file), like api(): PUT by default. For the stores' files.
  */
 export async function upload(caller: Caller, path: string, body: Uint8Array | Blob, method = 'PUT'): Promise<void> {
-	if (waitsForTunnel(path, caller.hubby)) throw new TunnelDownError()
-	const response = await fetch(`${getApiBaseUrl(path, caller.hubby)}${path}`, {
+	const response = await fetch(`${getApiBaseUrl()}${path}`, {
 		method,
 		body: body as BodyInit,
 		headers: { 'Content-Type': 'application/octet-stream', ...await caller.headers(path) }

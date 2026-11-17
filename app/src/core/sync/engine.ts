@@ -1,5 +1,4 @@
 import { platform } from '@platform'
-import { TunnelDownError } from '@core/api/client'
 import { hubbyApi } from '@core/hubby/tokens'
 import { requireDataKeys } from '@core/crypto/dataKey'
 import { open, seal } from '@core/crypto/format'
@@ -154,8 +153,7 @@ export class HubbySync {
 				} while (this.again)
 			}
 			catch (err) {
-				// a module behind the VPN, its tunnel closed: it syncs when it is open again
-				if (!(err instanceof TunnelDownError)) console.warn(`[sync] ${this.module}: not synced`, err)
+				console.warn(`[sync] ${this.module}: not synced`, err)
 			}
 			finally {
 				this.syncing = null

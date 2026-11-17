@@ -34,11 +34,11 @@ export function apiStream(path: string, options: RequestInit, onEvent: StreamEve
 }
 
 /**
- * The server's base URL for a path, as the hubby reaches it (a hubby requiring the VPN: the name
- * only reachable through it). For the URLs it hands an <img>, a <video>, a player: signed media.
+ * The server's base URL, for the URLs a hubby hands an <img>, a <video>, a player (signed media).
+ * The same for every path (`path`: kept for the hubbies passing it).
  */
-export function getApiBaseUrl(path?: string): string {
-	return baseUrl(path, bound ? hubby : null)
+export function getApiBaseUrl(_path?: string): string {
+	return baseUrl()
 }
 
 const call: ApiCall = (path, options) => api(path, options)

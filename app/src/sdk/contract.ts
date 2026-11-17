@@ -21,7 +21,6 @@ export { Amount } from '@core/privacy/Amount'
 
 // The server API (authenticated: api and apiStream are each hubby's, index.ts)
 export { ApiError, errorMessage } from '@core/api/client'
-export { getApiBaseUrl } from '@core/api/baseUrl'
 export { readEventStream, type StreamEventHandler } from '@core/api/stream'
 export { fetchSettings, updateSettings } from '@core/api/settings'
 export type { ListResponse, PaginatedResponse, SingleResponse } from '@shared/apiResponse'

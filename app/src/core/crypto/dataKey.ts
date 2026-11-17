@@ -32,7 +32,7 @@ function setState(next: DataKeyState): void {
 }
 
 // by the server's identity (serverIdentity): the same across its renames
-const secretName = () => `data-key@${serverIdentity(getApiBaseUrl(DATA_KEY_PATH))}`
+const secretName = () => `data-key@${serverIdentity(getApiBaseUrl())}`
 
 /** fingerprint → key (base64url): the keys this device holds for this server's accounts */
 async function storedKeys(): Promise<Record<string, string>> {
