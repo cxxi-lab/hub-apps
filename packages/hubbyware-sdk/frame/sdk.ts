@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { onBackDepth, handleBack } from '@cxxi-lab/hubbyware-ui'
-import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage, type HubbyPage } from '../protocol'
+import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage, type HubbyPage, type TaskState } from '../protocol'
 
 /**
  * The hubby SDK inside its frame (prototype): every call goes to the host by message and comes
@@ -11,6 +11,7 @@ let nextId = 1
 const pending = new Map<number, { resolve: (v: unknown) => void, reject: (e: Error) => void }>()
 const initListeners = new Set<(init: Extract<HostMessage, { type: 'init' }>) => void>()
 const pathListeners = new Set<(path: string) => void>()
+const taskListeners = new Map<string, Set<(state: TaskState) => void>>()
 let init: Extract<HostMessage, { type: 'init' }> | null = null
 
 function post(message: GuestMessage) {
@@ -49,6 +50,7 @@ window.addEventListener('message', event => {
 	else if (m.type === 'back') handleBack()
 	else if (m.type === 'path') pathListeners.forEach(l => l(m.path))
 	else if (m.type === 'theme') applyTheme(m.theme, m.accent)
+	else if (m.type === 'task') taskListeners.get(m.task.id)?.forEach(l => l(m.task))
 })
 
 /** A call to the host (the platform API, through it). */
@@ -122,6 +124,83 @@ export const oauth = {
 	connect: (provider: string, options: { connection?: string } = {}) => call<OAuthConnection | null>('oauth.connect', provider, options),
 	/** an access token, for the hubby's scopes only */
 	accessToken: (connection: string) => call<{ accessToken: string, expiresAt: number }>('oauth.accessToken', connection),
+}
+
+export type { TaskState }
+
+const finished = (state: TaskState) => state.status === 'succeeded' || state.status === 'failed' || state.status === 'cancelled'
+
+/** A task of the hubby, through its host: followed by a hook or a stream, then its result. */
+export interface Task {
+	readonly id: string
+	readonly state: TaskState
+	on(listener: (state: TaskState) => void): () => void
+	events(signal?: AbortSignal): AsyncIterableIterator<TaskState>
+	result<T>(): Promise<T>
+	cancel(): Promise<TaskState>
+}
+
+function frameTask(initial: TaskState): Task {
+	let state = initial
+	const on = (listener: (state: TaskState) => void) => {
+		listener(state)
+		if (finished(state)) return () => {}
+		let set = taskListeners.get(state.id)
+		if (!set) {
+			taskListeners.set(state.id, set = new Set())
+			void call('tasks.follow', state.id)
+		}
+		const wrapped = (next: TaskState) => { state = next; listener(next) }
+		set.add(wrapped)
+		return () => {
+			set.delete(wrapped)
+			if (set.size === 0) {
+				taskListeners.delete(state.id)
+				void call('tasks.unfollow', state.id)
+			}
+		}
+	}
+	return {
+		id: state.id,
+		get state() { return state },
+		on,
+		async *events(signal?: AbortSignal) {
+			const queue: TaskState[] = []
+			let wake: (() => void) | null = null
+			const stop = on(s => { queue.push(s); wake?.() })
+			const abort = () => wake?.()
+			signal?.addEventListener('abort', abort)
+			try {
+				while (!signal?.aborted) {
+					if (queue.length === 0) await new Promise<void>(resolve => { wake = resolve })
+					wake = null
+					while (queue.length > 0) {
+						const s = queue.shift()!
+						yield s
+						if (finished(s)) return
+					}
+				}
+			}
+			finally {
+				stop()
+				signal?.removeEventListener('abort', abort)
+			}
+		},
+		result: <T>() => call<T>('tasks.result', state.id),
+		cancel: async () => (state = await call<TaskState>('tasks.cancel', state.id))
+	}
+}
+
+/**
+ * The hubby's tasks (server docs/plan-tasks.md): a capability's call (/api/cap/…) run in the
+ * background by the host, as the hubby; followed live, its result read once finished.
+ */
+export const tasks = {
+	/** `options`: the call's method, JSON body (a string) and headers */
+	start: async (path: string, options: { method?: string, body?: string, headers?: Record<string, string> } = {}) =>
+		frameTask(await call<TaskState>('tasks.start', path, options)),
+	get: async (id: string) => frameTask(await call<TaskState>('tasks.get', id)),
+	list: (status?: TaskState['status']) => call<TaskState[]>('tasks.list', status)
 }
 
 export function register(pages: HubbyPage[], sections: Record<string, unknown>) {

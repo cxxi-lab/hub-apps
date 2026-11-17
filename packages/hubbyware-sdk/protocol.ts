@@ -15,6 +15,19 @@ export interface HubbyPage {
 	section?: string
 }
 
+/** A task of the hubby (server docs/plan-tasks.md), as its frame hears it. */
+export interface TaskState {
+	id: string
+	operation: string
+	status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+	progress: { done: number, total: number | null, message: string | null } | null
+	httpStatus: number | null
+	error: string | null
+	createdAt: string
+	startedAt: string | null
+	finishedAt: string | null
+}
+
 /** Guest → host. */
 export type GuestMessage =
 	| { type: 'ready', at: number }
@@ -34,6 +47,8 @@ export type HostMessage =
 	| { type: 'path', path: string }
 	/** the app's theme or accent changed */
 	| { type: 'theme', theme: 'light' | 'dark', accent?: string }
+	/** a task the frame follows changed (`tasks.follow`): its state */
+	| { type: 'task', task: TaskState }
 
 export const PROTOCOL = 'hubby/1'
 

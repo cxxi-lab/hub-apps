@@ -44,8 +44,12 @@ export const accountCaller: Caller = {
 	locked: lockedByServer
 }
 
-/** A call to the API, as the account or a hubby: its JSON (nothing on a 204), an ApiError otherwise. */
-export async function request<T>(caller: Caller, path: string, options: RequestInit = {}, retry = true): Promise<T> {
+/**
+ * Sends a call to the API, as the account or a hubby, and gives its response when it succeeded
+ * (2xx): a 401 renews the credentials once, a 423 locks the hubby, anything else not 2xx is an
+ * ApiError.
+ */
+export async function send(caller: Caller, path: string, options: RequestInit = {}, retry = true): Promise<Response> {
 	// a FormData body (multipart): the browser sets the type, with its boundary
 	const headers = {
 		...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
@@ -57,21 +61,47 @@ export async function request<T>(caller: Caller, path: string, options: RequestI
 	const response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers })
 
 	if (response.status === 401) {
-		if (retry && await caller.unauthorized()) return request<T>(caller, path, options, false)
+		if (retry && await caller.unauthorized()) return send(caller, path, options, false)
 		if (retry === false && caller === accountCaller) await resetAuthState()
 		throw new Error('Unauthorized')
 	}
 
 	if (response.status === 423) caller.locked(path)
 
-	if (!response.ok) {
-		const body = await response.json().catch(() => null)
-		throw new ApiError(response.status, typeof body?.detail === 'string' ? body.detail : null)
-	}
+	if (!response.ok) throw await apiError(response)
+	return response
+}
 
-	// 204: nothing to read
+/** The ApiError of a response not 2xx: its problem+json `detail`, or its JSON `error`. */
+export async function apiError(response: Response): Promise<ApiError> {
+	const body = await response.json().catch(() => null) as { detail?: unknown, error?: unknown } | null
+	const detail = typeof body?.detail === 'string' ? body.detail : typeof body?.error === 'string' ? body.error : null
+	return new ApiError(response.status, detail)
+}
+
+/**
+ * A call to the API, as the account or a hubby: its JSON (nothing on a 204), an ApiError otherwise.
+ * An operation that runs as a task even when called in sync (server docs/plan-tasks.md, D1)
+ * answers 202 with its task: the call then waits for it, and gives the response the task got, as
+ * if the call had lasted.
+ */
+export async function request<T>(caller: Caller, path: string, options: RequestInit = {}, retry = true): Promise<T> {
+	const response = await send(caller, path, options, retry)
+	const task = taskOf(response)
+	if (task) return (await import('./tasks')).awaitTask<T>(caller, task)
+	return read<T>(response)
+}
+
+/** A response's JSON (nothing on a 204). */
+export async function read<T>(response: Response): Promise<T> {
 	if (response.status === 204) return undefined as T
 	return response.json()
+}
+
+/** The task a 202 answers with (its id), when the call was queued as a task (server: TaskableListener). */
+export function taskOf(response: Response): string | null {
+	if (response.status !== 202) return null
+	return response.headers.get('Location')?.match(/^\/api\/cap\/tasks\/([0-9a-f]{24})$/)?.[1] ?? null
 }
 
 /** A call to the API as someone (the account, a hubby: the SDK binds each hubby's, src/sdk/index.ts). */

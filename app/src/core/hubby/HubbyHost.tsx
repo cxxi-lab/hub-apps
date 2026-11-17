@@ -4,6 +4,7 @@ import { api } from '@core/api/client'
 import { collection } from './collections'
 import { createOAuth } from './oauth'
 import { hubbyApi } from './tokens'
+import type { Task } from '@core/api/tasks'
 import { hasScope, useHubbyScopes } from '@core/hubbies/scopes'
 import { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import { platform } from '@platform'
@@ -54,6 +55,21 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		}
 		// its connections at a provider: as the hubby (its token), the server checking what it declares
 		const oauth = createOAuth((path, options) => hubbyApi(hubby).api(path, options))
+		// its tasks (server docs/plan-tasks.md): its capabilities' calls, as the hubby (the server
+		// checks what it declares); the host keeps the tasks the frame asked about, and pushes the
+		// changes of those it follows
+		const tasks = hubbyApi(hubby).tasks
+		const held = new Map<string, Task>()
+		const following = new Map<string, () => void>()
+		const hold = (task: Task) => { held.set(task.id, task); return task.state }
+		const heldTask = async (id: unknown): Promise<Task> => {
+			if (typeof id !== 'string') throw new Error('invalid task id')
+			const known = held.get(id)
+			if (known) return known
+			const task = await tasks.get(id)
+			held.set(task.id, task)
+			return task
+		}
 		// what a hubby may ask its host: its own collections and settings (no scope), the rest by scope
 		const methods: Record<string, (...args: unknown[]) => unknown> = {
 			'echo': (v: unknown) => v,
@@ -70,6 +86,25 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 				return oauth.connect(String(provider), { connection: typeof connection === 'string' ? connection : undefined })
 			},
 			'oauth.accessToken': (connection: unknown) => oauth.accessToken(String(connection)),
+			'tasks.start': async (path: unknown, options: unknown) => {
+				if (typeof path !== 'string' || !path.startsWith('/api/cap/')) throw new Error('a task is a capability\'s call (/api/cap/…)')
+				const o = (options ?? {}) as { method?: unknown, body?: unknown, headers?: unknown }
+				const headers = Object.fromEntries(Object.entries((o.headers ?? {}) as Record<string, unknown>).filter(([, v]) => typeof v === 'string')) as Record<string, string>
+				return hold(await tasks.start(path, { method: typeof o.method === 'string' ? o.method : 'POST', body: typeof o.body === 'string' ? o.body : undefined, headers }))
+			},
+			'tasks.get': async (id: unknown) => (await heldTask(id)).state,
+			'tasks.list': (status: unknown) => tasks.list(typeof status === 'string' ? status as never : undefined),
+			'tasks.result': async (id: unknown) => (await heldTask(id)).result(),
+			'tasks.cancel': async (id: unknown) => (await heldTask(id)).cancel(),
+			'tasks.follow': async (id: unknown) => {
+				const task = await heldTask(id)
+				if (!following.has(task.id)) following.set(task.id, task.on(state => send({ type: 'task', task: state })))
+				return null
+			},
+			'tasks.unfollow': (id: unknown) => {
+				if (typeof id === 'string') { following.get(id)?.(); following.delete(id) }
+				return null
+			},
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')
 				return null
@@ -113,7 +148,11 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			}
 		}
 		window.addEventListener('message', onMessage)
-		return () => window.removeEventListener('message', onMessage)
+		return () => {
+			window.removeEventListener('message', onMessage)
+			following.forEach(stop => stop())
+			following.clear()
+		}
 	}, [hubby])
 
 	if (!src) {

@@ -1,5 +1,6 @@
 import { api, request, upload, type Caller } from '@core/api/client'
 import { stream, type StreamEventHandler } from '@core/api/stream'
+import { createTasks, type TasksApi } from '@core/api/tasks'
 import { getAuthData } from '@core/auth/authState'
 import { lock, UNLOCK_HEADER, unlockHeadersOf } from '@core/privacy/locks'
 
@@ -88,6 +89,8 @@ export interface HubbyApi {
 	api<T>(path: string, options?: RequestInit, retry?: boolean): Promise<T>
 	apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry?: boolean): Promise<void>
 	apiUpload(path: string, body: Uint8Array | Blob, method?: string): Promise<void>
+	/** its tasks (server docs/plan-tasks.md) */
+	tasks: TasksApi
 }
 
 const apis = new Map<string, HubbyApi>()
@@ -99,7 +102,8 @@ export function hubbyApi(hubby: string): HubbyApi {
 		bound = {
 			api: (path, options, retry) => request(caller, path, options, retry),
 			apiStream: (path, options, onEvent, retry) => stream(caller, path, options, onEvent, retry),
-			apiUpload: (path, body, method) => upload(caller, path, body, method)
+			apiUpload: (path, body, method) => upload(caller, path, body, method),
+			tasks: createTasks(caller)
 		}
 		apis.set(hubby, bound)
 	}

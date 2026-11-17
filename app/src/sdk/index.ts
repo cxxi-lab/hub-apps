@@ -6,7 +6,8 @@
  * `shared/sdk.js?hubby=<id>` (hubby-cli), its sources in development the same (build/sharedRuntime.ts).
  * Imported without a hubby (an older bundle, the app itself): the calls are the account's.
  */
-import { api as accountApi, type ApiCall } from '@core/api/client'
+import { accountCaller, api as accountApi, type ApiCall } from '@core/api/client'
+import { createTasks, type TasksApi } from '@core/api/tasks'
 import { getApiBaseUrl as baseUrl } from '@core/api/baseUrl'
 import { createOAuth } from '@core/hubby/oauth'
 import { apiStream as accountStream, type StreamEventHandler } from '@core/api/stream'
@@ -25,6 +26,21 @@ const bound = hubby && /^[a-z0-9-]{1,80}$/.test(hubby) ? hubbyApi(hubby) : null
 export function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
 	return bound ? bound.api<T>(path, options, retry) : accountApi<T>(path, options, retry)
 }
+
+/**
+ * The hubby's tasks (server docs/plan-tasks.md): a capability's call run in the background, the
+ * hubby choosing at each call. In sync, `await api(path, options)`: a promise of the result (an
+ * operation always run as a task is awaited the same, unseen). As a task:
+ *
+ *     const task = await tasks.start('/api/cap/scrape/video', { method: 'POST', body })
+ *     task.on(state => …)                          // a hook: queued, running (progress), finished
+ *     for await (const state of task.events()) …   // or a stream, until it is finished
+ *     const video = await task.result()            // what the call would have given
+ *     await task.cancel()
+ *
+ * `tasks.list()`: its tasks, running and recent (24 h); `tasks.get(id)`: one again (after a reload).
+ */
+export const tasks: TasksApi = bound ? bound.tasks : createTasks(accountCaller)
 
 /**
  * Opens an authenticated server-sent event stream, as the hubby — over fetch, so it can POST a

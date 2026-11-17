@@ -19,9 +19,10 @@ export { useContributions } from '@core/contexts/HubbiesContext'
 export { useAmountsBlurred, useHubbyVisible, usePrivateMode } from '@core/privacy/hidden'
 export { Amount } from '@core/privacy/Amount'
 
-// The server API (authenticated: api and apiStream are each hubby's, index.ts)
+// The server API (authenticated: api, apiStream and tasks are each hubby's, index.ts)
 export { ApiError, errorMessage } from '@core/api/client'
 export { readEventStream, type StreamEventHandler } from '@core/api/stream'
+export { TaskCancelledError, type Task, type TaskProgress, type TaskState, type TaskStatus, type TasksApi } from '@core/api/tasks'
 export { fetchSettings, updateSettings } from '@core/api/settings'
 export type { ListResponse, PaginatedResponse, SingleResponse } from '@shared/apiResponse'
 
