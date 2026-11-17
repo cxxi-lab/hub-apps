@@ -11,7 +11,7 @@ export type StreamEventHandler = (event: string, data: unknown) => void
  * a 401 renews the credentials once before giving up.
  */
 export async function stream(caller: Caller, path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
-	if (waitsForTunnel(path)) throw new TunnelDownError()
+	if (waitsForTunnel(path, caller.hubby)) throw new TunnelDownError()
 
 	const headers = {
 		'Content-Type': 'application/json',
@@ -19,7 +19,7 @@ export async function stream(caller: Caller, path: string, options: RequestInit,
 		...await caller.headers(path)
 	}
 
-	const response = await fetch(`${getApiBaseUrl(path)}${path}`, { ...options, headers })
+	const response = await fetch(`${getApiBaseUrl(path, caller.hubby)}${path}`, { ...options, headers })
 
 	if (response.status === 423) caller.locked(path)
 

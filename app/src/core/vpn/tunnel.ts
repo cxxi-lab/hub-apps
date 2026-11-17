@@ -13,5 +13,5 @@ if (platform.capabilities.vpn) {
 	platform.onVpnStatusChange(info => { status = info.status })
 }
 
-/** Whether a call to this path must wait for the tunnel. */
-export const waitsForTunnel = (path: string): boolean => platform.capabilities.vpn && status !== 'connected' && isVpnPath(path)
+/** Whether a call to this path (by this hubby: its token's) must wait for the tunnel. */
+export const waitsForTunnel = (path: string, hubby?: string | null): boolean => platform.capabilities.vpn && status !== 'connected' && isVpnPath(path, hubby)

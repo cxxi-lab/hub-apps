@@ -17,14 +17,14 @@ export async function initBaseUrl(): Promise<void> {
 }
 
 /**
- * The server's base URL. Given the path called, the routes of the hubbies reached through the VPN
- * (their data, their capabilities, their media: as they declare, core/hubby/declarations.ts) go to
- * the name only reachable through it (prod): the desktop routes that name through the tunnel, the
- * phone routes everything through it in private mode. Development: one local server.
+ * The server's base URL. Given the path called and the hubby calling, the calls of a hubby
+ * requiring the VPN (as it declares, core/hubby/declarations.ts) go to the name only reachable
+ * through it (prod): the desktop routes that name through the tunnel, the phone routes everything
+ * through it while it runs. Development: one local server.
  */
-export function getApiBaseUrl(path?: string): string {
+export function getApiBaseUrl(path?: string, hubby?: string | null): string {
 	if (currentDevMode) return CONFIG.SERVER_URL_DEV
-	return path && isVpnPath(path) ? CONFIG.SERVER_URL_PRIVATE_PROD : CONFIG.SERVER_URL_PROD
+	return path && isVpnPath(path, hubby) ? CONFIG.SERVER_URL_PRIVATE_PROD : CONFIG.SERVER_URL_PROD
 }
 
 // Fires after the base URL has switched, so listeners already read the new target.
