@@ -682,13 +682,6 @@ export declare function Amount({ hubby, children, className }: {
 	children: ReactNode;
 	className?: string;
 }): import("react").JSX.Element;
-/**
- * The server's base URL. Given the path called, the routes of the hubbies reached through the VPN
- * (their data, their capabilities, their media: as they declare, core/hubby/declarations.ts) go to
- * the name only reachable through it (prod): the desktop routes that name through the tunnel, the
- * phone routes everything through it in private mode. Development: one local server.
- */
-export declare function getApiBaseUrl(path?: string): string;
 export declare function fetchSettings<T = Record<string, unknown>>(scope: string): Promise<T>;
 export declare function updateSettings<T = Record<string, unknown>>(scope: string, values: Partial<T>): Promise<T>;
 /** Standard JSON envelopes returned by the hub API. */
@@ -1030,6 +1023,11 @@ export declare function api<T>(path: string, options?: RequestInit, retry?: bool
  * body and carry the token — and resolves once the server closes it.
  */
 export declare function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry?: boolean): Promise<void>;
+/**
+ * The server's base URL for a path, as the hubby reaches it (a hubby requiring the VPN: the name
+ * only reachable through it). For the URLs it hands an <img>, a <video>, a player: signed media.
+ */
+export declare function getApiBaseUrl(path?: string): string;
 /** Applies the website integration (cookies, CDN referer) of a URL's site before a webview or the native player loads it. */
 export declare function ensureIntegrationForUrl(rawUrl: string): Promise<void>;
 /**
