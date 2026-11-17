@@ -1,0 +1,69 @@
+name: tunnel-release
+
+# The tunnel, a component of the platform (platforms/tunnel/README.md): built once per version and
+# published as the GitHub release tunnel-v<version>, with SHA256SUMS. The apps pin each file's
+# sha256 (platforms/tunnel/component.json) and download it only when a hubby needs the VPN.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version
+        id: component
+        run: |
+          echo "version=$(jq -r .version platforms/tunnel/component.json)" >> "$GITHUB_OUTPUT"
+          echo "wireproxy=$(jq -r .wireproxy platforms/tunnel/component.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-36" "ndk;30.0.16248370"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: platforms/mobile/tunnel/go.mod
+          cache-dependency-path: platforms/mobile/tunnel/go.sum
+
+      - name: Build wireproxy (desktop)
+        env:
+          WIREPROXY: ${{ steps.component.outputs.wireproxy }}
+        run: |
+          mkdir -p dist
+          GOBIN="$PWD/build/bin" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go install -trimpath -ldflags "-s -w" "github.com/pufferffish/wireproxy/cmd/wireproxy@$WIREPROXY"
+          cp build/bin/wireproxy dist/wireproxy-linux-x64
+
+      - name: Build the Android tunnel (libgojni.so, tunnel.aar)
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+          # gomobile at the x/mobile version the tunnel's go.mod pins: the Java glue and the library match
+          mobile=$(cd platforms/mobile/tunnel && go list -m -f '{{.Version}}' golang.org/x/mobile)
+          go install "golang.org/x/mobile/cmd/gomobile@$mobile" "golang.org/x/mobile/cmd/gobind@$mobile"
+          platforms/mobile/scripts/build-tunnel.sh
+          for abi in arm64-v8a x86_64; do cp "platforms/mobile/build/tunnel/jni/$abi/libgojni.so" "dist/libgojni-$abi.so"; done
+          cp platforms/mobile/android/app/libs/tunnel.aar dist/tunnel.aar
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.component.outputs.version }}
+        run: |
+          set -e
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+          gh release create "tunnel-v$VERSION" dist/* --title "Tunnel v$VERSION" --latest=false \
+            --notes "The VPN tunnel, a component of the platform (platforms/tunnel/README.md). Copy SHA256SUMS into platforms/tunnel/component.json."
