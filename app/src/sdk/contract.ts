@@ -35,9 +35,9 @@ export type {
 
 // The web socle: sites' integrations (cookies and referer rules applied before a site loads) and
 // their embedded players (scripts per site, ad/tracker blocklist)
-export { ensureIntegrationForUrl, isIntegrationKnownSync } from '@shared/web/integrations'
-export { getPlayerConfig, type PlayerConfig, type PlayerScripts } from '@shared/web/players'
-export { syncPlayerBlocklist } from '@shared/web/playerBlocklist'
+// (ensureIntegrationForUrl, getPlayerConfig, syncPlayerBlocklist: each hubby's, index.ts)
+export { isIntegrationKnownSync } from '@shared/web/integrations'
+export type { PlayerConfig, PlayerScripts } from '@shared/web/players'
 
 // UI kit (@cxxi-lab/hubbyware-ui: a hubby may also import the design system directly)
 export {

@@ -1,7 +1,7 @@
 /**
  * The hubby SDK (@cxxi-lab/hubbyware-sdk), as one hubby gets it. Everything is the contract's
  * (contract.ts, one instance shared by all, `shared/sdk-contract.js`) but the API calls: they are
- * made as the hubby, with its token (core/hubby/tokens.ts), so the server knows which hubby makes
+ * made as the hubby, with its token — its own, and the web socle's lookups (integrations, players) — (core/hubby/tokens.ts), so the server knows which hubby makes
  * each one. This entry is instantiated once per hubby: a hubby bundle imports
  * `shared/sdk.js?hubby=<id>` (hubby-cli), its sources in development the same (build/sharedRuntime.ts).
  * Imported without a hubby (an older bundle, the app itself): the calls are the account's.
@@ -9,6 +9,9 @@
 import { api as accountApi } from '@core/api/client'
 import { apiStream as accountStream, type StreamEventHandler } from '@core/api/stream'
 import { hubbyApi } from '@core/hubby/tokens'
+import { ensureIntegrationForUrl as ensureIntegration } from '@shared/web/integrations'
+import { getPlayerConfig as playerConfig, type ApiCall, type PlayerConfig } from '@shared/web/players'
+import { syncPlayerBlocklist as syncBlocklist } from '@shared/web/playerBlocklist'
 
 export * from './contract'
 
@@ -26,4 +29,25 @@ export function api<T>(path: string, options: RequestInit = {}, retry = true): P
  */
 export function apiStream(path: string, options: RequestInit, onEvent: StreamEventHandler, retry = true): Promise<void> {
 	return bound ? bound.apiStream(path, options, onEvent, retry) : accountStream(path, options, onEvent, retry)
+}
+
+const call: ApiCall = (path, options) => api(path, options)
+
+/** Applies the website integration (cookies, CDN referer) of a URL's site before a webview or the native player loads it. */
+export function ensureIntegrationForUrl(rawUrl: string): Promise<void> {
+	return ensureIntegration(call, rawUrl)
+}
+
+/**
+ * The player config for a domain, null when the back has no scripts for the
+ * site (it is then loaded as-is). A failed lookup resolves null too, and is
+ * retried next time.
+ */
+export function getPlayerConfig(domain: string): Promise<PlayerConfig | null> {
+	return playerConfig(call, domain)
+}
+
+/** Makes sure the shell holds the back's current player blocklist before a player loads a site (once per session). */
+export function syncPlayerBlocklist(): Promise<void> {
+	return syncBlocklist(call)
 }

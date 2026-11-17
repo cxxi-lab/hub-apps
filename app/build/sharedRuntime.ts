@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Plugin, UserConfig } from 'vite'
 
@@ -32,6 +32,14 @@ export function hubbiesDir(appRoot: string): string {
 	if (existsSync(inside)) return inside
 	const next = resolve(appRoot, '../../hubbies')
 	return existsSync(next) ? next : resolve(appRoot, '../../modules')
+}
+
+/** A hubby's id: its hubby.json's, else its folder's name (as hubby-cli reads it); null: not a hubby. */
+function hubbyId(dir: string): string | null {
+	const file = join(dir, 'hubby.json')
+	if (!existsSync(file)) return null
+	const id = (JSON.parse(readFileSync(file, 'utf8')) as { id?: unknown }).id
+	return typeof id === 'string' ? id : basename(dir)
 }
 
 export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNullable<UserConfig['build']>, alias: Record<string, string> } {
@@ -79,16 +87,22 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 
 	// The SDK's package holds its types only: the app is its implementation (dev and build alike;
 	// its subpaths, /frame and /protocol, are the package's own files)
+	let serving = false
 	const sdk: Plugin = {
 		name: 'hubbyware-sdk-source',
 		enforce: 'pre',
 		// development: the hubbies' sources live outside this repository (../../hubbies)
 		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), hubbiesDir(appRoot)] } } }),
+		configResolved(config) {
+			serving = config.command === 'serve'
+		},
 		resolveId(id, importer) {
 			if (id !== '@cxxi-lab/hubbyware-sdk') return null
 			// a hubby's sources (development): its own instance, as its bundle gets (src/sdk/index.ts)
+			if (!serving) return SOURCES[id]
 			const rel = importer ? relative(hubbiesDir(appRoot), importer.split('?')[0]) : '..'
-			const hubby = rel.startsWith('..') || isAbsolute(rel) ? null : rel.split(sep)[0]
+			const folder = rel.startsWith('..') || isAbsolute(rel) ? null : rel.split(sep)[0]
+			const hubby = folder ? hubbyId(join(hubbiesDir(appRoot), folder)) : null
 			return hubby ? `${SOURCES[id]}?hubby=${hubby}` : SOURCES[id]
 		}
 	}
@@ -102,6 +116,19 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 				// the shared entries keep their export names: hubbies import them by name
 				preserveEntrySignatures: 'exports-only',
 				output: {
+					// what only the SDK's entry imports (the web socle it binds to each hubby…): in a
+					// chunk of its own, not in the entry, which is instantiated once per hubby
+					manualChunks(id, { getModuleInfo }) {
+						const entry = SOURCES['@cxxi-lab/hubbyware-sdk']
+						const seen = new Set<string>()
+						const onlyFromSdk = (m: string): boolean => {
+							if (seen.has(m)) return true
+							seen.add(m)
+							const importers = getModuleInfo(m)?.importers ?? []
+							return importers.length > 0 && importers.every(i => i === entry || onlyFromSdk(i))
+						}
+						return id !== entry && onlyFromSdk(id) ? 'sdk-bound' : undefined
+					},
 					entryFileNames: chunk => chunk.name.startsWith('shared/') ? '[name].js' : 'assets/[name]-[hash].js'
 				}
 			}

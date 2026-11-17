@@ -1,9 +1,8 @@
 // Website integrations (cookies, CDN referer) applied before a webview / the
 // native player loads a site. Shared by Private's webviews (its Browse, its players) and the phone's
-// native player.
-import { getApiBaseUrl } from '@core/api/baseUrl'
-import { getAuthData, resetAuthState } from '@core/auth/authState'
-import { tryRefreshToken } from '@core/auth/refresh'
+// native player. Their lookups are made as the hubby asking (`call`, bound by the SDK).
+import { ApiError } from '@core/api/client'
+import type { ApiCall } from './players'
 import type { WebsiteIntegration } from '@platform'
 import { platform } from '@platform'
 
@@ -23,38 +22,20 @@ function suffixMatches(domain: string, host: string): boolean {
 	return domain === host || domain.endsWith('.' + host)
 }
 
-async function authedFetch(path: string): Promise<Response> {
-	const { token } = await getAuthData()
-	const res = await fetch(`${getApiBaseUrl()}${path}`, {
-		headers: token ? { Authorization: `Bearer ${token}` } : {}
-	})
-	if (res.status === 401) {
-		const refreshed = await tryRefreshToken()
-		if (!refreshed) {
-			await resetAuthState()
-			throw new Error('Unauthorized')
-		}
-		return authedFetch(path)
-	}
-	return res
-}
-
-async function fetchAndApply(domain: string): Promise<void> {
+async function fetchAndApply(call: ApiCall, domain: string): Promise<void> {
 	const existing = pending.get(domain)
 	if (existing) return existing
 
 	const p = (async () => {
 		try {
-			const res = await authedFetch(`/api/cap/web/integrations/${domain}`)
-			if (res.status === 404) {
+			let body: { data: { host: string; updatedAt: number; integration: WebsiteIntegration } }
+			try {
+				body = await call(`/api/cap/web/integrations/${domain}`)
+			}
+			catch (err) {
+				if (!(err instanceof ApiError && err.status === 404)) throw err
 				localState.set(domain, { matchedHost: null, updatedAt: null })
 				return
-			}
-			if (!res.ok) {
-				throw new Error(`HTTP ${res.status}`)
-			}
-			const body = await res.json() as {
-				data: { host: string; updatedAt: number; integration: WebsiteIntegration }
 			}
 			localState.set(domain, { matchedHost: body.data.host, updatedAt: body.data.updatedAt })
 			await platform.applyIntegration({
@@ -73,19 +54,17 @@ async function fetchAndApply(domain: string): Promise<void> {
 	try { await p } finally { pending.delete(domain) }
 }
 
-export async function initIntegrations(): Promise<void> {
+export async function initIntegrations(call: ApiCall): Promise<void> {
 	if (initialized) return
 	initialized = true
 
 	// Main process already replayed its disk cache via applyAll() at startup.
 	// We just sync the manifest to detect drift.
-	syncIntegrations().catch(err => console.warn('[integrations] background sync failed:', err))
+	syncIntegrations(call).catch(err => console.warn('[integrations] background sync failed:', err))
 }
 
-export async function syncIntegrations(): Promise<void> {
-	const res = await authedFetch('/api/cap/web/integrations')
-	if (!res.ok) throw new Error(`HTTP ${res.status}`)
-	const body = await res.json() as { data: Array<{ host: string; updatedAt: number }> }
+export async function syncIntegrations(call: ApiCall): Promise<void> {
+	const body = await call<{ data: Array<{ host: string; updatedAt: number }> }>('/api/cap/web/integrations')
 
 	const manifest = new Map<string, number>()
 	for (const { host, updatedAt } of body.data) manifest.set(host, updatedAt)
@@ -125,19 +104,19 @@ export async function syncIntegrations(): Promise<void> {
 	}
 
 	for (const domain of domainsToRefetch) {
-		await fetchAndApply(domain).catch(() => {})
+		await fetchAndApply(call, domain).catch(() => {})
 	}
 }
 
-export async function ensureIntegrationForUrl(rawUrl: string): Promise<void> {
-	if (!initialized) await initIntegrations()
+export async function ensureIntegrationForUrl(call: ApiCall, rawUrl: string): Promise<void> {
+	if (!initialized) await initIntegrations(call)
 
 	let host: string
 	try { host = new URL(rawUrl).hostname.toLowerCase() }
 	catch { return }
 
 	if (localState.has(host)) return
-	await fetchAndApply(host).catch(() => {})
+	await fetchAndApply(call, host).catch(() => {})
 }
 
 /**
