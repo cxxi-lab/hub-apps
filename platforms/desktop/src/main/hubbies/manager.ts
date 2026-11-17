@@ -9,6 +9,7 @@ import { fetchBuffer, RELEASES_URL } from '../network/updater'
 import { registerNativeLookup } from './natives'
 import { removeTunnel } from '../network/component'
 import { registerVpnHubbies } from '../network/vpnConfig'
+import { hubbyPartition, webSession } from '../session/sessions'
 import { compareVersions, fits } from './semver'
 import { HUBBY_SCHEME } from '../app/schemes'
 
@@ -291,6 +292,14 @@ function pruneTunnel(): void {
 	if (![...active.values()].some(needsVpn)) removeTunnel()
 }
 
+/**
+ * The webview sessions of the hubbies going out through the VPN, set up before any of their
+ * webviews exists: their proxy (or its kill switch) is in place before the first request.
+ */
+function prepareVpnSessions(): void {
+	for (const hubby of active.values()) if (needsVpn(hubby)) webSession(hubbyPartition(hubby.id))
+}
+
 /** A native file of whichever installed hubby brings it (this platform's), or null: e.g. Private's wireproxy. */
 function findNative(name: string): string | null {
 	for (const hubby of active.values()) {
@@ -438,6 +447,7 @@ function installHubby(id: string): Promise<HubbyEntry> {
 				if (!copy) throw new Error(`${id}: downloaded but not usable`)
 			}
 			active.set(id, copy)
+			prepareVpnSessions()
 			return entry(copy)
 		})().finally(() => installing.delete(id))
 		installing.set(id, pending)
@@ -490,6 +500,7 @@ function activateHubbies(): string[] {
 	const newer = pendingHubbies()
 	if (newer.length) {
 		resolveActive()
+		prepareVpnSessions()
 		console.log('[hubbies] activated without a restart:', newer.join(', '))
 	}
 	return newer
@@ -579,6 +590,7 @@ export function setupHubbies(): void {
 	registerVpnHubbies(() => [...active.values()].filter(needsVpn).map(h => h.id))
 	resolveActive()
 	pruneTunnel()
+	prepareVpnSessions()
 	serve()
 	if (app.isPackaged || TESTING) {
 		void checkHubbyUpdates()

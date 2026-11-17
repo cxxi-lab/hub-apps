@@ -11,6 +11,7 @@ import './app/state'
 import './app/deviceSecrets'
 import { setupCompanion } from './companion'
 import { setupPlayerBlocklist } from './session/playerBlocklist'
+import { setupBrowseMigration } from './session/migrateBrowse'
 import { integrationsRegistry } from './session/integrations'
 import { persistRefreshCookie } from './session/sessions'
 import { checkForUpdateAtStartup } from './network/updater'
@@ -74,6 +75,7 @@ app.whenReady().then(async () => {
 	persistRefreshCookie()
 	setupPlayerBlocklist()
 	setupVpn()
+	setupBrowseMigration()
 	setupCompanion()
 	applyMenu()
 	setupTray()

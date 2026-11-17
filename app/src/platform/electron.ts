@@ -15,6 +15,7 @@ declare global {
 const capabilities: PlatformCapabilities = {
 	companion: true,
 	vpn: true,
+	vpnPerWebview: true,
 	privateMode: true,
 	updates: true,
 	integrations: true,

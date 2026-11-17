@@ -9,8 +9,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { resolveWireproxyBinary } from './wireproxy'
-import { configInfo, defaultVpnHubby, readConfig, removeConfig, validHubby, writeConfig } from './vpnConfig'
-import { BROWSE_PARTITION } from '../session/sessions'
+import { configInfo, defaultVpnHubby, isVpnHubby, readConfig, removeConfig, validHubby, writeConfig } from './vpnConfig'
+import { hubbyOfPartition, onWebSession, webviewSessions } from '../session/sessions'
 
 export type VpnStatus = 'disabled' | 'starting' | 'connected' | 'error'
 
@@ -266,22 +266,34 @@ const BLACKHOLE_PROXY = '127.0.0.1:1'
 const LOCAL_BYPASS = '<local>;localhost;127.0.0.1;::1'
 
 /**
- * Only the embedded browser and players (the sites a hubby going out through the VPN opens) go
- * through the tunnel. Everything else is direct: the app's own session (the API, on its public
- * name), the updater (server docs/plan-reseau-vpn.md).
+ * A webview session's way out (server docs/plan-reseau-vpn.md, phase 4): a hubby going out through
+ * the VPN, through its own tunnel only (blocked while it isn't up, or runs for another hubby);
+ * any other hubby, direct. The former shared session (persist:browse), through the tunnel as before.
+ */
+function proxyOf(partition: string, info: VpnInfo): Electron.ProxyConfig | null {
+	const hubby = hubbyOfPartition(partition)
+	if (hubby !== null && !isVpnHubby(hubby)) return null
+	const ours = hubby === null || hubby === info.hubby
+	const proxy = ours && info.status === 'connected' && info.port !== null ? `127.0.0.1:${info.port}` : BLACKHOLE_PROXY
+	return { proxyRules: `http://${proxy}`, proxyBypassRules: LOCAL_BYPASS }
+}
+
+function applyTo(sess: Electron.Session, partition: string, info: VpnInfo): Promise<void> {
+	return sess.setProxy(proxyOf(partition, info) ?? { mode: 'direct' })
+}
+
+/**
+ * Only the webviews of a hubby going out through the VPN go through the tunnel. Everything else is
+ * direct: the app's own session (the API, on its public name), the updater.
  */
 async function applyVpnProxy(info: VpnInfo): Promise<void> {
-	const connected = info.status === 'connected' && info.port !== null
-	const proxy = connected ? `127.0.0.1:${info.port}` : BLACKHOLE_PROXY
-
 	await Promise.all([
 		// a PAC script from before (the former VPN-only name of the server): direct again
 		session.defaultSession.setProxy({ mode: 'direct' }),
-		session.fromPartition(BROWSE_PARTITION).setProxy({ proxyRules: `http://${proxy}`, proxyBypassRules: LOCAL_BYPASS })
+		...webviewSessions().map(([partition, sess]) => applyTo(sess, partition, info))
 	])
-
-	if (connected) console.log('[vpn] proxy applied:', info.port, '(the browser)')
-	else console.log('[vpn] tunnel down: the browser blocked')
+	if (info.status === 'connected') console.log(`[vpn] proxy applied: ${info.port} (${info.hubby ?? 'the browser'})`)
+	else console.log('[vpn] tunnel down: the VPN hubbies\' webviews blocked')
 }
 
 // Before the private temp dir, the config was left behind as <tmp>/wireproxy-<pid>.conf.
@@ -325,8 +337,10 @@ export function setupVpn(): void {
 		if (!answerProxyLogin(authInfo, callback)) callback()
 	})
 
-	// Until the tunnel runs (it starts when Private opens), what it carries is blocked.
+	// Until the tunnel runs (it starts when its hubby opens), what it carries is blocked; each
+	// webview session set up as it comes.
 	void applyVpnProxy(vpnManager.getInfo())
+	onWebSession((sess, partition) => applyTo(sess, partition, vpnManager.getInfo()))
 
 	vpnManager.on('status', async (info: VpnInfo) => {
 		await applyVpnProxy(info)

@@ -319,6 +319,12 @@ export interface PlatformCapabilities {
 	companion: boolean
 	/** integrated WireGuard tunnel controllable from the UI */
 	vpn: boolean
+	/**
+	 * the tunnel carries only the webviews of the hubby using it (desktop: per session), the rest of
+	 * the app going direct; false: it carries the whole app while it runs (Android: the WebView's
+	 * proxy is the process's), so the hubby waits for it
+	 */
+	vpnPerWebview?: boolean
 	/** hubbies hidden behind a reveal shortcut (Privacy) */
 	privateMode: boolean
 	/** in-app self-update */

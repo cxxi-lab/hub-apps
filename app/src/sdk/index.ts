@@ -11,6 +11,7 @@ import { getApiBaseUrl as baseUrl } from '@core/api/baseUrl'
 import { createOAuth } from '@core/hubby/oauth'
 import { apiStream as accountStream, type StreamEventHandler } from '@core/api/stream'
 import { hubbyApi } from '@core/hubby/tokens'
+import { useVpnStatus } from '@shared/hooks/useVpnStatus'
 import { ensureIntegrationForUrl as ensureIntegration } from '@shared/web/integrations'
 import { getPlayerConfig as playerConfig, type PlayerConfig } from '@shared/web/players'
 import { syncPlayerBlocklist as syncBlocklist } from '@shared/web/playerBlocklist'
@@ -39,6 +40,22 @@ export function apiStream(path: string, options: RequestInit, onEvent: StreamEve
  */
 export function getApiBaseUrl(_path?: string): string {
 	return baseUrl()
+}
+
+/**
+ * The partition of the hubby's <webview>s (desktop): its own session, its sites' cookies and storage
+ * apart from the other hubbies', going out through the VPN when it declares so (server
+ * docs/plan-reseau-vpn.md). `<webview partition={webviewPartition} …>`.
+ */
+export const webviewPartition = bound ? `persist:hubby:${hubby}` : 'persist:browse'
+
+/**
+ * For a hubby going out through the VPN: whether its tunnel is up, so its webviews and players can
+ * load (until then the shell blocks them: render them once this is true).
+ */
+export function useTunnelReady(): boolean {
+	const vpn = useVpnStatus()
+	return vpn.status === 'connected' && (vpn.hubby == null || !bound || vpn.hubby === hubby)
 }
 
 const call: ApiCall = (path, options) => api(path, options)

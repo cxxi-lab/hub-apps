@@ -1,7 +1,7 @@
 import { app, ipcMain } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { webSessions } from './sessions'
+import { appSessions, onWebSession } from './sessions'
 
 // Hosts blocked in the webview sessions (ads, trackers): without it a site's
 // player waits on its ad sequence and never starts the video. The list is
@@ -14,7 +14,7 @@ import { webSessions } from './sessions'
 // ^2.18.1) — ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, { path, read, write })
 // cached in userData/adblocker-engine.bin, network filters only
 // (loadCosmeticFilters: false: its scriptlets broke the video site's own scripts),
-// enabled with enableBlockingInSession() on every webSessions() entry.
+// enabled on the app's sessions and on every webview session (sessions.ts).
 // Replaced so desktop and mobile share one back-driven list.
 
 const LIST_PATH = join(app.getPath('userData'), 'player-blocklist.txt')
@@ -43,16 +43,19 @@ function load(): void {
 	}
 }
 
+function blockIn(sess: Electron.Session): void {
+	sess.webRequest.onBeforeRequest((details, callback) => {
+		let host: string
+		try { host = new URL(details.url).hostname }
+		catch { return callback({}) }
+		callback({ cancel: hosts.size > 0 && isBlocked(host) })
+	})
+}
+
 export function setupPlayerBlocklist(): void {
 	load()
-	for (const sess of webSessions()) {
-		sess.webRequest.onBeforeRequest((details, callback) => {
-			let host: string
-			try { host = new URL(details.url).hostname }
-			catch { return callback({}) }
-			callback({ cancel: hosts.size > 0 && isBlocked(host) })
-		})
-	}
+	for (const sess of appSessions()) blockIn(sess)
+	onWebSession(blockIn)
 	console.log(`[blocklist] ${hosts.size} hosts (version ${version ?? 'none'})`)
 }
 

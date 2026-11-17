@@ -15,6 +15,7 @@ import { createLocalStore } from './capacitorLocalStore'
 const capabilities: PlatformCapabilities = {
 	companion: false,
 	vpn: true,
+	vpnPerWebview: false,
 	privateMode: true,
 	updates: true,
 	integrations: true,

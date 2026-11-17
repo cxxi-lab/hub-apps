@@ -29,6 +29,14 @@ export function defaultVpnHubby(): string | null {
 	return lookup?.()[0] ?? null
 }
 
+/**
+ * Whether a hubby goes out through the VPN. Before the hubby manager has said (a build running the
+ * hubbies from their sources), every hubby is taken to: its webviews blocked rather than direct.
+ */
+export function isVpnHubby(hubby: string): boolean {
+	return lookup ? lookup().includes(hubby) : true
+}
+
 export function validHubby(hubby: unknown): hubby is string {
 	return typeof hubby === 'string' && HUBBY.test(hubby)
 }

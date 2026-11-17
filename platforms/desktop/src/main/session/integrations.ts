@@ -1,4 +1,5 @@
-import { app, ipcMain, session, type Session } from 'electron'
+import { app, ipcMain, type Session } from 'electron'
+import { onWebSession, webviewSessions } from './sessions'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 
@@ -65,9 +66,10 @@ class IntegrationsRegistry {
 	async apply(host: string, integration: WebsiteIntegration, updatedAt: number): Promise<void> {
 		this.cache.set(host, { integration, updatedAt })
 		this.persist()
-		const sess = session.fromPartition('persist:browse')
-		this.installHook(sess)
-		await this.applyCookies(host, integration, sess)
+		for (const [, sess] of webviewSessions()) {
+			this.installHook(sess)
+			await this.applyCookies(host, integration, sess)
+		}
 	}
 
 	async remove(host: string): Promise<void> {
@@ -75,15 +77,20 @@ class IntegrationsRegistry {
 		if (!entry) return
 		this.cache.delete(host)
 		this.persist()
-		const sess = session.fromPartition('persist:browse')
-		for (const c of entry.integration.cookies ?? []) {
-			await sess.cookies.remove(`https://www.${host}`, c.name).catch(() => {})
-			await sess.cookies.remove(`https://${host}`, c.name).catch(() => {})
+		for (const [, sess] of webviewSessions()) {
+			for (const c of entry.integration.cookies ?? []) {
+				await sess.cookies.remove(`https://www.${host}`, c.name).catch(() => {})
+				await sess.cookies.remove(`https://${host}`, c.name).catch(() => {})
+			}
 		}
 	}
 
+	/** On every webview session, the ones known and the ones to come (each hubby's). */
 	async applyAll(): Promise<void> {
-		const sess = session.fromPartition('persist:browse')
+		onWebSession(sess => this.applyAllIn(sess))
+	}
+
+	private async applyAllIn(sess: Session): Promise<void> {
 		this.installHook(sess)
 		for (const [host, entry] of this.cache) {
 			await this.applyCookies(host, entry.integration, sess)
