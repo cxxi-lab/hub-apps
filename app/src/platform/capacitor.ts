@@ -195,7 +195,6 @@ export function createCapacitorPlatform(): Platform {
 		// no Settings window here: a page of the app
 		setTheme: (_mode, theme, accent) => { void Theme.set({ theme, accent }).catch(() => {}) },
 		openSettings: async target => { window.location.hash = `#/settings${target ? `/${target}` : ''}` },
-		authorizeOAuth: () => unavailable('authorizeOAuth'),
 		onSettingsGoto: () => () => {},
 		openHubbyWindow: () => unavailable('openHubbyWindow'),
 		registerHubbyWindows: async () => {},

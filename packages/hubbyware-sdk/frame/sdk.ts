@@ -109,6 +109,21 @@ export const notifications = {
 }
 
 /** Announces the hubby's pages to its host (it builds the navigation). */
+/** An account connected at a provider, as the hubby sees it (its grant covers what it declares: `ready`). */
+export interface OAuthConnection { id: string, provider: string, email: string, name: string | null, ready: boolean, lastError: string | null }
+
+/**
+ * The account's connections at a provider (Google, Microsoft), for what the hubby declares
+ * (hubby.json `oauth`; the account allowing it `app:oauth:<provider>`): through the host, as the hubby.
+ */
+export const oauth = {
+	connections: () => call<OAuthConnection[]>('oauth.connections'),
+	/** the consent opens in the browser; resolves once the account consented */
+	connect: (provider: string, options: { connection?: string } = {}) => call<OAuthConnection | null>('oauth.connect', provider, options),
+	/** an access token, for the hubby's scopes only */
+	accessToken: (connection: string) => call<{ accessToken: string, expiresAt: number }>('oauth.accessToken', connection),
+}
+
 export function register(pages: HubbyPage[], sections: Record<string, unknown>) {
 	post({ type: 'register', pages, sections })
 }

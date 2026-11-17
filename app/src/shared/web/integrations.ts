@@ -2,7 +2,7 @@
 // native player loads a site. Shared by Private's webviews (its Browse, its players) and the phone's
 // native player. Their lookups are made as the hubby asking (`call`, bound by the SDK).
 import { ApiError } from '@core/api/client'
-import type { ApiCall } from './players'
+import type { ApiCall } from '@core/api/client'
 import type { WebsiteIntegration } from '@platform'
 import { platform } from '@platform'
 

@@ -38,6 +38,7 @@ export type {
 // (ensureIntegrationForUrl, getPlayerConfig, syncPlayerBlocklist: each hubby's, index.ts)
 export { isIntegrationKnownSync } from '@shared/web/integrations'
 export type { PlayerConfig, PlayerScripts } from '@shared/web/players'
+export type { OAuthAccessToken, OAuthApi, OAuthConnection } from '@core/hubby/oauth'
 
 // UI kit (@cxxi-lab/hubbyware-ui: a hubby may also import the design system directly)
 export {

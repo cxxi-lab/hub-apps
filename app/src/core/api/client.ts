@@ -84,6 +84,9 @@ export async function request<T>(caller: Caller, path: string, options: RequestI
 	return response.json()
 }
 
+/** A call to the API as someone (the account, a hubby: the SDK binds each hubby's, src/sdk/index.ts). */
+export type ApiCall = <T>(path: string, options?: RequestInit) => Promise<T>
+
 /** A call as the account (the app itself). */
 export function api<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
 	return request<T>(accountCaller, path, options, retry)

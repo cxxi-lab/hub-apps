@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@cxxi-lab/hubbyware-ui'
-import { connect, fetchConnections, removeConnection, type ConnectProvider, type Connection } from '@core/api/connections'
+import { fetchConnections, reconnect, removeConnection, type ConnectProvider, type Connection } from '@core/api/connections'
 import { errorMessage } from '@core/api/client'
 
-const USE_LABELS: Record<string, string> = { mail: 'Mail', drive: 'Drive' }
-const useLabel = (use: string) => USE_LABELS[use] ?? use
-
 /**
- * The accounts connected at a provider (Google, Microsoft): one per account, reused by everything
- * that needs it (Mail, Storage…). A use added later asks the provider for that access only. The
- * consent opens in the browser; the server takes the provider's answer.
+ * The accounts connected at a provider (Google, Microsoft): one per account, shared by the hubbies
+ * allowed to use it, each for what it declares. A hubby connects one when it needs it; here they
+ * are seen (what each was granted), connected again, or disconnected. The consent opens in the
+ * browser; the server takes the provider's answer.
  */
 export function SettingsConnections() {
 	const [connections, setConnections] = useState<Connection[] | null>(null)
@@ -25,10 +23,10 @@ export function SettingsConnections() {
 		.catch(e => setError(errorMessage(e))), [])
 	useEffect(() => { void load() }, [load])
 
-	const consent = (key: string, provider: string, use: string, connection?: string) => {
+	const consent = (key: string, provider: string, connection: string) => {
 		const controller = new AbortController()
 		waiting.current = controller
-		return run(key, () => connect(provider, use, connection, controller.signal))
+		return run(key, () => reconnect(provider, connection, controller.signal))
 	}
 
 	const run = async (key: string, action: () => Promise<unknown>) => {
@@ -52,7 +50,7 @@ export function SettingsConnections() {
 				<div>
 					<h2 className="m-0 mb-1 text-sm font-semibold text-white uppercase tracking-wider">Connected accounts</h2>
 					<p className="m-0 text-xs text-steel-300">
-						Accounts the hub may use for you. Their access stays on the server, sealed; disconnecting asks the provider to drop it.
+						Accounts your hubbies use, each for what it needs (allowed in its permissions). Their access stays on the server, sealed; disconnecting asks the provider to drop it.
 					</p>
 					{error && <p className="m-0 mt-1 text-xs text-red-300">{error}</p>}
 					{busy !== null && !busy.endsWith('/remove') && (
@@ -63,25 +61,26 @@ export function SettingsConnections() {
 					)}
 				</div>
 				{connections === null && !error && <p className="m-0 text-xs text-steel-400">Loading…</p>}
-				{connections?.length === 0 && <p className="m-0 text-xs text-steel-400">No connected account yet.</p>}
+				{connections?.length === 0 && <p className="m-0 text-xs text-steel-400">No connected account yet: a hubby asks for one when it needs it.</p>}
 				{connections?.map(c => {
 					const provider = providers.find(p => p.id === c.provider)
-					const missing = (provider?.uses ?? []).filter(u => !c.uses.includes(u))
 					return (
 						<div key={c.id} className="flex flex-wrap items-center gap-3 border-t border-steel-800 pt-3">
 							<div className="flex-1 min-w-0">
 								<div className="text-sm text-white truncate">{c.email}</div>
 								<div className="text-xs text-steel-400">
-									{provider?.label ?? c.provider} · {c.uses.length > 0 ? c.uses.map(useLabel).join(', ') : 'no access'}
+									{provider?.label ?? c.provider}
 									{c.lastUsedAt && ` · used ${new Date(c.lastUsedAt).toLocaleDateString()}`}
 								</div>
+								<ul className="m-0 mt-1 p-0 list-none text-xs text-steel-300">
+									{c.scopes.length === 0 && <li>No access granted</li>}
+									{c.scopes.map(s => <li key={s.scope} title={s.scope}>{s.label}</li>)}
+								</ul>
 								{c.lastError && <div className="text-xs text-red-300 truncate" title={c.lastError}>{c.lastError}</div>}
 							</div>
-							{missing.map(use => (
-								<Button key={use} label={`Allow ${useLabel(use)}`} color="secondary"
-									isLoading={busy === `${c.id}/${use}`} isDisabled={busy !== null}
-									onClick={() => void consent(`${c.id}/${use}`, c.provider, use, c.id)} />
-							))}
+							<Button label="Reconnect" color="secondary"
+								isLoading={busy === `${c.id}/reconnect`} isDisabled={busy !== null || provider?.configured === false}
+								onClick={() => void consent(`${c.id}/reconnect`, c.provider, c.id)} />
 							<Button label="Disconnect" color="secondary" isLoading={busy === `${c.id}/remove`} isDisabled={busy !== null}
 								onClick={() => void run(`${c.id}/remove`, () => removeConnection(c.id))} />
 						</div>
@@ -89,20 +88,6 @@ export function SettingsConnections() {
 				})}
 			</section>
 
-			<section className="bg-steel-900 border border-steel-700 rounded-md p-5 flex flex-col gap-3">
-				<h2 className="m-0 text-sm font-semibold text-white uppercase tracking-wider">Connect an account</h2>
-				{providers.map(p => (
-					<div key={p.id} className="flex flex-wrap items-center gap-3">
-						<span className="flex-1 min-w-0 text-sm text-white">{p.label}</span>
-						{!p.configured && <span className="text-xs text-steel-400">No OAuth client on the server</span>}
-						{p.configured && p.uses.map(use => (
-							<Button key={use} label={`Connect for ${useLabel(use)}`} color="secondary"
-								isLoading={busy === `${p.id}/${use}`} isDisabled={busy !== null}
-								onClick={() => void consent(`${p.id}/${use}`, p.id, use)} />
-						))}
-					</div>
-				))}
-			</section>
 		</div>
 	)
 }

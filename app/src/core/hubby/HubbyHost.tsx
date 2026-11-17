@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api } from '@core/api/client'
 import { collection } from './collections'
+import { createOAuth } from './oauth'
+import { hubbyApi } from './tokens'
 import { hasScope, useHubbyScopes } from '@core/hubbies/scopes'
 import { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import { platform } from '@platform'
@@ -50,6 +52,8 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			if (typeof name !== 'string' || !/^[a-z][a-z0-9_]{0,39}$/.test(name)) throw new Error('invalid collection name')
 			return collection<Record<string, unknown>>(hubby, name)
 		}
+		// its connections at a provider: as the hubby (its token), the server checking what it declares
+		const oauth = createOAuth((path, options) => hubbyApi(hubby).api(path, options))
 		// what a hubby may ask its host: its own collections and settings (no scope), the rest by scope
 		const methods: Record<string, (...args: unknown[]) => unknown> = {
 			'echo': (v: unknown) => v,
@@ -60,6 +64,12 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 				if (!granted('user:profile')) throw new Error('scope_denied: user:profile')
 				return api<{ data?: unknown }>('/api/hub/settings/account').then(r => r.data)
 			},
+			'oauth.connections': () => oauth.connections(),
+			'oauth.connect': (provider: unknown, options: unknown) => {
+				const connection = (options as { connection?: unknown } | undefined)?.connection
+				return oauth.connect(String(provider), { connection: typeof connection === 'string' ? connection : undefined })
+			},
+			'oauth.accessToken': (connection: unknown) => oauth.accessToken(String(connection)),
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')
 				return null

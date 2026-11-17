@@ -1,13 +1,13 @@
 import { api } from './client'
 
-/** An account connected at a provider (Settings › Connections): what it serves, never its tokens. */
+/** An account connected at a provider (Settings › Connections): what it was granted, never its tokens. */
 export interface Connection {
 	id: string
 	provider: string
 	email: string
 	name: string | null
-	/** what it is allowed for: 'mail', 'drive'… */
-	uses: string[]
+	/** what the provider granted (the hubbies using it asked for), as the account is told */
+	scopes: Array<{ scope: string; label: string }>
 	createdAt: string
 	lastUsedAt: string | null
 	lastError: string | null
@@ -18,7 +18,6 @@ export interface ConnectProvider {
 	label: string
 	/** an OAuth client is set up on the server */
 	configured: boolean
-	uses: string[]
 }
 
 export function fetchConnections() {
@@ -40,14 +39,15 @@ const POLL_MS = 2000
 const GIVE_UP_MS = 30 * 60 * 1000
 
 /**
- * Connects an account for a use, or gives one already connected a use more (`connection`): the
- * provider's consent opens in the browser, the provider redirects to the server, which exchanges the
- * code; meanwhile the app asks how it ends. `signal`: stop waiting (the user cancelled).
+ * Connects an account again (its scopes, when the provider stopped honouring them): the provider's
+ * consent opens in the browser, the provider redirects to the server, which exchanges the code;
+ * meanwhile the app asks how it ends. `signal`: stop waiting (the user cancelled). A new account is
+ * connected by the hubby that needs it (SDK `oauth.connect`).
  */
-export async function connect(provider: string, use: string, connection?: string, signal?: AbortSignal): Promise<Connection | null> {
+export async function reconnect(provider: string, connection: string, signal?: AbortSignal): Promise<Connection | null> {
 	const { url, attempt } = await api<{ data: { url: string; attempt: string } }>(`/api/hub/connections/${provider}/start`, {
 		method: 'POST',
-		body: JSON.stringify({ use, connection: connection ?? null }),
+		body: JSON.stringify({ connection }),
 	}).then(r => r.data)
 	// the system browser (desktop: the window-open handler; Android: outside the WebView)
 	window.open(url, '_blank', 'noopener')

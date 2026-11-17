@@ -1,5 +1,6 @@
 import { platform } from '@platform'
-import { fetchPlayerBlocklist, type ApiCall } from './players'
+import type { ApiCall } from '@core/api/client'
+import { fetchPlayerBlocklist } from './players'
 
 let synced: Promise<void> | null = null
 

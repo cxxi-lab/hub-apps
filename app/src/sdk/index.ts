@@ -6,11 +6,12 @@
  * `shared/sdk.js?hubby=<id>` (hubby-cli), its sources in development the same (build/sharedRuntime.ts).
  * Imported without a hubby (an older bundle, the app itself): the calls are the account's.
  */
-import { api as accountApi } from '@core/api/client'
+import { api as accountApi, type ApiCall } from '@core/api/client'
+import { createOAuth } from '@core/hubby/oauth'
 import { apiStream as accountStream, type StreamEventHandler } from '@core/api/stream'
 import { hubbyApi } from '@core/hubby/tokens'
 import { ensureIntegrationForUrl as ensureIntegration } from '@shared/web/integrations'
-import { getPlayerConfig as playerConfig, type ApiCall, type PlayerConfig } from '@shared/web/players'
+import { getPlayerConfig as playerConfig, type PlayerConfig } from '@shared/web/players'
 import { syncPlayerBlocklist as syncBlocklist } from '@shared/web/playerBlocklist'
 
 export * from './contract'
@@ -51,3 +52,9 @@ export function getPlayerConfig(domain: string): Promise<PlayerConfig | null> {
 export function syncPlayerBlocklist(): Promise<void> {
 	return syncBlocklist(call)
 }
+
+/**
+ * The account's connections at a provider (Google, Microsoft), for what the hubby declares
+ * (hubby.json `oauth`): list them, connect an account, get access tokens narrowed to its scopes.
+ */
+export const oauth = createOAuth(call)

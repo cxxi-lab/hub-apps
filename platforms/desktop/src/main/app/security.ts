@@ -27,13 +27,6 @@ function isSafeExternalUrl(url: string): boolean {
 	}
 }
 
-// Windows allowed to leave the app (the OAuth consent pages, see windows/oauth).
-const externalContents = new WeakSet<WebContents>()
-
-export function allowExternalNavigation(contents: WebContents): void {
-	externalContents.add(contents)
-}
-
 function isAppUrl(url: string): boolean {
 	const devUrl = process.env['ELECTRON_RENDERER_URL']
 	if (!app.isPackaged && devUrl && url.startsWith(devUrl)) return true
@@ -63,7 +56,7 @@ export function installSecurityHandlers(): void {
 		if (isWebview) return
 
 		contents.on('will-navigate', (event, url) => {
-			if (!isAppUrl(url) && !externalContents.has(contents)) event.preventDefault()
+			if (!isAppUrl(url)) event.preventDefault()
 		})
 
 		contents.on('will-attach-webview', (event, webPreferences, params) => {

@@ -92,7 +92,6 @@ const api = {
 	},
 
 	/** Opens an OAuth consent page; resolves with the redirect URL it ended on (null: closed). */
-	authorizeOAuth: (url: string, redirectUri: string): Promise<string | null> => ipcRenderer.invoke('oauth:authorize', url, redirectUri),
 
 	openHubbyWindow: (hubbyId: string, windowId: string): Promise<void> => ipcRenderer.invoke('hubby-window:open', hubbyId, windowId),
 

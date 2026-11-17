@@ -408,11 +408,6 @@ export interface Platform {
 	openSettings(target?: string): Promise<void>
 	/** In the Settings window: a screen another window asked for. */
 	onSettingsGoto(cb: (target: string) => void): Unsubscribe
-	/**
-	 * Opens an OAuth consent page in an app window; resolves with the URL the provider redirected to
-	 * (`redirectUri` + the code), caught before it loads, or null when the window was closed.
-	 */
-	authorizeOAuth(url: string, redirectUri: string): Promise<string | null>
 	/** Opens a hubby's window (HubbyManifest.windows), registered beforehand. */
 	openHubbyWindow(hubbyId: string, windowId: string): Promise<void>
 	/** The windows of the active hubbies: what the app menu offers (replaces the previous list). */

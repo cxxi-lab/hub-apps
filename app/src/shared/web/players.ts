@@ -1,7 +1,4 @@
-import { ApiError } from '@core/api/client'
-
-/** A call to the API as the hubby asking (the SDK binds it: src/sdk/index.ts). */
-export type ApiCall = <T>(path: string, options?: RequestInit) => Promise<T>
+import { ApiError, type ApiCall } from '@core/api/client'
 
 /** A site's player scripts, served by the back (the web socle, Resources/<host>/). */
 export interface PlayerScripts {
