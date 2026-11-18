@@ -111,13 +111,18 @@ function KeepAlive({ when, children }: { when: boolean, children: ReactNode }) {
 	return createElement('div', { className: when ? 'contents' : 'hidden' }, children)
 }
 
-function ManifestPages({ definition }: { definition: ManifestDefinition }) {
+function ManifestPages({ definition, id }: { definition: ManifestDefinition, id: string }) {
 	const { pathname } = useLocation()
+	const navigate = useNavigate()
+	// the hubby's root, no page of its own there: its home (as the app opens a hubby)
+	const home = (definition.navItems.find(i => i.home) ?? definition.navItems[0])?.to ?? definition.routes[0]?.path
+	const atRoot = pathname === `/${id}` && home !== undefined && home !== pathname && !definition.routes.some(r => r.path === pathname)
+	useEffect(() => { if (atRoot) navigate(home!, { replace: true }) }, [atRoot])
 	const matches = (route: ManifestDefinition['routes'][number]) => pathname === route.path || (!!route.prefix && pathname.startsWith(`${route.path}/`))
 	const pages = definition.routes.map(route => route.persistent
 		? createElement(KeepAlive, { key: route.path, when: matches(route), children: createElement(route.Component) })
 		: matches(route) ? createElement(route.Component, { key: route.path }) : null)
-	const content = definition.routes.some(matches)
+	const content = definition.routes.some(matches) || atRoot
 		? createElement(Fragment, null, ...pages)
 		: createElement(Fragment, null, ...pages, createElement('p', { key: '_none', className: 'p-6 text-sm text-steel-400' }, `Nothing at ${pathname}`))
 	return (definition.providers ?? []).reduceRight<ReactNode>((inner, Provider) => createElement(Provider, { children: inner }), content)
@@ -141,7 +146,7 @@ function ManifestRoot({ definition }: { definition: ManifestDefinition }) {
 	if (!init) return null
 	return createElement(MemoryRouter, { initialEntries: [absolute(init.hubby, init.path)] },
 		createElement(LocationSync, { id: init.hubby }),
-		createElement(ManifestPages, { definition }))
+		createElement(ManifestPages, { definition, id: init.hubby }))
 }
 
 /** Runs a hubby in its frame: announces its pages to the host, renders the one it is on. */

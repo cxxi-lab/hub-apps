@@ -9,6 +9,11 @@ import { call, useAppState, watchCollection } from './sdk'
 export { api, apiStream, ApiError, errorMessage, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type OAuthConnection, type Task, type TaskState } from './sdk'
 export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
 export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
+// the design system's components, as the app's SDK hands them too
+export {
+	Button, IconButton, Checkbox, ChoiceSwitch, Form, InputField, Switch, Dropdown, ConfirmationModal, Modal,
+	Table, TableCell, TableHead, TableHeadGroup, TableRow, TableRowGroup, type FormData
+} from '@cxxi-lab/hubbyware-ui'
 
 // --- its collections ---
 
@@ -106,6 +111,20 @@ export function Amount({ children, className = '' }: { hubby?: string, children:
 		onKeyDown: (e: { key: string, preventDefault(): void }) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShown(v => !v) } },
 		className: `${className} cursor-pointer transition-[filter] ${shown ? '' : 'blur-[6px] select-none'}`
 	}, children)
+}
+
+// --- what other hubbies contribute ---
+
+const NO_CONTRIBUTIONS: never[] = []
+
+/**
+ * What the other hubbies contribute to a point (Planner's calendar…): none in a frame. A
+ * contribution was a function and a component another hubby ran in the app; between isolated
+ * hubbies it will be their APIs (docs/plan-isolation.md, D2: another chantier). Until then the
+ * link is cut, and a hubby reading contributions gets none (the same list each render).
+ */
+export function useContributions(_point: string): never[] {
+	return NO_CONTRIBUTIONS
 }
 
 // --- helpers (as in the app) ---
