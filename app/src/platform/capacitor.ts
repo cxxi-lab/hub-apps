@@ -203,6 +203,7 @@ export function createCapacitorPlatform(): Platform {
 		setTheme: (_mode, theme, accent) => { void Theme.set({ theme, accent }).catch(() => {}) },
 		openSettings: async target => { window.location.hash = `#/settings${target ? `/${target}` : ''}` },
 		onSettingsGoto: () => () => {},
+		onHubbyFilesChange: () => () => {},
 		systemNotifications: null,
 		push,
 		localStore: createLocalStore(),

@@ -53,23 +53,34 @@ export async function buildHubbyRuntime(out) {
 		writeFileSync(file, [`import * as m from '${spec}'`, fallback, keys.length ? `export const { ${keys.join(', ')} } = m` : ''].join('\n') + '\n')
 		entry[RUNTIME[spec]] = file
 	}
-	await build({
-		configFile: false,
-		root: APP,
-		logLevel: 'warn',
-		publicDir: false,
-		plugins: [react(), tailwindcss(), svgr()],
-		define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-		// the packages' production builds (react-router's exports pick by condition)
-		resolve: { conditions: ['module', 'browser', 'production'] },
-		build: {
-			outDir,
-			emptyOutDir: true,
-			cssCodeSplit: false,
-			lib: { entry, formats: ['es'], fileName: (_format, name) => `${name}.js`, cssFileName: 'runtime' },
-			rollupOptions: { output: { chunkFileNames: 'chunks/[name]-[hash].js' }, preserveEntrySignatures: 'exports-only' }
-		}
-	})
+	// always a production build, even run from the dev server (its NODE_ENV is development: the
+	// JSX would be compiled for React's dev runtime, which the frame's runtime doesn't export)
+	const nodeEnv = process.env.NODE_ENV
+	process.env.NODE_ENV = 'production'
+	try {
+		await build({
+			mode: 'production',
+			configFile: false,
+			root: APP,
+			logLevel: 'warn',
+			publicDir: false,
+			plugins: [react(), tailwindcss(), svgr()],
+			define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+			// the packages' production builds (react-router's exports pick by condition)
+			resolve: { conditions: ['module', 'browser', 'production'] },
+			build: {
+				outDir,
+				emptyOutDir: true,
+				cssCodeSplit: false,
+				lib: { entry, formats: ['es'], fileName: (_format, name) => `${name}.js`, cssFileName: 'runtime' },
+				rollupOptions: { output: { chunkFileNames: 'chunks/[name]-[hash].js' }, preserveEntrySignatures: 'exports-only' }
+			}
+		})
+	}
+	finally {
+		if (nodeEnv === undefined) delete process.env.NODE_ENV
+		else process.env.NODE_ENV = nodeEnv
+	}
 	// The frame's page, the same for every hubby (the platform serves it at the hubby's root, the
 	// runtime under /_runtime/, the hubby's files at the root): the import map (allowed by its hash,
 	// nothing else inline), the base styles then the hubby's, the boot script. No network.

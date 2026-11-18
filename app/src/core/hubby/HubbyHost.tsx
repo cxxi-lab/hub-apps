@@ -60,6 +60,14 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	const src = base_ ? `${base_}?capabilities=${frameCapabilities()}` : null
 	// its web surfaces (D3): the webviews shown over the frame
 	const [surfaceStates, setSurfaceStates] = useState<Record<number, SurfaceState>>({})
+	// development: its files built again (`hubby dev`): the frame loads them (a new frame)
+	const [build, setBuild] = useState(0)
+	useEffect(() => platform.onHubbyFilesChange(changed => {
+		if (changed !== hubby) return
+		// the former frame's surfaces go with it (the new one opens its own)
+		setSurfaceStates({})
+		setBuild(b => b + 1)
+	}), [hubby])
 	const surfaceElements = useRef(new Map<number, WebviewElement>()).current
 
 	// the app's state, as the frame gets it (pushed at each change)
@@ -285,6 +293,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	return (
 		<div className="relative flex-1 min-h-0 flex">
 			<iframe
+				key={build}
 				ref={frame}
 				title={hubby}
 				src={src}

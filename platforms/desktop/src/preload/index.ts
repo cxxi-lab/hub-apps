@@ -84,6 +84,11 @@ const api = {
 	},
 
 	/** In the Settings window: a screen another window asked for (see openSettings). */
+	onHubbyFilesChange: (cb: (hubby: string) => void): (() => void) => {
+		const handler = (_: IpcRendererEvent, hubby: string) => cb(hubby)
+		ipcRenderer.on('hubbies:dev-changed', handler)
+		return () => ipcRenderer.removeListener('hubbies:dev-changed', handler)
+	},
 	onSettingsGoto: (cb: (target: string) => void): (() => void) => {
 		const handler = (_: IpcRendererEvent, target: string) => cb(target)
 		ipcRenderer.on('settings:goto', handler)

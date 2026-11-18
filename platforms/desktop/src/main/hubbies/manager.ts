@@ -1,6 +1,6 @@
-import { app, ipcMain, net, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, net, protocol } from 'electron'
 import { createHash, createPublicKey, verify } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch, writeFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import sdk from '@cxxi-lab/hubbyware-sdk/version.json'
@@ -582,6 +582,47 @@ function hubbyId(id: unknown): string {
 }
 
 /** At start, before any window: decides the versions of this session and serves them. */
+/**
+ * The development hubbies' declarations (their hubby.json, where the renderer reads them:
+ * HUB_HUBBIES_DIR, else the official hubbies' checkout next to the apps', app/build/sharedRuntime.ts):
+ * which go out through the VPN (the others' webviews go direct, as in a build).
+ */
+function devSourceHubbies(): HubbyEntry[] {
+	const dir = process.env['HUB_HUBBIES_DIR'] ?? join(app.getAppPath(), '../../../hubbies')
+	if (!existsSync(dir)) return []
+	const out: HubbyEntry[] = []
+	for (const name of readdirSync(dir)) {
+		const file = join(dir, name, 'hubby.json')
+		try {
+			if (existsSync(file)) out.push({ id: name, ...JSON.parse(readFileSync(file, 'utf8')) } as HubbyEntry)
+		}
+		catch (err) {
+			console.warn(`[hubbies] ${name}: hubby.json not read`, err)
+		}
+	}
+	return out
+}
+
+/**
+ * Development: a hubby's files rebuilt (`hubby dev`, into BUILT_IN/<id>) reload its frame: the
+ * windows are told which hubby changed (once its build settles).
+ */
+function watchDevHubbies(): void {
+	mkdirSync(BUILT_IN, { recursive: true })
+	const timers = new Map<string, NodeJS.Timeout>()
+	watch(BUILT_IN, { recursive: true }, (_event, file) => {
+		// its entry.json is written last (hubby dev): its build is complete then
+		const parts = typeof file === 'string' ? file.split(sep) : []
+		const id = parts[0] ?? ''
+		if (!ID.test(id) || parts.at(-1) !== 'entry.json') return
+		clearTimeout(timers.get(id))
+		timers.set(id, setTimeout(() => {
+			timers.delete(id)
+			for (const win of BrowserWindow.getAllWindows()) win.webContents.send('hubbies:dev-changed', id)
+		}, 150))
+	})
+}
+
 export function setupHubbies(): void {
 	ipcMain.handle('hubbies:list', () => listHubbies())
 	ipcMain.handle('hubbies:install', (_event, id: unknown) => installHubby(hubbyId(id)))
@@ -590,7 +631,13 @@ export function setupHubbies(): void {
 	ipcMain.handle('hubbies:pending', () => pendingHubbies())
 	ipcMain.handle('hubbies:activate', (_event, ids?: unknown) => activateHubbies(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string' && ID.test(id)) : undefined))
 	serveHubbies()
-	if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) return // dev server: hubbies from their sources
+	if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
+		// dev server: hubbies from their sources (their files built by `hubby dev`, served from BUILT_IN)
+		const vpn = devSourceHubbies().filter(needsVpn).map(h => h.id)
+		registerVpnHubbies(() => vpn)
+		watchDevHubbies()
+		return
+	}
 	loadRestricted()
 	registerVpnHubbies(() => [...active.values()].filter(needsVpn).map(h => h.id))
 	resolveActive()

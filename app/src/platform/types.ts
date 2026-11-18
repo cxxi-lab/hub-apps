@@ -419,6 +419,8 @@ export interface Platform {
 	openSettings(target?: string): Promise<void>
 	/** In the Settings window: a screen another window asked for. */
 	onSettingsGoto(cb: (target: string) => void): Unsubscribe
+	/** Development (desktop): a hubby's files were built again (`hubby dev`): its frame reloads. */
+	onHubbyFilesChange(cb: (hubby: string) => void): Unsubscribe
 	openAbout(): Promise<void>
 
 	getAppVersion(): Promise<string>

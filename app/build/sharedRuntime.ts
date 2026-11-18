@@ -38,10 +38,21 @@ export function sharedRuntime(appRoot: string): { plugin: Plugin[], build: NonNu
 			await buildHubbyRuntime(outDir)
 		}
 	}
-	// development: the hubbies' sources live outside this repository
+	// development: the hubbies' sources live outside this repository; their frames' runtime is
+	// built as the dev server starts (where the desktop serves it: its renderer's out dir), never
+	// stale (the hubbies' own files: `hubby dev`)
+	let devOut = ''
 	const sources: Plugin = {
 		name: 'hub-hubby-sources',
-		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), hubbiesDir(appRoot)] } } })
+		apply: 'serve',
+		config: () => ({ server: { fs: { allow: [resolve(appRoot, '..'), hubbiesDir(appRoot)] } } }),
+		configResolved(config) {
+			devOut = resolve(config.root, config.build.outDir)
+		},
+		async configureServer() {
+			const { buildHubbyRuntime } = await import(pathToFileURL(resolve(appRoot, 'scripts/build-hubby-runtime.mjs')).href)
+			await buildHubbyRuntime(devOut)
+		}
 	}
 
 	return {
