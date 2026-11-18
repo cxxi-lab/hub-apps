@@ -1,4 +1,7 @@
+import { app } from 'electron'
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
+import { existsSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import net from 'node:net'
@@ -31,6 +34,26 @@ const IDLE_MS = Number(process.env.HUB_AI_ENGINE_IDLE_MS) || 5 * 60_000
 const READY_TIMEOUT_MS = 180_000
 const STOP_TIMEOUT_MS = 5_000
 const GPU_OWNER = 'ai-engine'
+
+/**
+ * The running server, written down: an app that crashed (or was killed) leaves its server behind,
+ * holding the GPU's memory; the next start stops it — only if that process is still the engine's
+ * own binary (its /proc exe), never anything else that took its pid.
+ */
+const pidFile = (): string => path.join(app.getPath('userData'), 'ai-engine.pid')
+
+export function reapOrphanServer(): void {
+	if (!existsSync(pidFile())) return
+	try {
+		const { pid, binary } = JSON.parse(readFileSync(pidFile(), 'utf8')) as { pid: number, binary: string }
+		if (Number.isInteger(pid) && existsSync(`/proc/${pid}`) && readlinkSync(`/proc/${pid}/exe`) === binary) {
+			process.kill(pid, 'SIGTERM')
+			console.log(`[ai:engine] stopped the server a previous run left behind (pid ${pid})`)
+		}
+	}
+	catch { /* gone already */ }
+	rmSync(pidFile(), { force: true })
+}
 
 function freePort(): Promise<number> {
 	return new Promise((resolve, reject) => {
@@ -150,9 +173,11 @@ class LocalEngine extends EventEmitter {
 		const child = spawn(binary, args, { stdio: ['ignore', 'ignore', 'pipe'] })
 		this.proc = child
 		this.url = `http://127.0.0.1:${port}`
+		if (child.pid) writeFileSync(pidFile(), JSON.stringify({ pid: child.pid, binary }))
 		let tail = ''
 		child.stderr?.on('data', (chunk: Buffer) => { tail = (tail + chunk.toString()).slice(-2_000) })
 		child.on('exit', (code, signal) => {
+			rmSync(pidFile(), { force: true })
 			if (this.proc !== child) return
 			this.proc = null
 			this.url = null

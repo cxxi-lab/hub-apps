@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 
 import { applyMenu } from '../app/menu'
-import { localEngine } from './engine'
+import { localEngine, reapOrphanServer } from './engine'
 import { chat } from './chat'
 import { deviceInfo, downloadModel, installedModels, modelEvents, modelPlans, removeModel, setModelsDirectory } from './models'
 
@@ -12,6 +12,12 @@ import { deviceInfo, downloadModel, installedModels, modelEvents, modelPlans, re
  * its token, and logs what happened ([ai:selftest]).
  */
 export function setupLocalAi(): void {
+	// a server a crashed (or killed) run left behind: stopped
+	reapOrphanServer()
+	// killed (SIGTERM, Ctrl+C in a terminal): the engine first, then the app quits as usual
+	for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+		process.once(signal, () => { void localEngine.stop(true); app.quit() })
+	}
 	localEngine.on('status', () => applyMenu())
 	// the models on this device (the Models screen of Settings): their state, pushed to every window
 	ipcMain.handle('ai-models:state', async () => ({ device: await deviceInfo(), plans: await modelPlans(), installed: installedModels() }))
