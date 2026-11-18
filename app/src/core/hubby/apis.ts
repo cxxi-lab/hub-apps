@@ -11,18 +11,27 @@ export interface ApiMethod {
 	description: string
 	input: Schema
 	output: Schema
-	effect: 'read' | 'write'
+	/** read: free; write: the user's data changed (an agent's call confirmed); outward: outside Hubbyware or for good (always confirmed) */
+	effect: 'read' | 'write' | 'outward'
 	/** the interface it implements (callAll), if any */
 	interface?: string
 }
 
 const apis = new Map<string, Record<string, ApiMethod>>()
+// each hubby's api.md: how to use its API (an agent reads it)
+const docs = new Map<string, string>()
 // the hubbies that may answer: active, shown (not hidden by its Privacy), not locked
 let available = new Set<string>()
 
-/** Takes an installed hubby's api.json into account. */
-export function registerApi(hubby: string, api: { methods?: Record<string, ApiMethod> }): void {
+/** Takes an installed hubby's api.json (and its api.md) into account. */
+export function registerApi(hubby: string, api: { methods?: Record<string, ApiMethod> }, doc?: string | null): void {
 	if (api.methods && typeof api.methods === 'object') apis.set(hubby, api.methods)
+	if (doc) docs.set(hubby, doc.slice(0, 20_000))
+}
+
+/** Every API known here: by hubby, its methods and its api.md (an agent's catalogue: core/ai/agent.ts). */
+export function allApis(): Array<{ hubby: string, methods: Record<string, ApiMethod>, doc: string | null }> {
+	return [...apis].map(([hubby, methods]) => ({ hubby, methods, doc: docs.get(hubby) ?? null }))
 }
 
 /** The hubbies that may answer now (the app's layout says: active, shown, unlocked). */

@@ -19,6 +19,7 @@ import { storageSet, storageSnapshot } from './storage'
 import { SurfaceViews, surfaceMethods, type WebviewElement } from './HubbySurfaces'
 import { callAll, callHubby, isAvailable, served, serveFrom } from './apis'
 import { askModelConsent } from '@core/ai/ModelConsent'
+import { agentCall, agentTools, assistantHubbies, hubbiesWithApis, setAssistantHubbies } from '@core/ai/agent'
 import type { AiChatRequest } from '@platform'
 
 // ai.chat's ids, unique across the frames (the main process tells their answers apart by them)
@@ -293,6 +294,25 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 				if (!granted('app:ai-links')) throw new Error('scope_denied: app:ai-links')
 				if (!platform.localModels) return 0
 				return platform.localModels.setUserModels(hubby, list as never)
+			},
+			// an AI assistant acting on the user's other hubbies (scope app:agent, an official hubby's):
+			// the tools of the hubbies opened to it, each call confirmed by the app (write, outward)
+			'agent.tools': () => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				return agentTools(hubby)
+			},
+			'agent.call': (conversation: unknown, tool: unknown, input: unknown) => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				if (typeof conversation !== 'string' || typeof tool !== 'string') throw new Error('agent.call(conversation, tool, input)')
+				return agentCall(hubby, conversation, tool, input)
+			},
+			'agent.access': async () => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				return { opened: await assistantHubbies(), hubbies: hubbiesWithApis().filter(h => h.hubby !== hubby) }
+			},
+			'agent.setAccess': (ids: unknown) => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				return setAssistantHubbies(Array.isArray(ids) ? ids.filter((i): i is string => typeof i === 'string') : [])
 			},
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')

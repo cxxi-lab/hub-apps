@@ -7,6 +7,7 @@ import { TopBar } from '@core/layout/TopBar'
 import { HubbyUpdates } from '@core/hubby/HubbyUpdates'
 import { HubbyApiFrames } from '@core/hubby/HubbyApiFrames'
 import { ModelConsent } from '@core/ai/ModelConsent'
+import { AgentConfirm } from '@core/ai/AgentConfirm'
 import { setAvailableHubbies } from '@core/hubby/apis'
 import { useUpdating } from '@core/hubby/updates'
 import { HubbyNav } from '@core/layout/HubbyNav'
@@ -237,6 +238,7 @@ export function AppLayout() {
 			<HubbyUpdates activeHubby={activeDomain?.id ?? null} />
 			<HubbyApiFrames />
 			<ModelConsent />
+			<AgentConfirm />
 			{/* on phones the hubby nav is a bar under the content (column, the bar last) */}
 			<div className="relative flex-1 flex max-sm:flex-col min-h-0 overflow-hidden">
 				{/* its column: its pages, or its live navigation (its action shows it even before any item) */}

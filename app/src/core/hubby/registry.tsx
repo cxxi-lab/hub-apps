@@ -252,7 +252,8 @@ async function fromSources(): Promise<HubbyManifest[]> {
 	}
 	// their APIs (docs/plan-api-hubbies.md)
 	const apis = import.meta.glob<Parameters<typeof registerApi>[1]>('@hub-hubbies/*/api.json', { import: 'default', eager: true })
-	for (const [path, api] of Object.entries(apis)) registerApi(path.split('/').at(-2)!, api)
+	const apiDocs = import.meta.glob<string>('@hub-hubbies/*/api.md', { query: '?raw', import: 'default', eager: true })
+	for (const [path, api] of Object.entries(apis)) registerApi(path.split('/').at(-2)!, api, apiDocs[path.replace(/api\.json$/, 'api.md')] ?? null)
 	const manifests: HubbyManifest[] = []
 	for (const [path, info] of Object.entries(infos)) {
 		const id = path.split('/').at(-2)!
@@ -295,7 +296,8 @@ async function loadModels(entry: HubbyDeclaration & { models?: boolean, api?: bo
 	// its API for the other hubbies (docs/plan-api-hubbies.md): unknown to them without it
 	if (entry.api === true) {
 		const res = await fetch(new URL(`modules/${id}/api.json`, document.baseURI)).catch(() => null)
-		if (res?.ok) registerApi(id, await res.json() as Parameters<typeof registerApi>[1])
+		const doc = await fetch(new URL(`modules/${id}/api.md`, document.baseURI)).then(r => r.ok ? r.text() : null, () => null)
+		if (res?.ok) registerApi(id, await res.json() as Parameters<typeof registerApi>[1], doc)
 		else console.warn(`[hubbies] ${id}: its api.json is missing`)
 	}
 	if (models === false) return

@@ -266,6 +266,31 @@ export interface AiRepoModel {
 	reason: string
 }
 
+/** One of an AI assistant's tools: an API method of a hubby opened to it. */
+export interface AgentTool {
+	/** its name for an engine (hubby__method) */
+	name: string
+	hubby: string
+	hubbyLabel: string
+	method: string
+	description: string
+	/** its input's JSON Schema */
+	input: unknown
+	effect: 'read' | 'write' | 'outward'
+}
+
+/** What an assistant's call did (its trace). */
+export interface AgentCallResult {
+	tool: string
+	hubby: string
+	method: string
+	effect: 'read' | 'write' | 'outward'
+	confirmation: 'none' | 'allowed' | 'allowed-for-conversation' | 'denied'
+	ok: boolean
+	result?: unknown
+	error?: string
+}
+
 /** A model added by link, as the hubby keeps it (`ai.models.set`). */
 export interface AiUserModel { name: string, label: string, repo: string, revision: string, files: AiRepoModel['files'], requires: AiRepoModel['requires'] }
 
@@ -279,6 +304,18 @@ export const ai = {
 	models: {
 		inspect: (link: string) => call<{ repo: string, revision: string, models: AiRepoModel[], selected: string | null }>('ai.models.inspect', link),
 		set: (list: AiUserModel[]) => call<number>('ai.models.set', list)
+	},
+	/**
+	 * An AI assistant on the user's other hubbies (scope app:agent, an official hubby's; client
+	 * docs/plan-ia-agent.md): `tools` — the API methods of the hubbies the user opened to it (and their
+	 * api.md); `call` — one of them, the app asking the user first for a `write` (once, or for the
+	 * conversation) or an `outward` one (always); `access` / `setAccess` — the hubbies opened to it.
+	 */
+	agent: {
+		tools: () => call<{ tools: AgentTool[], docs: Array<{ hubby: string, label: string, doc: string }> }>('agent.tools'),
+		call: (conversation: string, tool: string, input: unknown) => call<AgentCallResult>('agent.call', conversation, tool, input),
+		access: () => call<{ opened: string[], hubbies: Array<{ hubby: string, label: string, methods: number, writes: boolean, outward: boolean }> }>('agent.access'),
+		setAccess: (ids: string[]) => call<string[]>('agent.setAccess', ids)
 	},
 	async chat(request: AiChatRequest, options: AiChatOptions = {}): Promise<AiChatResult> {
 		const id = nextStream++
