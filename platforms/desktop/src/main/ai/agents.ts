@@ -48,10 +48,28 @@ export interface AgentRunResult {
 
 type Emit = (event: { kind: 'delta' | 'status' | 'tool' | 'denied', text: string }) => void
 
-interface AcpAgent { id: string, label: string, bin: string, args: string[], signIn: string }
+interface AcpAgent {
+	id: string
+	label: string
+	bin: string
+	args: string[]
+	signIn: string
+	/** its settings, for this run (an env var naming a file Hubbyware writes): its own tools off */
+	settings?: { env: string, value: unknown }
+}
+
+// Gemini CLI's own tools, off (D8: only Hubbyware's tools): its "system" settings come first
+const GEMINI_SETTINGS = {
+	tools: { exclude: ['run_shell_command', 'read_file', 'read_many_files', 'write_file', 'replace', 'glob', 'grep_search', 'list_directory', 'web_fetch', 'google_web_search', 'save_memory', 'activate_skill', 'invoke_agent', 'take_snapshot', 'get_internal_docs', 'list_mcp_resources', 'read_mcp_resource'] },
+	mcp: { allowed: ['hubbyware'] }
+}
 
 const ACP_AGENTS: AcpAgent[] = [
-	{ id: 'gemini-cli', label: 'Gemini CLI', bin: 'gemini', args: ['--experimental-acp'], signIn: 'run `gemini` once in a terminal to sign in' },
+	{ id: 'gemini-cli', label: 'Gemini CLI', bin: 'gemini', args: ['--acp'], signIn: 'run `gemini` once in a terminal to sign in', settings: { env: 'GEMINI_CLI_SYSTEM_SETTINGS_PATH', value: GEMINI_SETTINGS } },
+	// Google's successor to Gemini CLI for personal accounts (Gemini CLI: paid API keys only since June 2026);
+	// HTTP MCP servers from the client need a process per session. Its own tools: its permission requests
+	// are refused (shell, web), its reads and writes stay in its empty folder (no access outside it by default)
+	{ id: 'antigravity', label: 'Antigravity', bin: 'agy', args: ['acp', '--process-per-session'], signIn: 'run `agy` once in a terminal to sign in' },
 	{ id: 'codex', label: 'Codex', bin: 'codex-acp', args: [], signIn: 'run `codex login` in a terminal' },
 	{ id: 'opencode', label: 'OpenCode', bin: 'opencode', args: ['acp'], signIn: 'run `opencode auth login` in a terminal' },
 	{ id: 'goose', label: 'Goose', bin: 'goose', args: ['acp'], signIn: 'run `goose configure` in a terminal' }
@@ -293,7 +311,12 @@ async function runAcp(agent: AcpAgent, req: AgentRunRequest, key: string, mcp: M
 	const bin = await which(agent.bin)
 	if (!bin) throw new Error(`${agent.label} is not installed`)
 	const cwd = workFolder(agent.id)
-	const env = { ...process.env, PATH: await userPath(), ...(agent.id === 'acp-test' ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }
+	const env: NodeJS.ProcessEnv = { ...process.env, PATH: await userPath(), ...(agent.id === 'acp-test' ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }
+	if (agent.settings) {
+		const file = join(app.getPath('userData'), 'agents', `${agent.id}.settings.json`)
+		writeFileSync(file, JSON.stringify(agent.settings.value, null, 2), { mode: 0o600 })
+		env[agent.settings.env] = file
+	}
 	const child = spawn(bin, agent.args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
 	const conn = new AcpConnection(child)
 	const ours = new Set(await toolNames())
