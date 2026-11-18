@@ -33,8 +33,8 @@ function ModelRow({ plan, models, onError }: { plan: ModelPlan, models: LocalMod
 	return (
 		<div className="flex flex-wrap items-center gap-3 border-t border-steel-800 pt-3">
 			<div className="flex-1 min-w-0">
-				<div className="text-sm text-white truncate">{plan.hubbyLabel} · {plan.name} <span className="text-xs text-steel-400">({plan.family})</span></div>
-				{plan.description && <div className="text-xs text-steel-300">{plan.description}</div>}
+				<div className="text-sm text-white truncate">{plan.hubbyLabel} · {plan.byLink ? plan.description : plan.name} <span className="text-xs text-steel-400">({plan.byLink ? 'added by link' : plan.family})</span></div>
+				{plan.description && !plan.byLink && <div className="text-xs text-steel-300">{plan.description}</div>}
 				<div className="text-xs text-steel-400 truncate" title={`${variant.repo}@${variant.revision}`}>{variant.repo} · {gb(variant.sizeBytes)}</div>
 				<div className={`text-xs ${fit.tone}`}>{fit.label}: {variant.reason}</div>
 				{plan.variants.length > 1 && <div className="text-xs text-steel-500">{plan.variants.length} sizes declared; this device uses the {plan.chosen === 0 ? 'largest' : plan.chosen === null ? 'none' : 'one it can run'}</div>}

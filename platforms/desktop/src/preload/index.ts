@@ -15,6 +15,14 @@ import type {
 	SystemNotification
 } from '@hub/app/platform'
 
+/** An IPC call whose error reads as the main process wrote it (not "Error invoking remote method 'x': Error: …"). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- as ipcRenderer.invoke: the renderer types each call
+function invoke<T = any>(channel: string, ...args: unknown[]): Promise<T> {
+	return ipcRenderer.invoke(channel, ...args).catch((err: unknown) => {
+		throw new Error(String(err instanceof Error ? err.message : err).replace(/^Error invoking remote method '[^']+': (?:Error: )?/, ''))
+	})
+}
+
 const api = {
 
 	platform: process.platform,
@@ -107,11 +115,13 @@ const api = {
 		purge: (account: string, hubby: string, scope: string): Promise<void> => ipcRenderer.invoke('store:purge', account, hubby, scope)
 	},
 
-	// the AI models on this device (main: ai/models.ts)
+	// the AI models on this device (main: ai/models.ts); their errors as the main process wrote them
 	localModels: {
-		state: () => ipcRenderer.invoke('ai-models:state'),
-		download: (hubby: string, name: string): Promise<void> => ipcRenderer.invoke('ai-models:download', hubby, name),
-		remove: (sha256: string): Promise<void> => ipcRenderer.invoke('ai-models:remove', sha256),
+		state: () => invoke('ai-models:state'),
+		download: (hubby: string, name: string): Promise<void> => invoke('ai-models:download', hubby, name),
+		remove: (sha256: string): Promise<void> => invoke('ai-models:remove', sha256),
+		inspect: (link: string) => invoke('ai-models:inspect', link),
+		setUserModels: (hubby: string, list: unknown): Promise<number> => invoke('ai-models:set-user', hubby, list),
 		chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke('ai-models:directory'),
 		onChange: (cb: () => void): (() => void) => subscribe<void>('ai-models:changed', () => cb()),
 		onFailure: (cb: (failure: { hubby: string, name: string, error: string }) => void): (() => void) => subscribe('ai-models:failed', cb)

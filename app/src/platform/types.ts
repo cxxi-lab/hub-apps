@@ -181,7 +181,25 @@ export interface ModelPlan {
 	download: { received: number, total: number } | null
 	/** the declaration is refused (not pinned as it must be) */
 	invalid: string | null
+	/** added by the user from a link */
+	byLink?: boolean
 }
+
+/** A model of a Hugging Face repo, as the device read it (a link the user gave). */
+export interface RepoModel {
+	name: string
+	label: string
+	files: Array<{ path: string, sha256: string, size: number }>
+	sizeBytes: number
+	requires: { vram: number, ram: number }
+	fit: ModelFit
+	reason: string
+}
+
+export interface RepoListing { repo: string, revision: string, models: RepoModel[], selected: string | null }
+
+/** A model added by link, as a hubby keeps it (pinned when the repo was read). */
+export interface UserModel { name: string, label: string, repo: string, revision: string, files: RepoModel['files'], requires: RepoModel['requires'] }
 
 export interface InstalledModel { sha256: string, repo: string, revision: string, path: string, sizeBytes: number, users: string[] }
 
@@ -197,6 +215,10 @@ export interface LocalModelsApi {
 	/** the user agrees (this device): the model downloads (its progress: onChange) */
 	download(hubby: string, name: string): Promise<void>
 	remove(sha256: string): Promise<void>
+	/** a Hugging Face repo's models, read by the device (a link the user gave) */
+	inspect(link: string): Promise<RepoListing>
+	/** the models added by link a hubby keeps (all of them) */
+	setUserModels(hubby: string, list: UserModel[]): Promise<number>
 	/** where new models go (a folder picker); null: cancelled */
 	chooseDirectory(): Promise<string | null>
 	onChange(cb: () => void): Unsubscribe

@@ -3,7 +3,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { applyMenu } from '../app/menu'
 import { localEngine, reapOrphanServer } from './engine'
 import { chat } from './chat'
-import { deviceInfo, downloadModel, installedModels, modelEvents, modelPlans, removeModel, setModelsDirectory } from './models'
+import { deviceInfo, downloadModel, inspectRepo, installedModels, modelEvents, modelPlans, removeModel, setModelsDirectory, setUserModels } from './models'
 
 /**
  * The local AI engine in the desktop (client docs/plan-ia-moteur.md): its state in the menu, and
@@ -28,6 +28,12 @@ export function setupLocalAi(): void {
 			console.error(`[ai:models] ${hubby} ${name}:`, err)
 			for (const w of BrowserWindow.getAllWindows()) w.webContents.send('ai-models:failed', { hubby, name, error: err instanceof Error ? err.message : String(err) })
 		})
+	})
+	// models added by link (the app has checked the hubby's scope app:ai-links)
+	ipcMain.handle('ai-models:inspect', (_e, link: unknown) => inspectRepo(String(link)))
+	ipcMain.handle('ai-models:set-user', (_e, hubby: unknown, list: unknown) => {
+		if (typeof hubby !== 'string') throw new Error('invalid hubby')
+		return setUserModels(hubby, list)
 	})
 	ipcMain.handle('ai-models:remove', (_e, sha256: unknown) => removeModel(String(sha256)))
 	ipcMain.handle('ai-models:directory', async () => {

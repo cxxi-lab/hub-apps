@@ -55,12 +55,28 @@ export interface ModelPlan {
 	download: { received: number, total: number } | null
 	/** the declaration is refused (not pinned as it must be) */
 	invalid: string | null
+	/** added by the user from a link (not declared by the hubby) */
+	byLink?: boolean
 }
 
 export interface InstalledModel { sha256: string, repo: string, revision: string, path: string, sizeBytes: number, users: string[] }
 
 interface StoredFile { repo: string, revision: string, path: string, size: number, file: string, users: string[] }
-interface Index { directory: string | null, files: Record<string, StoredFile>, consents: Record<string, string> }
+/**
+ * A model the user added by a link (docs/plan-ia-chat.md § 2.6): a file of a Hugging Face repo, pinned
+ * by the device when it read the repo (its commit, sha256, size), kept as the hubby that may add them
+ * (scope app:ai-links) last handed them over.
+ */
+export interface UserModel {
+	name: string
+	label: string
+	repo: string
+	revision: string
+	files: ModelFile[]
+	requires: { vram: number, ram: number }
+}
+
+interface Index { directory: string | null, files: Record<string, StoredFile>, consents: Record<string, string>, userModels: Record<string, UserModel[]> }
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/
 const REPO = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}\/[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/
@@ -77,10 +93,10 @@ const defaultDirectory = (): string => path.join(app.getPath('userData'), 'model
 function readIndex(): Index {
 	try {
 		const raw = JSON.parse(readFileSync(indexFile(), 'utf8')) as Partial<Index>
-		return { directory: raw.directory ?? null, files: raw.files ?? {}, consents: raw.consents ?? {} }
+		return { directory: raw.directory ?? null, files: raw.files ?? {}, consents: raw.consents ?? {}, userModels: raw.userModels ?? {} }
 	}
 	catch {
-		return { directory: null, files: {}, consents: {} }
+		return { directory: null, files: {}, consents: {}, userModels: {} }
 	}
 }
 
@@ -158,14 +174,21 @@ const downloads = new Map<string, { received: number, total: number, done: Promi
 export const modelEvents = new EventEmitter()
 
 /** Every model the hubbies declare, as this device sees it. */
+/** A user model as a declaration (one variant, one size). */
+const asDeclaration = (m: UserModel): ModelDeclaration => ({ family: 'text', description: m.label, variants: [{ repo: m.repo, revision: m.revision, files: m.files, requires: m.requires }] })
+
+/** What a hubby declares (its hubby.json "ai"), and the models added by link it handed over. */
+function declarationsOf(hubby: { id: string, ai?: unknown }, index = readIndex()): Array<[string, unknown, boolean]> {
+	const declared = hubby.ai && typeof hubby.ai === 'object' ? Object.entries(hubby.ai as Record<string, unknown>).map(([n, d]) => [n, d, false] as [string, unknown, boolean]) : []
+	return [...declared, ...(index.userModels[hubby.id] ?? []).map(m => [m.name, asDeclaration(m), true] as [string, unknown, boolean])]
+}
+
 export async function modelPlans(): Promise<ModelPlan[]> {
 	const device = await deviceInfo()
 	const index = readIndex()
 	const plans: ModelPlan[] = []
 	for (const hubby of hubbyDeclarations()) {
-		const ai = hubby.ai as Record<string, unknown> | undefined
-		if (!ai || typeof ai !== 'object') continue
-		for (const [name, raw] of Object.entries(ai)) {
+		for (const [name, raw, byLink] of declarationsOf(hubby, index)) {
 			if (!NAME.test(name)) continue
 			const checked = validDeclaration(raw)
 			const label = typeof hubby.label === 'string' ? hubby.label : hubby.id
@@ -189,7 +212,8 @@ export async function modelPlans(): Promise<ModelPlan[]> {
 				consented: !!pick && consent === variantKey(pick),
 				installed: chosen >= 0 && variants[chosen].installed,
 				download: dl ? { received: dl.received, total: dl.total } : null,
-				invalid: null
+				invalid: null,
+				byLink
 			})
 		}
 	}
@@ -197,8 +221,9 @@ export async function modelPlans(): Promise<ModelPlan[]> {
 }
 
 function declaration(hubby: string, name: string): ModelDeclaration {
-	const found = hubbyDeclarations().find(h => h.id === hubby)?.ai as Record<string, unknown> | undefined
-	const checked = validDeclaration(found?.[name])
+	const found = hubbyDeclarations().find(h => h.id === hubby)
+	const raw = found ? declarationsOf(found).find(([n]) => n === name)?.[1] : undefined
+	const checked = validDeclaration(raw)
 	if ('error' in checked) throw new Error(`${hubby} declares no model ${name} this device accepts`)
 	return checked.model
 }
@@ -332,4 +357,94 @@ export function modelFiles(hubby: string, name: string): string[] | null {
 	const variant = model.variants.find(v => variantKey(v) === agreed)
 	if (!variant || !variant.files.every(f => present(index, f))) return null
 	return variant.files.map(f => index.files[f.sha256].file)
+}
+
+// --- models added by link (docs/plan-ia-chat.md § 2.6) ---
+
+const SPLIT = /-(\d{5})-of-(\d{5})\.gguf$/i
+
+export interface RepoModel {
+	/** its name as a model (u-<its first file's sha256>) */
+	name: string
+	label: string
+	files: ModelFile[]
+	sizeBytes: number
+	requires: { vram: number, ram: number }
+	fit: Fit
+	reason: string
+}
+
+export interface RepoListing { repo: string, revision: string, models: RepoModel[], selected: string | null }
+
+/** owner/repo, its address, or one of its files' (…/blob|resolve|tree/<rev>/<path>). */
+function parseLink(link: string): { repo: string, ref: string, path: string | null } {
+	const text = link.trim().replace(/^https?:\/\/(www\.)?huggingface\.co\//, '').replace(/[?#].*$/, '').replace(/\/$/, '')
+	const [owner, name, kind, ref, ...rest] = text.split('/')
+	const repo = `${owner}/${name}`
+	if (!REPO.test(repo)) throw new Error('not a Hugging Face model: give its address (huggingface.co/<owner>/<name>) or owner/name')
+	if (kind && !['blob', 'resolve', 'tree'].includes(kind)) throw new Error('not a model\'s address on Hugging Face')
+	return { repo, ref: ref ? decodeURIComponent(ref) : 'main', path: rest.length ? rest.map(decodeURIComponent).join('/') : null }
+}
+
+async function hf<T>(path: string): Promise<T> {
+	const res = await net.fetch(`https://huggingface.co/api/models/${path}`)
+	if (res.status === 401 || res.status === 403) throw new Error('this repo is gated or private: only public repos for now')
+	if (!res.ok) throw new Error(`Hugging Face answered ${res.status}`)
+	return res.json() as Promise<T>
+}
+
+/** What a device needs to run a model it only knows the size of: the file, its context, a margin. */
+function estimate(sizeBytes: number): { vram: number, ram: number } {
+	const mib = sizeBytes / MIB
+	return { vram: Math.ceil(mib + 1_300), ram: Math.ceil(mib * 1.1 + 1_500) }
+}
+
+/**
+ * The models of a Hugging Face repo, as this device reads them (never the hubby's frame): its commit,
+ * its GGUF files (a split model's parts together, vision projectors left out) with their sha256 and
+ * size as the repo publishes them, and how each fits this device.
+ */
+export async function inspectRepo(link: string): Promise<RepoListing> {
+	const { repo, ref, path: wanted } = parseLink(link)
+	const commit = COMMIT.test(ref) ? ref : (await hf<{ sha: string }>(`${repo}/revision/${encodeURIComponent(ref)}`)).sha
+	if (!COMMIT.test(commit ?? '')) throw new Error('its revision was not found')
+	const tree = await hf<Array<{ type: string, path: string, size?: number, lfs?: { oid: string, size: number } }>>(`${repo}/tree/${commit}?recursive=true`)
+	const groups = new Map<string, ModelFile[]>()
+	for (const f of tree) {
+		if (f.type !== 'file' || !/\.gguf$/i.test(f.path) || /mmproj/i.test(f.path) || !PATH.test(f.path)) continue
+		if (!f.lfs || !SHA256.test(f.lfs.oid)) continue
+		const group = f.path.replace(SPLIT, '')
+		groups.set(group, [...(groups.get(group) ?? []), { path: f.path, sha256: f.lfs.oid, size: f.lfs.size }])
+	}
+	const device = await deviceInfo()
+	const models: RepoModel[] = [...groups.entries()].map(([group, files]) => {
+		files.sort((a, b) => a.path.localeCompare(b.path))
+		const sizeBytes = files.reduce((n, f) => n + f.size, 0)
+		const requires = estimate(sizeBytes)
+		const name = `u-${files[0].sha256.slice(0, 12)}`
+		const label = path.basename(group).replace(/\.gguf$/i, '')
+		return { name, label, files, sizeBytes, requires, ...fitOf({ repo, revision: commit, files, requires }, device, false) }
+	}).sort((a, b) => a.sizeBytes - b.sizeBytes)
+	if (!models.length) throw new Error('no GGUF model in this repo (the engine runs GGUF files)')
+	const selected = wanted ? models.find(m => m.files.some(f => f.path === wanted))?.name ?? null : null
+	return { repo, revision: commit, models, selected }
+}
+
+/** The models added by link a hubby hands over (all of them, each time), checked as pinned declarations. */
+export function setUserModels(hubby: string, list: unknown): number {
+	if (!Array.isArray(list) || list.length > 50) throw new Error('at most 50 models')
+	const models: UserModel[] = []
+	for (const m of list as Partial<UserModel>[]) {
+		const files = Array.isArray(m?.files) ? m.files : []
+		const ok = m && typeof m.name === 'string' && /^u-[0-9a-f]{12}$/.test(m.name) && typeof m.label === 'string' && REPO.test(m.repo ?? '') && COMMIT.test(m.revision ?? '')
+			&& files.length > 0 && files.every(f => PATH.test(f?.path ?? '') && SHA256.test(f?.sha256 ?? '') && Number.isInteger(f?.size) && f.size > 0)
+			&& Number.isInteger(m.requires?.vram) && Number.isInteger(m.requires?.ram)
+		if (!ok) throw new Error('a model added by link is not pinned (repo, commit, files with sha256 and size)')
+		models.push({ name: m.name!, label: m.label!.slice(0, 120), repo: m.repo!, revision: m.revision!, files: files.map(f => ({ path: f.path, sha256: f.sha256, size: f.size })), requires: { vram: m.requires!.vram, ram: m.requires!.ram } })
+	}
+	const index = readIndex()
+	index.userModels[hubby] = models
+	writeIndex(index)
+	modelEvents.emit('changed')
+	return models.length
 }

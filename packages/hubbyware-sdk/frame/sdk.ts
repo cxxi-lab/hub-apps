@@ -255,7 +255,31 @@ export interface AiChatOptions {
  * (scope `app:ai`; `platform.capabilities.localAi`). The first use asks the user to allow (and
  * download) the model; refused, the call fails.
  */
+/** A model of a Hugging Face repo, as the device read it (`ai.models.inspect`). */
+export interface AiRepoModel {
+	name: string
+	label: string
+	files: Array<{ path: string, sha256: string, size: number }>
+	sizeBytes: number
+	requires: { vram: number, ram: number }
+	fit: 'runs' | 'slow' | 'cannot'
+	reason: string
+}
+
+/** A model added by link, as the hubby keeps it (`ai.models.set`). */
+export interface AiUserModel { name: string, label: string, repo: string, revision: string, files: AiRepoModel['files'], requires: AiRepoModel['requires'] }
+
 export const ai = {
+	/**
+	 * Models added from links the user gives (scope app:ai-links, an official hubby's): `inspect` reads a
+	 * Hugging Face repo (by the device: its commit, its GGUF files with their sha256, how each fits);
+	 * `set` hands the device all the models the hubby keeps (it then offers them as models of its own,
+	 * by `name`, to allow and download as the declared ones).
+	 */
+	models: {
+		inspect: (link: string) => call<{ repo: string, revision: string, models: AiRepoModel[], selected: string | null }>('ai.models.inspect', link),
+		set: (list: AiUserModel[]) => call<number>('ai.models.set', list)
+	},
 	async chat(request: AiChatRequest, options: AiChatOptions = {}): Promise<AiChatResult> {
 		const id = nextStream++
 		const abort = () => { void call('stream.abort', id) }
