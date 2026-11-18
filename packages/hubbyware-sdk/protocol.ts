@@ -43,6 +43,23 @@ export interface AppState {
 	tunnelReady: boolean
 }
 
+/** What a web surface tells its frame (the names of the webview's events it stands for). */
+export type SurfaceEvent = 'dom-ready' | 'did-navigate' | 'did-navigate-in-page' | 'page-favicon-updated' | 'console-message' | 'did-fail-load'
+
+/**
+ * A web surface as the frame asks for it (docs/plan-isolation.md D3): a webview the host shows over
+ * the frame, at `rect` (the frame's coordinates; null: not shown), in the hubby's partition.
+ */
+export interface SurfaceState {
+	rect: { x: number, y: number, width: number, height: number } | null
+	src: string
+	referrer: string | null
+	userAgent: string | null
+	webPreferences: string | null
+	/** kept loaded but not shown (something of the frame is over it) */
+	covered: boolean
+}
+
 /** A failed call, as the frame rebuilds it (an ApiError when it has a status). */
 export interface CallError {
 	message: string
@@ -62,7 +79,7 @@ export type GuestMessage =
 /** Host → guest. */
 export type HostMessage =
 	/** `theme`, `accent`: the app's (a host from before themes sends none: dark, blue) */
-	| { type: 'init', hubby: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string, apiBase?: string }
+	| { type: 'init', hubby: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string, apiBase?: string, storage?: Record<string, string> }
 	| { type: 'result', id: number, ok: true, value: unknown }
 	| { type: 'result', id: number, ok: false, error: string, failure?: CallError }
 	| { type: 'back' }
@@ -77,6 +94,10 @@ export type HostMessage =
 	| { type: 'stream', stream: number, event: string, data: unknown }
 	/** a document of one of its collections changed (another window, another device) */
 	| { type: 'changed', collection: string, doc: string }
+	/** the native player (Android) said something: `ready`, `closed`, `action` (its id), `navigate` (prev/next) */
+	| { type: 'player', event: 'ready' | 'closed' | 'action' | 'navigate', value?: string }
+	/** an event of one of its web surfaces (the webview the host shows for it) */
+	| { type: 'surface', surface: number, event: SurfaceEvent, detail: Record<string, unknown> }
 
 export const PROTOCOL = 'hubby/1'
 

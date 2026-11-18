@@ -14,7 +14,17 @@ import { setHubbyNav } from './navs'
 import { currentAccent, currentTheme, useAccent, useTheme } from '@core/theme/theme'
 import { useAmountsBlurred, useBlurEpoch, useHubbyVisible, usePrivateMode } from '@core/privacy/hidden'
 import { useVpnStatus } from '@shared/hooks/useVpnStatus'
-import type { AppState, CallError } from '@cxxi-lab/hubbyware-sdk/protocol'
+import type { AppState, CallError, SurfaceState } from '@cxxi-lab/hubbyware-sdk/protocol'
+import { storageSet, storageSnapshot } from './storage'
+import { SurfaceViews, surfaceMethods, type WebviewElement } from './HubbySurfaces'
+
+/**
+ * What a frame learns of the shell (its URL: a manifest reads it as it loads). The companion's
+ * engine isn't relayed to a frame (docs/plan-isolation.md D5): never said there.
+ */
+function frameCapabilities(): string {
+	return Object.entries(platform.capabilities).filter(([name, on]) => on === true && name !== 'companion').map(([name]) => name).join(',')
+}
 
 /** The calls a frame may make to the server, as its hubby (the server checks what it declares). */
 const API_PATHS = /^\/api\/cap\//
@@ -46,7 +56,11 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	const [backDepth, setBackDepth] = useState(0)
 	const base = `/${hubby}`
 	const inner = pathname === base ? '/' : pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : null
-	const src = platform.hubbyUrl(hubby)
+	const base_ = platform.hubbyUrl(hubby)
+	const src = base_ ? `${base_}?capabilities=${frameCapabilities()}` : null
+	// its web surfaces (D3): the webviews shown over the frame
+	const [surfaceStates, setSurfaceStates] = useState<Record<number, SurfaceState>>({})
+	const surfaceElements = useRef(new Map<number, WebviewElement>()).current
 
 	// the app's state, as the frame gets it (pushed at each change)
 	const vpn = useVpnStatus()
@@ -98,6 +112,8 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		// the collections whose changes it follows
 		const watching = new Map<string, () => void>()
 		const docs = (name: unknown) => own(name) as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+		// the native player (Android): relayed, its events pushed once the frame listens
+		const playerOffs: Array<() => void> = []
 		const following = new Map<string, () => void>()
 		const hold = (task: Task) => { held.set(task.id, task); return task.state }
 		const heldTask = async (id: unknown): Promise<Task> => {
@@ -169,6 +185,34 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 				watching.delete(String(name))
 				return null
 			},
+			// its own storage on this device (its frame has none)
+			'storage.set': (key: unknown, value: unknown) => { storageSet(hubby, String(key), value === null ? null : String(value)); return null },
+			// the native player (Android, capabilities.nativePlayer)
+			...(platform.capabilities.nativePlayer ? {
+				'player.open': (options: unknown) => platform.player.open(options as Parameters<typeof platform.player.open>[0]),
+				'player.exec': (script: unknown) => platform.player.exec(String(script)),
+				'player.reload': () => platform.player.reload(),
+				'player.close': () => platform.player.close(),
+				'player.setActions': (actions: unknown, icons: unknown) => platform.player.setActions(actions as never, icons as never),
+				'player.showPanel': (panel: unknown) => platform.player.showPanel(panel as never),
+				'player.listen': () => {
+					if (playerOffs.length) return null
+					playerOffs.push(
+						platform.player.onReady(() => send({ type: 'player', event: 'ready' })),
+						platform.player.onClosed(() => send({ type: 'player', event: 'closed' })),
+						platform.player.onAction(id => send({ type: 'player', event: 'action', value: id })),
+						platform.player.onNavigate(direction => send({ type: 'player', event: 'navigate', value: direction }))
+					)
+					return null
+				}
+			} : {}),
+			// its web surfaces (desktop: capabilities.webview)
+			...surfaceMethods((id, next) => setSurfaceStates(prev => {
+				const copy = { ...prev }
+				if (next) copy[id] = next
+				else delete copy[id]
+				return copy
+			}), surfaceElements, (path, options) => caller.api(path, options)),
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')
 				return null
@@ -183,7 +227,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			const m = data.message
 			switch (m.type) {
 				case 'ready':
-					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent(), apiBase: getApiBaseUrl() })
+					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent(), apiBase: getApiBaseUrl(), storage: storageSnapshot(hubby) })
 					send({ type: 'state', state: state.current.appState })
 					break
 				case 'register':
@@ -224,6 +268,8 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			streams.clear()
 			watching.forEach(stop => stop())
 			watching.clear()
+			playerOffs.forEach(stop => stop())
+			setSurfaceStates({})
 		}
 	}, [hubby])
 
@@ -231,14 +277,19 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		return <div className="flex-1 flex items-center justify-center text-sm text-steel-400">This hubby runs isolated: not available on this platform yet.</div>
 	}
 	return (
-		<iframe
-			ref={frame}
-			title={hubby}
-			src={src}
-			// popups: its links open outside the app (the system's browser, the shell decides), as a
-			// mail's links and attachments do
-			sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-			className="flex-1 min-h-0 w-full border-0 bg-steel-900"
-		/>
+		<div className="relative flex-1 min-h-0 flex">
+			<iframe
+				ref={frame}
+				title={hubby}
+				src={src}
+				// popups: its links open outside the app (the system's browser, the shell decides), as a
+				// mail's links and attachments do
+				sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+				className="flex-1 min-h-0 w-full border-0 bg-steel-900"
+			/>
+			{platform.capabilities.webview && (
+				<SurfaceViews hubby={hubby} surfaces={{ states: surfaceStates, elements: surfaceElements }} call={(path, options) => hubbyApi(hubby).api(path, options)} send={send} />
+			)}
+		</div>
 	)
 }

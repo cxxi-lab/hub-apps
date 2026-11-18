@@ -1,0 +1,107 @@
+import { createElement, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, type CSSProperties } from 'react'
+import type { SurfaceEvent, SurfaceState } from '../protocol'
+import { call, onHostMessage } from './sdk'
+
+/**
+ * A web page shown in the hubby (docs/plan-isolation.md D3): a webview can't live in a frame, the
+ * host shows one over this place — in the hubby's partition, the site's integration applied before
+ * it loads, the shell's player blocklist on. It takes a webview's attributes and its ref stands for
+ * the webview (addEventListener of its events, executeJavaScript, reload, loadURL, getURL): a hubby
+ * swaps `<webview>` for `<WebSurface>` and keeps its code. `covered`: something of the frame is over
+ * it (a menu, an overlay): kept loaded, not shown.
+ */
+export interface WebSurfaceProps {
+	src: string
+	httpreferrer?: string
+	useragent?: string
+	webpreferences?: string
+	/** the host chooses the hubby's own (accepted for the webview's form) */
+	partition?: string
+	className?: string
+	style?: CSSProperties
+	covered?: boolean
+}
+
+export interface WebSurfaceElement {
+	addEventListener(event: SurfaceEvent | string, listener: (e: Event) => void): void
+	removeEventListener(event: SurfaceEvent | string, listener: (e: Event) => void): void
+	executeJavaScript(code: string): Promise<unknown>
+	reload(): void
+	loadURL(url: string): Promise<void>
+	getURL(): string
+}
+
+let nextSurface = 1
+const surfaces = new Map<number, (event: SurfaceEvent, detail: Record<string, unknown>) => void>()
+
+onHostMessage(m => {
+	if (m.type === 'surface') surfaces.get(m.surface)?.(m.event, m.detail)
+})
+
+export const WebSurface = forwardRef<WebSurfaceElement, WebSurfaceProps>(function WebSurface(props, ref) {
+	const place = useRef<HTMLDivElement>(null)
+	const id = useMemo(() => nextSurface++, [])
+	const url = useRef(props.src)
+	const handle = useMemo<WebSurfaceElement & { emit: (event: SurfaceEvent, detail: Record<string, unknown>) => void }>(() => {
+		const listeners = new Map<string, Set<(e: Event) => void>>()
+		return {
+			addEventListener(event, listener) {
+				let set = listeners.get(event)
+				if (!set) listeners.set(event, set = new Set())
+				set.add(listener)
+			},
+			removeEventListener(event, listener) { listeners.get(event)?.delete(listener) },
+			executeJavaScript: code => call('surface.exec', id, code),
+			reload: () => { void call('surface.reload', id) },
+			loadURL: target => call<void>('surface.load', id, target),
+			getURL: () => url.current,
+			emit(event, detail) {
+				if ((event === 'did-navigate' || event === 'did-navigate-in-page') && typeof detail.url === 'string' && detail.isMainFrame !== false) url.current = detail.url
+				// the webview's event, as its listeners read it (its fields on the event)
+				const e = Object.assign(new Event(event), detail)
+				listeners.get(event)?.forEach(l => l(e))
+			}
+		}
+	}, [id])
+	useImperativeHandle(ref, () => handle, [handle])
+
+	useEffect(() => {
+		surfaces.set(id, handle.emit)
+		return () => {
+			surfaces.delete(id)
+			void call('surface.close', id)
+		}
+	}, [id])
+
+	// where it is, what it shows: told to the host as it changes (each frame: a modal animating,
+	// a page scrolling move it without resizing it)
+	const { src, httpreferrer, useragent, webpreferences, covered } = props
+	useEffect(() => { url.current = src }, [src])
+	useEffect(() => {
+		let frame = 0
+		let last = ''
+		const tick = () => {
+			const el = place.current
+			const r = el?.getBoundingClientRect()
+			const shown = !!el && !!r && r.width > 0 && r.height > 0 && el.offsetParent !== null
+			const state: SurfaceState = {
+				rect: shown ? { x: r.left, y: r.top, width: r.width, height: r.height } : null,
+				src,
+				referrer: httpreferrer ?? null,
+				userAgent: useragent ?? null,
+				webPreferences: webpreferences ?? null,
+				covered: !!covered
+			}
+			const key = JSON.stringify(state)
+			if (key !== last) {
+				last = key
+				void call('surface.update', id, state)
+			}
+			frame = requestAnimationFrame(tick)
+		}
+		tick()
+		return () => cancelAnimationFrame(frame)
+	}, [id, src, httpreferrer, useragent, webpreferences, covered])
+
+	return createElement('div', { ref: place, className: props.className, style: props.style })
+})

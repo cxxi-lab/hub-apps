@@ -19,7 +19,8 @@ import { syncPlayerBlocklist as syncBlocklist } from '@shared/web/playerBlocklis
 import { collection as hubbyCollection } from '@core/hubby/collections'
 import { useAmountsBlurred as amountsBlurred, useHubbyVisible as hubbyVisible } from '@core/privacy/hidden'
 import { Amount as AppAmount } from '@core/privacy/Amount'
-import { createElement, type ReactNode } from 'react'
+import { createElement, forwardRef, type CSSProperties, type ReactNode } from 'react'
+import { storageGet, storageSet } from '@core/hubby/storage'
 
 export * from './contract'
 
@@ -139,3 +140,34 @@ export function Amount(props: { hubby?: string, children: ReactNode, className?:
 export function defineHubby<D extends object>(definition: D): D {
 	return definition
 }
+
+/**
+ * The hubby's own key-value storage on this device (core/hubby/storage.ts): the same in the app and
+ * in its frame (which has no localStorage). Its former keys (hubby.json `storageFrom`) copied once.
+ */
+export const storage = {
+	getItem: (key: string): string | null => (hubby ? storageGet(hubby, key) : null),
+	setItem: (key: string, value: string): void => { if (hubby) storageSet(hubby, key, String(value)) },
+	removeItem: (key: string): void => { if (hubby) storageSet(hubby, key, null) }
+}
+
+export interface WebSurfaceProps {
+	src: string
+	httpreferrer?: string
+	useragent?: string
+	webpreferences?: string
+	partition?: string
+	className?: string
+	style?: CSSProperties
+	/** isolated: something of the frame is over it (in the app, the page's own stacking does it) */
+	covered?: boolean
+}
+
+/**
+ * A web page shown in the hubby: in the app, a webview in the hubby's partition; in its frame, the
+ * one the host shows over its place (docs/plan-isolation.md D3). Its ref is the webview.
+ */
+export const WebSurface = forwardRef<HTMLElement, WebSurfaceProps>(function WebSurface({ covered: _covered, partition: _partition, httpreferrer, ...props }, ref) {
+	// httpreferrer before src: a src change loads with the referrer as it stands
+	return createElement('webview', { ref, httpreferrer, ...props, partition: webviewPartition })
+})

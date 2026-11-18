@@ -25,6 +25,7 @@ const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
 export const RUNTIME = {
 	'react': 'react',
 	'react/jsx-runtime': 'jsx-runtime',
+	'react-dom': 'react-dom',
 	'react-dom/client': 'react-dom-client',
 	'@fortawesome/react-fontawesome': 'fontawesome-react',
 	'react-router': 'react-router',
@@ -34,7 +35,7 @@ export const RUNTIME = {
 }
 
 
-const NPM = ['react', 'react/jsx-runtime', 'react-dom/client', 'react-router', '@fortawesome/react-fontawesome']
+const NPM = ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', 'react-router', '@fortawesome/react-fontawesome']
 
 export async function buildHubbyRuntime(out) {
 	const outDir = join(resolve(out), 'hubby-runtime')

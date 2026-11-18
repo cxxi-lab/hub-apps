@@ -61,11 +61,20 @@ function applyTheme(theme: 'light' | 'dark' | undefined, accent: string | undefi
 	else delete root.dataset.accent
 }
 
+const hostListeners = new Set<(m: HostMessage) => void>()
+
+/** Called with each message of the host (the frame's other parts: the player, the surfaces). */
+export function onHostMessage(listener: (m: HostMessage) => void): () => void {
+	hostListeners.add(listener)
+	return () => { hostListeners.delete(listener) }
+}
+
 window.addEventListener('message', event => {
 	if (event.source !== window.parent) return
 	const data = event.data as Envelope<HostMessage> | undefined
 	if (data?.protocol !== PROTOCOL) return
 	const m = data.message
+	hostListeners.forEach(l => l(m))
 	if (m.type === 'result') {
 		const p = pending.get(m.id)
 		pending.delete(m.id)

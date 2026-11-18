@@ -9,6 +9,8 @@ import { call, currentInit, useAppState, watchCollection } from './sdk'
 export { api, apiStream, ApiError, errorMessage, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type OAuthConnection, type Task, type TaskState } from './sdk'
 export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
 export { BottomBar, type BottomBarEntry, type BottomBarTab } from './BottomBar'
+export { platform, storage } from './platform'
+export { WebSurface, type WebSurfaceElement, type WebSurfaceProps } from './WebSurface'
 export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 // the design system's components, as the app's SDK hands them too
 export {
@@ -136,6 +138,47 @@ export function useContributions(_point: string): never[] {
 export function getApiBaseUrl(_path?: string): string {
 	return currentInit()?.apiBase ?? ''
 }
+
+// --- the web socle (the host applies it to the surfaces it shows) ---
+
+/** A site's integration (cookies, referer rules) before it loads: the host does it for the surfaces. */
+export async function ensureIntegrationForUrl(url: string): Promise<void> {
+	await call('web.integration', url)
+}
+
+/** Whether a site's integration is known already: in a frame, always (the host checks each load). */
+export function isIntegrationKnownSync(_url: string): boolean {
+	return true
+}
+
+export interface PlayerConfig {
+	host: string
+	scripts: { page: string | null, embed: string | null, pause: string | null }
+}
+
+const playerConfigs = new Map<string, Promise<PlayerConfig | null>>()
+
+/** The player's scripts for a site (null: none), the web capability's; once per domain (a failure is asked again). */
+export function getPlayerConfig(domain: string): Promise<PlayerConfig | null> {
+	const key = domain.toLowerCase()
+	const cached = playerConfigs.get(key)
+	if (cached) return cached
+	const pending = call<{ data: PlayerConfig }>('api', `/api/cap/web/players/${key}`, {}).then(r => r.data, err => {
+		// none for this site (404): kept; another failure: asked again next time
+		if ((err as { status?: number }).status === 404) return null
+		playerConfigs.delete(key)
+		console.warn('[player] scripts lookup failed for', key, err)
+		return null
+	})
+	playerConfigs.set(key, pending)
+	return pending
+}
+
+/** The shell's player blocklist: the host keeps it for the surfaces it shows. */
+export async function syncPlayerBlocklist(): Promise<void> {}
+
+/** The partition of the hubby's webviews: the host's choice (accepted for the webview's form). */
+export const webviewPartition = ''
 
 // --- helpers (as in the app) ---
 
