@@ -67,7 +67,7 @@ export function ModelConsent() {
 	return (
 		<Modal title={plan.installed ? 'Use an AI model?' : 'Download an AI model?'} size="sm" onClose={() => finish(false)}>
 			<div className="flex flex-col gap-3 text-sm text-steel-200">
-				<p className="m-0"><b className="text-white">{plan.hubbyLabel}</b> wants to use an AI model on this device{plan.description ? `: ${plan.description.charAt(0).toLowerCase()}${plan.description.slice(1)}` : ''}.</p>
+				<p className="m-0"><b className="text-white">{plan.hubbyLabel}</b> wants to use an AI model on this device{plan.description ? ` (${plan.description.replace(/\.$/, '')})` : ''}.</p>
 				<p className="m-0 text-xs text-steel-300 break-all">{variant.repo} · {gb(variant.sizeBytes)}{variant.fit === 'slow' ? ` · ${variant.reason}` : ''}</p>
 				<p className="m-0 text-xs text-steel-400">It runs here: nothing you ask it leaves this device. Downloaded from Hugging Face, checked; you can delete it in Settings › AI models.</p>
 				{downloading && (
