@@ -160,6 +160,49 @@ export interface HubbyStoreApi {
 }
 
 /** One of the app's notifications, as the system shows it. */
+/** How an AI model fits this device: as it should, only on the CPU (slower), not at all. */
+export type ModelFit = 'runs' | 'slow' | 'cannot'
+
+/** A variant of a model a hubby declares (hubby.json "ai"), against this device. */
+export interface ModelVariantPlan { repo: string, revision: string, sizeBytes: number, fit: ModelFit, reason: string, installed: boolean }
+
+/** A model a hubby declares, as this device sees it (client docs/plan-ia-moteur.md § 5). */
+export interface ModelPlan {
+	hubby: string
+	hubbyLabel: string
+	name: string
+	family: 'text' | 'image' | 'voice'
+	description: string | null
+	variants: ModelVariantPlan[]
+	/** the variant this device uses, null: none can run here */
+	chosen: number | null
+	consented: boolean
+	installed: boolean
+	download: { received: number, total: number } | null
+	/** the declaration is refused (not pinned as it must be) */
+	invalid: string | null
+}
+
+export interface InstalledModel { sha256: string, repo: string, revision: string, path: string, sizeBytes: number, users: string[] }
+
+export interface LocalModelsState {
+	device: { ramMib: number, gpu: { label: string, vramMib: number } | null, freeDiskMib: number, directory: string }
+	plans: ModelPlan[]
+	installed: InstalledModel[]
+}
+
+/** The AI models on this device: the ones the hubbies declare, downloaded once the user agreed. */
+export interface LocalModelsApi {
+	state(): Promise<LocalModelsState>
+	/** the user agrees (this device): the model downloads (its progress: onChange) */
+	download(hubby: string, name: string): Promise<void>
+	remove(sha256: string): Promise<void>
+	/** where new models go (a folder picker); null: cancelled */
+	chooseDirectory(): Promise<string | null>
+	onChange(cb: () => void): Unsubscribe
+	onFailure(cb: (failure: { hubby: string, name: string, error: string }) => void): Unsubscribe
+}
+
 export interface SystemNotification {
 	id: number
 	title: string
@@ -452,6 +495,8 @@ export interface Platform {
 	readonly localStore: LocalStoreApi | null
 	/** null: the hubbies come from their sources (development), all of them, nothing to install */
 	readonly hubbyStore: HubbyStoreApi | null
+	/** null: no local AI models here (Android, for now) */
+	readonly localModels: LocalModelsApi | null
 	/**
 	 * Where an isolated hubby's frame loads from (its own origin: desktop hubby://<id>/, Android
 	 * https://<id>.hubby.localhost/); null where hubbies can't run isolated (yet).

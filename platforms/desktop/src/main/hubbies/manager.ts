@@ -545,6 +545,18 @@ function serveHubbies(): void {
 let checking = false
 
 /** Looks for newer compatible versions of the installed hubbies and downloads them (for the next start). */
+/**
+ * The hubbies' declarations as this session runs them (their hubby.json, from the copy checked when
+ * it was installed; development: their sources): what the platform acts on for them (their AI
+ * models: ai/models.ts), never what a renderer says they declare.
+ */
+export function hubbyDeclarations(): Array<HubbyEntry & Record<string, unknown>> {
+	const running = [...active.values()].map(entry)
+	if (app.isPackaged) return running
+	const ids = new Set(running.map(h => h.id))
+	return [...running, ...devSourceHubbies().filter(h => !ids.has(h.id))]
+}
+
 export async function checkHubbyUpdates(): Promise<void> {
 	if (checking) return
 	checking = true

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { platform } from '@platform'
-import { faBell, faCode, faLink, faLock, faPalette } from '@fortawesome/free-solid-svg-icons'
+import { faBell, faBrain, faCode, faLink, faLock, faPalette } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { SettingsConnections } from '@core/settings/SettingsConnections'
 import { SettingsNotifications } from '@core/settings/SettingsNotifications'
 import { SettingsSecurity } from '@core/settings/SettingsSecurity'
 import { SettingsTheme } from '@core/settings/SettingsTheme'
 import { SettingsDeveloper } from '@core/settings/SettingsDeveloper'
+import { SettingsModels } from '@core/settings/SettingsModels'
 
 interface Section {
 	id: string
@@ -24,6 +25,8 @@ const SECTIONS: Section[] = [
 	{ id: 'connections', label: 'Connections', icon: faLink, component: () => <SettingsConnections /> },
 	{ id: 'notifications', label: 'Notifications', icon: faBell, component: () => <SettingsNotifications /> },
 	{ id: 'theme', label: 'Theme', icon: faPalette, component: () => <SettingsTheme /> },
+	// the AI models on this device (only where they can run)
+	...(platform.localModels ? [{ id: 'models', label: 'AI models', icon: faBrain, component: () => <SettingsModels /> }] : []),
 	{ id: 'developer', label: 'Developer', icon: faCode, component: () => <SettingsDeveloper /> },
 ]
 

@@ -46,6 +46,7 @@ export function createElectronPlatform(): Platform {
 		...window.api,
 		push: null,
 		hubbyStore: import.meta.env.DEV ? null : window.api.hubbyStore,
+		localModels: window.api.localModels,
 		// served by the main process (its hubby:// protocol)
 		hubbyUrl: hubby => `hubby://${hubby}/`
 	}

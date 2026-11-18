@@ -107,6 +107,16 @@ const api = {
 		purge: (account: string, hubby: string, scope: string): Promise<void> => ipcRenderer.invoke('store:purge', account, hubby, scope)
 	},
 
+	// the AI models on this device (main: ai/models.ts)
+	localModels: {
+		state: () => ipcRenderer.invoke('ai-models:state'),
+		download: (hubby: string, name: string): Promise<void> => ipcRenderer.invoke('ai-models:download', hubby, name),
+		remove: (sha256: string): Promise<void> => ipcRenderer.invoke('ai-models:remove', sha256),
+		chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke('ai-models:directory'),
+		onChange: (cb: () => void): (() => void) => subscribe<void>('ai-models:changed', () => cb()),
+		onFailure: (cb: (failure: { hubby: string, name: string, error: string }) => void): (() => void) => subscribe('ai-models:failed', cb)
+	},
+
 	systemNotifications: {
 		sync: (items: SystemNotification[]): void => {
 			ipcRenderer.send('system-notifications:sync', items)

@@ -1,7 +1,8 @@
-import { app } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 
 import { applyMenu } from '../app/menu'
 import { localEngine } from './engine'
+import { deviceInfo, downloadModel, installedModels, modelEvents, modelPlans, removeModel, setModelsDirectory } from './models'
 
 /**
  * The local AI engine in the desktop (client docs/plan-ia-moteur.md): its state in the menu, and
@@ -11,6 +12,24 @@ import { localEngine } from './engine'
  */
 export function setupLocalAi(): void {
 	localEngine.on('status', () => applyMenu())
+	// the models on this device (the Models screen of Settings): their state, pushed to every window
+	ipcMain.handle('ai-models:state', async () => ({ device: await deviceInfo(), plans: await modelPlans(), installed: installedModels() }))
+	ipcMain.handle('ai-models:download', (_e, hubby: unknown, name: unknown) => {
+		if (typeof hubby !== 'string' || typeof name !== 'string') throw new Error('invalid model')
+		// resolves now: the download goes on, its progress comes with ai-models:changed
+		downloadModel(hubby, name).catch(err => {
+			console.error(`[ai:models] ${hubby} ${name}:`, err)
+			for (const w of BrowserWindow.getAllWindows()) w.webContents.send('ai-models:failed', { hubby, name, error: err instanceof Error ? err.message : String(err) })
+		})
+	})
+	ipcMain.handle('ai-models:remove', (_e, sha256: unknown) => removeModel(String(sha256)))
+	ipcMain.handle('ai-models:directory', async () => {
+		const res = await dialog.showOpenDialog({ title: 'Where AI models go', properties: ['openDirectory', 'createDirectory'] })
+		if (res.canceled || !res.filePaths[0]) return null
+		setModelsDirectory(res.filePaths[0])
+		return res.filePaths[0]
+	})
+	modelEvents.on('changed', () => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('ai-models:changed') })
 	app.on('will-quit', () => { void localEngine.stop(true) })
 	const model = process.env.HUB_AI_ENGINE_SELFTEST
 	if (model && !app.isPackaged) void selfTest(model)
