@@ -9,8 +9,8 @@ import { openMcpSession, type McpSession } from './mcp'
 /**
  * The device's AI agents as the chat's engines (client docs/plan-ia-agent.md, phase 4): Claude Code
  * driven directly (its unmodified binary, `claude -p`, the user's own login — never read nor
- * touched), and any agent speaking ACP (the Agent Client Protocol: Gemini CLI, Codex through its
- * adapter, OpenCode, Goose…). Each turn runs in an empty folder, with Hubbyware's MCP server as its
+ * touched), and Codex over ACP (the Agent Client Protocol, through Zed's adapter; another ACP agent
+ * is one more entry of ACP_AGENTS). Each turn runs in an empty folder, with Hubbyware's MCP server as its
  * only tools (the agent's own — shell, files, web — off or refused): Hubbyware confirms every change
  * and send itself. The agent's session is kept on this device (resumed next turn); elsewhere, the
  * conversation is replayed (the transcript the hubby gives).
@@ -58,21 +58,9 @@ interface AcpAgent {
 	settings?: { env: string, value: unknown }
 }
 
-// Gemini CLI's own tools, off (D8: only Hubbyware's tools): its "system" settings come first
-const GEMINI_SETTINGS = {
-	tools: { exclude: ['run_shell_command', 'read_file', 'read_many_files', 'write_file', 'replace', 'glob', 'grep_search', 'list_directory', 'web_fetch', 'google_web_search', 'save_memory', 'activate_skill', 'invoke_agent', 'take_snapshot', 'get_internal_docs', 'list_mcp_resources', 'read_mcp_resource'] },
-	mcp: { allowed: ['hubbyware'] }
-}
-
 const ACP_AGENTS: AcpAgent[] = [
-	{ id: 'gemini-cli', label: 'Gemini CLI', bin: 'gemini', args: ['--acp'], signIn: 'run `gemini` once in a terminal to sign in', settings: { env: 'GEMINI_CLI_SYSTEM_SETTINGS_PATH', value: GEMINI_SETTINGS } },
-	// Google's successor to Gemini CLI for personal accounts (Gemini CLI: paid API keys only since June 2026);
-	// HTTP MCP servers from the client need a process per session. Its own tools: its permission requests
-	// are refused (shell, web), its reads and writes stay in its empty folder (no access outside it by default)
-	{ id: 'antigravity', label: 'Antigravity', bin: 'agy', args: ['acp', '--process-per-session'], signIn: 'run `agy` once in a terminal to sign in' },
-	{ id: 'codex', label: 'Codex', bin: 'codex-acp', args: [], signIn: 'run `codex login` in a terminal' },
-	{ id: 'opencode', label: 'OpenCode', bin: 'opencode', args: ['acp'], signIn: 'run `opencode auth login` in a terminal' },
-	{ id: 'goose', label: 'Goose', bin: 'goose', args: ['acp'], signIn: 'run `goose configure` in a terminal' }
+	// Codex through Zed's ACP adapter (codex-acp): the user's OpenAI login
+	{ id: 'codex', label: 'Codex', bin: 'codex-acp', args: [], signIn: 'run `codex login` in a terminal' }
 ]
 
 // development: HUB_AGENT_ACP_TEST=<a script> adds a test ACP agent (node <script>)
