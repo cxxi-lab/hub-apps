@@ -137,7 +137,12 @@ const api = {
 	// a device agent's requests through Hubbyware's MCP server (main ai/mcp.ts), answered by the app
 	agentBridge: {
 		onRequest: (cb: (request: { rid: number, op: 'tools' | 'call', caller: string, conversation: string, name?: string, input?: unknown }) => void): (() => void) => subscribe('agent:request', cb),
-		respond: (rid: number, result: unknown, error?: string): void => { ipcRenderer.send('agent:response', rid, result, error) }
+		respond: (rid: number, result: unknown, error?: string): void => { ipcRenderer.send('agent:response', rid, result, error) },
+		// the device's agents as the chat's engines (main ai/agents.ts)
+		engines: () => invoke('agent:engines'),
+		run: (id: number, caller: string, request: unknown) => invoke('agent:run', id, caller, request),
+		abort: (id: number): void => { ipcRenderer.send('agent:abort', id) },
+		onEvent: (cb: (event: { id: number, kind: 'delta' | 'status' | 'tool' | 'denied', text: string }) => void): (() => void) => subscribe('agent:event', cb)
 	},
 
 	systemNotifications: {

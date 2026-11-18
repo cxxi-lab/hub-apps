@@ -4,6 +4,7 @@ export { APP_NAME }
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 
 import { setupLocalAi } from './ai'
+import { setupAgents } from './ai/agents'
 import { applyMenu } from './app/menu'
 import { acquireSingleInstanceLock, RELAUNCH_FLAG } from './app/restart'
 import { installSecurityHandlers } from './app/security'
@@ -78,6 +79,7 @@ app.whenReady().then(async () => {
 	setupVpn()
 	setupCompanion()
 	setupLocalAi()
+	setupAgents()
 	applyMenu()
 	setupTray()
 	setupSystemNotifications()

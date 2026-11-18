@@ -279,6 +279,44 @@ export interface AgentTool {
 	effect: 'read' | 'write' | 'outward'
 }
 
+/** One of the device's AI agents (`ai.agent.engines`). */
+export interface AgentEngine {
+	id: string
+	label: string
+	kind: 'claude' | 'acp'
+	available: boolean
+	version: string | null
+	/** null: unknown */
+	signedIn: boolean | null
+	/** what the user should do first (in a terminal) */
+	note: string | null
+}
+
+export interface AgentRunRequest {
+	engine: string
+	conversation: string
+	/** the user's new message */
+	text: string
+	/** the conversation so far, as plain text: used when the agent has no session of it on this device */
+	transcript?: string | null
+	instructions?: string | null
+}
+
+export interface AgentRunResult {
+	content: string
+	/** it went on with its own session (on this device) */
+	resumed: boolean
+	usage: { inputTokens?: number, outputTokens?: number, costUsd?: number } | null
+}
+
+export interface AgentRunOptions {
+	onDelta?: (text: string) => void
+	onCall?: (call: AgentCallResult & { input: unknown }) => void
+	onDenied?: (tool: string) => void
+	onStatus?: (kind: string, text: string) => void
+	signal?: AbortSignal
+}
+
 /** What an assistant's call did (its trace). */
 export interface AgentCallResult {
 	tool: string
@@ -315,7 +353,31 @@ export const ai = {
 		tools: () => call<{ tools: AgentTool[], docs: Array<{ hubby: string, label: string, doc: string }> }>('agent.tools'),
 		call: (conversation: string, tool: string, input: unknown) => call<AgentCallResult>('agent.call', conversation, tool, input),
 		access: () => call<{ opened: string[], hubbies: Array<{ hubby: string, label: string, methods: number, writes: boolean, outward: boolean }> }>('agent.access'),
-		setAccess: (ids: string[]) => call<string[]>('agent.setAccess', ids)
+		setAccess: (ids: string[]) => call<string[]>('agent.setAccess', ids),
+		/** the device's AI agents that may be a conversation's engine (desktop: Claude Code, ACP agents) */
+		engines: () => call<AgentEngine[]>('agent.engines'),
+		/**
+		 * A turn with one of them: its text as it comes (onDelta), Hubbyware's record of each call it
+		 * made (onCall: the trace to keep), the tools it tried that aren't Hubbyware's (onDenied).
+		 */
+		async run(request: AgentRunRequest, options: AgentRunOptions = {}): Promise<AgentRunResult> {
+			const id = nextStream++
+			const abort = () => { void call('stream.abort', id) }
+			streamListeners.set(id, (event, data) => {
+				if (event === 'delta') options.onDelta?.(String(data))
+				else if (event === 'call') options.onCall?.(data as AgentCallResult & { input: unknown })
+				else if (event === 'denied') options.onDenied?.(String(data))
+				else if (event === 'tool' || event === 'status') options.onStatus?.(String(event), String(data))
+			})
+			options.signal?.addEventListener('abort', abort)
+			try {
+				return await call<AgentRunResult>('agent.run', id, request)
+			}
+			finally {
+				streamListeners.delete(id)
+				options.signal?.removeEventListener('abort', abort)
+			}
+		}
 	},
 	async chat(request: AiChatRequest, options: AiChatOptions = {}): Promise<AiChatResult> {
 		const id = nextStream++

@@ -20,6 +20,8 @@ import { SurfaceViews, surfaceMethods, type WebviewElement } from './HubbySurfac
 import { callAll, callHubby, isAvailable, served, serveFrom } from './apis'
 import { askModelConsent } from '@core/ai/ModelConsent'
 import { agentCall, agentTools, assistantHubbies, hubbiesWithApis, setAssistantHubbies } from '@core/ai/agent'
+import { onAgentCall } from '@core/ai/agentBridge'
+import type { AgentRunRequest } from '@platform'
 import type { AiChatRequest } from '@platform'
 
 // ai.chat's ids, unique across the frames (the main process tells their answers apart by them)
@@ -309,6 +311,33 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 			'agent.access': async () => {
 				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
 				return { opened: await assistantHubbies(), hubbies: hubbiesWithApis().filter(h => h.hubby !== hubby) }
+			},
+			// the device's AI agents as the conversation's engine (desktop): which are here, a turn with one —
+			// its text streamed, and Hubbyware's own record of every call it made (the trace)
+			'agent.engines': async () => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				return platform.agentBridge ? platform.agentBridge.engines() : []
+			},
+			'agent.run': async (id: unknown, request: unknown) => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				const bridge = platform.agentBridge
+				if (!bridge) throw new Error('device agents are not available on this device')
+				if (typeof id !== 'number') throw new Error('invalid stream id')
+				const req = request as AgentRunRequest
+				const runId = nextChat++
+				const controller = new AbortController()
+				streams.set(id, controller)
+				controller.signal.addEventListener('abort', () => bridge.abort(runId))
+				const off = bridge.onEvent(e => { if (e.id === runId) send({ type: 'stream', stream: id, event: e.kind, data: e.text }) })
+				const offCalls = onAgentCall((conversation, call) => { if (conversation === req?.conversation) send({ type: 'stream', stream: id, event: 'call', data: call }) })
+				try {
+					return await bridge.run(runId, hubby, req)
+				}
+				finally {
+					off()
+					offCalls()
+					streams.delete(id)
+				}
 			},
 			'agent.setAccess': (ids: unknown) => {
 				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')

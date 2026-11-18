@@ -265,9 +265,38 @@ export interface AgentRequest {
 	input?: unknown
 }
 
+/** One of the device's AI agents, as a chat's engine (desktop main ai/agents.ts). */
+export interface AgentEngine {
+	id: string
+	label: string
+	kind: 'claude' | 'acp'
+	available: boolean
+	version: string | null
+	signedIn: boolean | null
+	note: string | null
+}
+
+export interface AgentRunRequest {
+	engine: string
+	conversation: string
+	text: string
+	transcript?: string | null
+	instructions?: string | null
+}
+
+export interface AgentRunResult {
+	content: string
+	resumed: boolean
+	usage: { inputTokens?: number, outputTokens?: number, costUsd?: number } | null
+}
+
 export interface AgentBridgeApi {
 	onRequest(cb: (request: AgentRequest) => void): Unsubscribe
 	respond(rid: number, result: unknown, error?: string): void
+	engines(): Promise<AgentEngine[]>
+	run(id: number, caller: string, request: AgentRunRequest): Promise<AgentRunResult>
+	abort(id: number): void
+	onEvent(cb: (event: { id: number, kind: 'delta' | 'status' | 'tool' | 'denied', text: string }) => void): Unsubscribe
 }
 
 export interface SystemNotification {
