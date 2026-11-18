@@ -169,6 +169,24 @@ export function installHubbies(ids: string[]): void {
 	}
 }
 
+/**
+ * An isolated hubby's new version, switched to (store.activate([id])): its entry read again, its
+ * models, its manifest in place of the former (its frame, a new component, mounts again). The
+ * running version's entry when nothing changed. Throws for a hubby running in the app (its new
+ * version runs at the next start).
+ */
+export async function reloadHubby(id: string): Promise<string> {
+	const store = platform.hubbyStore
+	if (!store) throw new Error('no hubby store here')
+	const entry = await store.install(id)
+	if (!(entry as { isolated?: boolean }).isolated) throw new Error(`${id} runs in the app: its new version at the next start`)
+	await loadModels(entry)
+	place([isolatedManifest(entry as HubbyPackage & { label: string })])
+	HUBBY_VERSIONS[id] = entry.version
+	changed()
+	return entry.version
+}
+
 /** Removes a hubby from this device (a disabled one); it is listed again as not installed. */
 export async function uninstallHubby(id: string): Promise<void> {
 	const store = platform.hubbyStore

@@ -85,7 +85,7 @@ interface HubbiesPlugin {
 	/** drop: remove the hubbies no longer published (only once the restricted ones are listed) */
 	update(options: { catalog: unknown[]; baseUrl: string; drop: boolean }): Promise<{ downloaded: string[] }>
 	pending(): Promise<{ pending: string[] }>
-	activate(): Promise<{ activated: string[] }>
+	activate(options?: { ids?: string[] }): Promise<{ activated: string[] }>
 }
 
 const Hubbies = registerPlugin<HubbiesPlugin>('Modules')
@@ -215,7 +215,7 @@ export function createHubbyStore(): HubbyStoreApi {
 		},
 		uninstall: id => Hubbies.uninstall({ id }),
 		pending: async () => (await Hubbies.pending()).pending,
-		activate: async () => (await Hubbies.activate()).activated,
+		activate: async (ids?: string[]) => (await Hubbies.activate(ids ? { ids } : undefined)).activated,
 		async setRestricted(hubbies) {
 			const next = new Map<string, PublishedEntry>()
 			const kept: RestrictedHubbyPackage[] = []

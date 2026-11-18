@@ -202,6 +202,24 @@ public final class HubbyStore {
     }
 
     /**
+     * Runs only these hubbies' newer downloaded versions from now on (isolated hubbies: their frames
+     * reload, the app goes on). Returns what changed.
+     */
+    public synchronized List<String> activate(List<String> only) {
+        List<String> newer = new ArrayList<>();
+        if (!ready) return newer;
+        for (String id : only) {
+            Entry running = active.get(id);
+            Entry best = running == null ? null : bestCopy(id, shippedCopies.get(id));
+            if (best == null || compare(best.version, running.version) <= 0) continue;
+            active.put(id, best);
+            newer.add(id + " " + best.version);
+        }
+        if (!newer.isEmpty()) Log.i(TAG, "updated: " + String.join(", ", newer));
+        return newer;
+    }
+
+    /**
      * Answers hubbies/… (this session's catalogue, a downloaded hubby's files); null for
      * everything else, served from the APK as usual.
      */

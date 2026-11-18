@@ -481,13 +481,33 @@ function pendingHubbies(): string[] {
 	return newer
 }
 
-/** Decides the versions again, as at start: the renderer reloads right after. Returns what changed. */
-function activateHubbies(): string[] {
-	const newer = pendingHubbies()
+/**
+ * Runs the newer downloaded versions from now on: all of them (as at start: the renderer reloads
+ * right after), or only these hubbies' (an isolated hubby switches alone, its frame reloaded:
+ * the others keep running). Returns what changed ("id version").
+ */
+function activateHubbies(ids?: string[]): string[] {
+	if (!ids) {
+		const newer = pendingHubbies()
+		if (newer.length) {
+			resolveActive()
+			prepareVpnSessions()
+			console.log('[hubbies] activated without a restart:', newer.join(', '))
+		}
+		return newer
+	}
+	const shipped = new Map(builtIns().map(e => [e.id, e]))
+	const newer: string[] = []
+	for (const id of ids) {
+		const running = active.get(id)
+		const best = running ? bestCopy(id, shipped.get(id)) : null
+		if (!running || !best || compareVersions(best.version, running.version) <= 0) continue
+		active.set(id, best)
+		newer.push(`${id} ${best.version}`)
+	}
 	if (newer.length) {
-		resolveActive()
 		prepareVpnSessions()
-		console.log('[hubbies] activated without a restart:', newer.join(', '))
+		console.log('[hubbies] updated:', newer.join(', '))
 	}
 	return newer
 }
@@ -568,7 +588,7 @@ export function setupHubbies(): void {
 	ipcMain.handle('hubbies:uninstall', (_event, id: unknown) => uninstallHubby(hubbyId(id)))
 	ipcMain.handle('hubbies:restricted', (_event, hubbies: unknown) => setRestricted(hubbies))
 	ipcMain.handle('hubbies:pending', () => pendingHubbies())
-	ipcMain.handle('hubbies:activate', () => activateHubbies())
+	ipcMain.handle('hubbies:activate', (_event, ids?: unknown) => activateHubbies(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string' && ID.test(id)) : undefined))
 	serveHubbies()
 	if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) return // dev server: hubbies from their sources
 	loadRestricted()

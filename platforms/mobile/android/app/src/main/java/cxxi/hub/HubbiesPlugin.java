@@ -40,7 +40,13 @@ public class HubbiesPlugin extends Plugin {
     @PluginMethod
     public void activate(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("activated", new org.json.JSONArray(HubbyStore.get().activate()));
+        java.util.List<String> only = null;
+        com.getcapacitor.JSArray ids = call.getArray("ids");
+        if (ids != null) {
+            only = new java.util.ArrayList<>();
+            for (int i = 0; i < ids.length(); i++) only.add(ids.optString(i));
+        }
+        result.put("activated", new org.json.JSONArray(only == null ? HubbyStore.get().activate() : HubbyStore.get().activate(only)));
         call.resolve(result);
     }
 

@@ -9,6 +9,8 @@ import { UserMenu } from '@core/layout/UserMenu'
 import type { NavDomain } from '@core/layout/AppLayout'
 import { hubbyCount, openNotifications, useNotifications } from '@core/notifications/notifications'
 import { HUBBY_MANIFESTS, hubbyHomePath } from '@core/hubby/registry'
+import { useUpdating } from '@core/hubby/updates'
+import { UpdateVeil } from '@core/hubby/UpdateVeil'
 import { platform } from '@platform'
 import { CommandSheet } from '@core/layout/CommandSheet'
 import { useDeveloperMode } from '@core/settings/developer'
@@ -23,6 +25,7 @@ interface Props {
 
 export function TopBar({ domains, activeDomainId }: Props) {
 	const notifications = useNotifications()
+	const updating = useUpdating()
 	const navigate = useNavigate()
 	const location = useLocation()
 	const muted = useAudioMuted()
@@ -92,6 +95,8 @@ export function TopBar({ domains, activeDomainId }: Props) {
 			>
 				{domains.map(domain => {
 					const active = domain.id === activeDomainId
+					// updating: can't be opened, the veil over its tab
+					const update = updating.get(domain.id)
 					// its dot: it has notifications (a hubby that supports them)
 					const count = HUBBY_MANIFESTS.find(m => m.id === domain.id)?.supports?.includes('notifications')
 						? hubbyCount(notifications, domain.id)
@@ -101,16 +106,20 @@ export function TopBar({ domains, activeDomainId }: Props) {
 							key={domain.id}
 							ref={active ? activeTab : undefined}
 							type="button"
-							onClick={() => handleDomainClick(domain)}
+							onClick={() => { if (!update) handleDomainClick(domain) }}
+							disabled={!!update}
+							title={update ? 'Updating…' : undefined}
 							className={[
-								'relative shrink-0 flex flex-col items-center justify-center mx-1 bg-transparent border-0 cursor-pointer whitespace-nowrap',
+								'relative shrink-0 flex flex-col items-center justify-center mx-1 bg-transparent border-0 whitespace-nowrap',
+								update ? 'cursor-default' : 'cursor-pointer',
 								active
 									? 'after:absolute after:bottom-0 after:inset-x-1 after:h-[3px] after:bg-primary-500 after:rounded-t-[1px]'
 									: ''
 							].join(' ')}
 						>
-							<div className="flex items-center hover:bg-steel-700 hover:rounded-xs px-1">
+							<div className={`relative flex items-center rounded-xs px-1 ${update ? '' : 'hover:bg-steel-700'}`}>
 								<span className="mx-1 text-steel-100">{domain.label}</span>
+								{update && <UpdateVeil updating={update} />}
 								{count > 0 && (
 									<span
 										role="button"

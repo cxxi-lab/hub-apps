@@ -4,6 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCube } from '@fortawesome/free-solid-svg-icons'
 import { useHubbies } from '@core/contexts/HubbiesContext'
 import { INSTALLS, isInstalled, HUBBY_MANIFESTS, hubbyHomePath, useRegistry, type InstallState } from '@core/hubby/registry'
+import { useUpdating } from '@core/hubby/updates'
+import { UpdateVeil } from '@core/hubby/UpdateVeil'
 import type { HubbyManifest } from '@core/hubby/types'
 
 /** The home page: the enabled hubbies as cards, in their order (pinning one to the top bar: its settings). */
@@ -37,8 +39,10 @@ export function Home() {
 
 function HubbyCard({ hubby: m, install }: { hubby: HubbyManifest, install?: InstallState }) {
 	const navigate = useNavigate()
-	const soon = !!install
-	const badge = install?.phase === 'error' ? 'Install failed' : 'Installing…'
+	// updating: can't be opened, the veil over its icon
+	const update = useUpdating().get(m.id)
+	const soon = !!install || !!update
+	const badge = update ? 'Updating…' : install?.phase === 'error' ? 'Install failed' : 'Installing…'
 
 	const open = () => { if (!soon) navigate(hubbyHomePath(m)) }
 	const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -55,12 +59,13 @@ function HubbyCard({ hubby: m, install }: { hubby: HubbyManifest, install?: Inst
 			onKeyDown={onKeyDown}
 			className={[
 				'h-full flex flex-col gap-3 sm:gap-4 p-4 sm:p-6 rounded bg-steel-800 text-steel-100 outline-none transition-shadow duration-200 shadow-raised',
-				soon ? 'opacity-50' : 'cursor-pointer hover:shadow-raised-hover focus-visible:shadow-raised-focus'
+				update ? '' : soon ? 'opacity-50' : 'cursor-pointer hover:shadow-raised-hover focus-visible:shadow-raised-focus'
 			].join(' ')}
 		>
 			<div className="flex items-start justify-between gap-3">
-				<span className="size-10 sm:size-12 shrink-0 flex items-center justify-center rounded bg-primary-500 text-steel-800">
+				<span className="relative overflow-hidden size-10 sm:size-12 shrink-0 flex items-center justify-center rounded bg-primary-500 text-steel-800">
 					<FontAwesomeIcon icon={m.icon ?? faCube} className="text-lg sm:text-xl" />
+					{update && <UpdateVeil updating={update} />}
 				</span>
 				{soon && (
 					<span

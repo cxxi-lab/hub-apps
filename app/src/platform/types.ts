@@ -162,8 +162,11 @@ export interface HubbyStoreApi {
 	 * decided at start; these wait for activate() (or the next start).
 	 */
 	pending(): Promise<string[]>
-	/** Runs them from now on: the app reloads its page right after. Returns what changed. */
-	activate(): Promise<string[]>
+	/**
+	 * Runs them from now on: all of them (the app reloads its page right after), or only these
+	 * hubbies' (isolated ones: their frames reload, the app goes on). Returns what changed.
+	 */
+	activate(ids?: string[]): Promise<string[]>
 }
 
 /** One of the app's notifications, as the system shows it. */

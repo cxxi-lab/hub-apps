@@ -5,6 +5,7 @@ import { hideAll, reveal, setBlurredHubbies, setHiddenHubbies, useHiddenHubbies,
 import { KeepAlive } from '@core/layout/KeepAlive'
 import { TopBar } from '@core/layout/TopBar'
 import { HubbyUpdates } from '@core/hubby/HubbyUpdates'
+import { useUpdating } from '@core/hubby/updates'
 import { HubbyNav } from '@core/layout/HubbyNav'
 import { useHubbyNavs } from '@core/hubby/navs'
 import { installHubbies, HUBBY_MANIFESTS, useRegistry } from '@core/hubby/registry'
@@ -166,6 +167,12 @@ export function AppLayout() {
 	useEffect(() => {
 		if (location.pathname !== '/' && !activeDomain && !isCorePath(location.pathname)) navigate('/', { replace: true })
 	}, [location.pathname, activeDomain, navigate])
+
+	// a hubby updating can't be opened (its update shows on its icon): home meanwhile
+	const updating = useUpdating()
+	useEffect(() => {
+		if (activeDomain && updating.has(activeDomain.id)) navigate('/', { replace: true })
+	}, [activeDomain?.id, updating, navigate])
 
 	useEffect(() => {
 		if (hiddenRoutes.has(location.pathname)) {

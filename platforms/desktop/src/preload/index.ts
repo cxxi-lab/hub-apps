@@ -118,7 +118,7 @@ const api = {
 		uninstall: (id: string): Promise<void> => ipcRenderer.invoke('hubbies:uninstall', id),
 		setRestricted: (hubbies: RestrictedHubbyPackage[]): Promise<void> => ipcRenderer.invoke('hubbies:restricted', hubbies),
 		pending: (): Promise<string[]> => ipcRenderer.invoke('hubbies:pending'),
-		activate: (): Promise<string[]> => ipcRenderer.invoke('hubbies:activate')
+		activate: (ids?: string[]): Promise<string[]> => ipcRenderer.invoke('hubbies:activate', ids)
 	},
 
 	openAbout: (): Promise<void> => ipcRenderer.invoke('about:open'),
