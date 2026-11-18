@@ -3,6 +3,7 @@ import { faRotate, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { platform } from '@platform'
 import { HUBBY_MANIFESTS } from '@core/hubby/registry'
+import { setLocalNotification } from '@core/notifications/notifications'
 
 /** Back after this long away (ms): the new versions are switched to without asking. */
 const AWAY_MS = 2 * 60_000
@@ -11,10 +12,11 @@ const CHECK_EVERY_MS = 60_000
 /**
  * Hubby versions are decided at start (never a half-updated session); a newer one downloaded in
  * the background used to wait for the next start, while the server may already have moved on
- * (e.g. an API retired). Here: a bar offers to reload as soon as one is ready, and coming back to
- * the app after a while reloads by itself (nothing being typed is cut off).
+ * (e.g. an API retired). Here: as soon as one is ready, a notification of the app (the bell) offers
+ * to reload, and a bar too, on that hubby's pages only; coming back to the app after a while
+ * reloads by itself (nothing being typed is cut off).
  */
-export function HubbyUpdates() {
+export function HubbyUpdates({ activeHubby }: { activeHubby: string | null }) {
 	const store = platform.hubbyStore
 	const [pending, setPending] = useState<string[]>([])
 	const [dismissed, setDismissed] = useState<string>('')
@@ -61,18 +63,34 @@ export function HubbyUpdates() {
 		}
 	}, [store])
 
+	// each update ready: a notification of the app (the bell), until it is applied or dismissed
 	const key = pending.join(',')
-	if (!store || !pending.length || dismissed === key) return null
+	useEffect(() => {
+		const ids = new Set<string>()
+		for (const p of pending) {
+			const [id, version] = p.split(' ')
+			ids.add(id)
+			setLocalNotification(`hubby-update:${id}`, {
+				hubby: id,
+				title: `Update ready: ${labelOf(id)} ${version}`,
+				body: 'Reload to switch to it (or it switches at the next start).',
+				action: () => void apply()
+			})
+		}
+		for (const id of shownUpdates) if (!ids.has(id)) setLocalNotification(`hubby-update:${id}`, null)
+		shownUpdates = ids
+	}, [key])
 
-	const names = pending.map(p => {
-		const [id, version] = p.split(' ')
-		return `${HUBBY_MANIFESTS.find(m => m.id === id)?.label ?? id} ${version}`
-	})
+	// the bar: on the pages of a hubby with an update ready
+	const here = pending.find(p => p.split(' ')[0] === activeHubby)
+	if (!store || !here || dismissed === here) return null
+	const [id, version] = here.split(' ')
+	const names = [`${labelOf(id)} ${version}`]
 
 	return (
 		<div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-steel-900 border-b border-steel-700 text-xs text-steel-300">
 			<FontAwesomeIcon icon={faRotate} className="text-primary-500" />
-			<span className="flex-1 min-w-0 truncate">Updates ready: {names.join(', ')}</span>
+			<span className="flex-1 min-w-0 truncate">Update ready: {names.join(', ')}</span>
 			<button
 				type="button"
 				onClick={() => void apply()}
@@ -82,7 +100,7 @@ export function HubbyUpdates() {
 			</button>
 			<button
 				type="button"
-				onClick={() => setDismissed(key)}
+				onClick={() => setDismissed(here)}
 				title="Later (at the next start)"
 				aria-label="Later"
 				className="shrink-0 size-7 flex items-center justify-center rounded bg-transparent border-0 text-steel-400 hover:text-white cursor-pointer"
@@ -92,3 +110,8 @@ export function HubbyUpdates() {
 		</div>
 	)
 }
+
+/** the hubbies whose update the bell shows */
+let shownUpdates = new Set<string>()
+
+const labelOf = (id: string) => HUBBY_MANIFESTS.find(m => m.id === id)?.label ?? id

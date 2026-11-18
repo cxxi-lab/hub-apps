@@ -221,7 +221,7 @@ export function AppLayout() {
 		<div className="flex flex-col h-[calc(100vh-var(--status-bar-height))]">
 			<SystemNotifications />
 			<TopBar domains={topBarDomains} activeDomainId={activeDomain?.id ?? null} />
-			<HubbyUpdates />
+			<HubbyUpdates activeHubby={activeDomain?.id ?? null} />
 			{/* on phones the hubby nav is a bar under the content (column, the bar last) */}
 			<div className="relative flex-1 flex max-sm:flex-col min-h-0 overflow-hidden">
 				{activeDomain && activeDomain.items.length > 0 && (

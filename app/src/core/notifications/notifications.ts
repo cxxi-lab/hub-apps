@@ -69,6 +69,37 @@ export function useNotifications(): AppNotification[] {
 	return useSyncExternalStore(subscribe, () => items)
 }
 
+/**
+ * A notification of the app itself (never the server's: a hubby's update ready…), shown in the
+ * same menu, on this device only. Its click runs `action`; its cross forgets it.
+ */
+export interface LocalNotification {
+	/** unique among the app's own (e.g. `hubby-update:ai`) */
+	key: string
+	/** the hubby it is about (its icon and label in the menu) */
+	hubby: string
+	title: string
+	body: string | null
+	action: () => void
+	createdAt: string
+}
+
+let locals: LocalNotification[] = []
+const localListeners = new Set<() => void>()
+
+/** Shows (or replaces) one of the app's own notifications; null: removes it. */
+export function setLocalNotification(key: string, notification: Omit<LocalNotification, 'key' | 'createdAt'> | null): void {
+	const existing = locals.find(n => n.key === key)
+	const others = locals.filter(n => n.key !== key)
+	locals = notification ? [{ ...notification, key, createdAt: existing?.createdAt ?? new Date().toISOString() }, ...others] : others
+	localListeners.forEach(l => l())
+}
+
+/** The app's own notifications, newest first. */
+export function useLocalNotifications(): LocalNotification[] {
+	return useSyncExternalStore(l => { localListeners.add(l); return () => { localListeners.delete(l) } }, () => locals)
+}
+
 /** A module's badge: the sum of its notifications' counts (an event counts as one). */
 export function hubbyCount(list: AppNotification[], hubby: string): number {
 	return list.filter(n => n.module === hubby).reduce((sum, n) => sum + (n.count ?? 1), 0)
