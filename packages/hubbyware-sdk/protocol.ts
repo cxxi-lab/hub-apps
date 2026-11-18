@@ -75,6 +75,11 @@ export type GuestMessage =
 	| { type: 'back-depth', depth: number }
 	| { type: 'key', key: string, ctrl: boolean, alt: boolean, shift: boolean, meta: boolean }
 	| { type: 'navigate', path: string }
+	/**
+	 * its live navigation (`nav.setItems`): links after its pages in the app's column (paths of its
+	 * own), an action (New chat: `nav-action` when clicked), a search field over them
+	 */
+	| { type: 'nav', items: Array<{ path: string, label: string, section?: string }>, action?: { label: string } | null, search?: string | null }
 	/** the answer to a `serve` (its id): what one of its API's methods gave, or why it failed */
 	| { type: 'served', id: number, ok: true, value: unknown }
 	| { type: 'served', id: number, ok: false, error: string }
@@ -103,6 +108,8 @@ export type HostMessage =
 	| { type: 'player', event: 'ready' | 'closed' | 'action' | 'navigate', value?: string }
 	/** an event of one of its web surfaces (the webview the host shows for it) */
 	| { type: 'surface', surface: number, event: SurfaceEvent, detail: Record<string, unknown> }
+	/** its live navigation's action was clicked */
+	| { type: 'nav-action' }
 	/**
 	 * Another hubby (`from`) calls a method of this hubby's API (docs/plan-api-hubbies.md): its input
 	 * checked against its api.json; the frame answers with `served` (same id)

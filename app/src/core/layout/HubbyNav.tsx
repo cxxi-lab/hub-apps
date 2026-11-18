@@ -1,12 +1,13 @@
+import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCube, faEllipsis, type IconDefinition } from '@fortawesome/free-solid-svg-icons'
+import { faCube, faEllipsis, faMagnifyingGlass, type IconDefinition } from '@fortawesome/free-solid-svg-icons'
 import { useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import type { NavItem } from '@core/layout/AppLayout'
 import { BottomBar, type BottomBarTab } from '@core/layout/BottomBar'
 
 const linkClass = ({ isActive }: { isActive: boolean }) => [
-	'block relative py-2 pl-8 pr-10 text-sm/[1] no-underline transition',
+	'block relative py-2 pl-8 pr-10 text-sm/[1] no-underline transition truncate',
 	isActive
 		? 'text-primary-500 bg-primary-700 before:absolute before:bg-primary-500 before:w-1 before:left-0 before:inset-y-0'
 		: 'text-steel-100 hover:text-white hover:bg-steel-700'
@@ -75,15 +76,21 @@ function tabsOf(items: NavItem[], hubbyIcon: IconDefinition, sections: Record<st
  * bar under the content, like Android's (nothing to drag from the screen's edge, which is the
  * system's back gesture).
  */
-export function HubbyNav({ items, icon, sections, action }: {
+export function HubbyNav({ items: all, icon, sections, action, search }: {
 	items: NavItem[]
 	/** the hubby's icon: the tabs' default */
 	icon?: IconDefinition
 	/** the icons of the sections, by title */
 	sections?: Record<string, IconDefinition>
 	action?: NavAction
+	/** a search field over the live items (its placeholder) */
+	search?: string
 }) {
 	const phone = useMediaQuery('(width < 40rem)')
+	const [query, setQuery] = useState('')
+	const q = query.trim().toLowerCase()
+	// a phone's bottom bar: the pages only (the live items are the hubby's page's there)
+	const items = phone ? all.filter(i => !i.live) : all.filter(i => !i.live || !q || i.label.toLowerCase().includes(q))
 	const { pathname } = useLocation()
 	const navigate = useNavigate()
 
@@ -100,7 +107,20 @@ export function HubbyNav({ items, icon, sections, action }: {
 	}
 
 	return (
-		<aside className="w-64 shrink-0 flex flex-col py-4 bg-steel-900 border-r border-steel-700">
+		<aside className="w-64 shrink-0 flex flex-col py-4 bg-steel-900 border-r border-steel-700 min-h-0 overflow-y-auto">
+			{/* a live navigation (a hubby's conversations…): its action and its search first, above a long list */}
+			{search !== undefined && action && (
+				<button type="button" onClick={action.onClick} className="mx-6 mb-3 flex items-center justify-center gap-2 rounded bg-primary-500 hover:bg-primary-300 px-3 py-2 text-sm font-semibold text-steel-950 border-0 cursor-pointer">
+					<FontAwesomeIcon icon={action.icon} />
+					{action.label}
+				</button>
+			)}
+			{search !== undefined && (
+				<label className="mx-6 mb-4 flex items-center gap-2 rounded bg-steel-800 px-2.5 py-1.5 text-steel-300">
+					<FontAwesomeIcon icon={faMagnifyingGlass} className="text-xs" />
+					<input value={query} onChange={e => setQuery(e.target.value)} placeholder={search} className="flex-1 min-w-0 bg-transparent text-sm text-white outline-none" />
+				</label>
+			)}
 			<nav className="flex flex-col gap-5">
 				{blocksOf(items).map((block, i) => (
 					<div key={block.section ?? i} className="flex flex-col">
@@ -114,7 +134,7 @@ export function HubbyNav({ items, icon, sections, action }: {
 						))}
 					</div>
 				))}
-				{action && (
+				{action && search === undefined && (
 					<button
 						type="button"
 						onClick={action.onClick}

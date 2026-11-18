@@ -10,7 +10,7 @@ import { hasScope, useHubbyScopes } from '@core/hubbies/scopes'
 import { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 import { platform } from '@platform'
 import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage } from '@cxxi-lab/hubbyware-sdk/protocol'
-import { setHubbyNav } from './navs'
+import { setHubbyLiveNav, setHubbyNav } from './navs'
 import { currentAccent, currentTheme, useAccent, useTheme } from '@core/theme/theme'
 import { useAmountsBlurred, useBlurEpoch, useHubbyVisible, usePrivateMode } from '@core/privacy/hidden'
 import { useVpnStatus } from '@shared/hooks/useVpnStatus'
@@ -302,11 +302,28 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent(), apiBase: getApiBaseUrl(), storage: storageSnapshot(hubby) })
 					send({ type: 'state', state: state.current.appState })
 					stopServing?.()
+					// a new frame (started again): its live navigation is the one it sets
+					if (!headless) setHubbyLiveNav(hubby, null)
 					stopServing = serveFrom(hubby, { headless, serve: (id, method, input, from) => send({ type: 'serve', id, method, input, from }) })
 					break
 				case 'register':
 					if (!headless) setHubbyNav(hubby, m.pages, m.sections)
 					break
+				case 'nav': {
+					if (headless) break
+					// its live navigation, checked: links of its own pages, short labels, at most 500
+					const text = (v: unknown, max: number) => typeof v === 'string' ? v.slice(0, max) : ''
+					const items = (Array.isArray(m.items) ? m.items : []).slice(0, 500)
+						.filter(i => typeof i?.path === 'string' && i.path.startsWith('/') && !i.path.includes('..'))
+						.map(i => ({ to: `${base}${i.path === '/' ? '' : i.path}`, label: text(i.label, 120) || i.path, section: text(i.section, 40) || undefined, end: true, live: true }))
+					const label = text(m.action?.label, 40)
+					setHubbyLiveNav(hubby, items.length || label || m.search ? {
+						items,
+						action: label ? { label, onClick: () => send({ type: 'nav-action' }) } : undefined,
+						search: typeof m.search === 'string' ? text(m.search, 40) : undefined
+					} : null)
+					break
+				}
 				case 'served':
 					served(m.id, m.ok, m.ok ? m.value : undefined, m.ok ? undefined : m.error)
 					break
@@ -341,6 +358,7 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 		return () => {
 			window.removeEventListener('message', onMessage)
 			stopServing?.()
+			if (!headless) setHubbyLiveNav(hubby, null)
 			following.forEach(stop => stop())
 			following.clear()
 			streams.forEach(controller => controller.abort())

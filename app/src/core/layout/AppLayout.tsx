@@ -30,6 +30,8 @@ export interface NavItem {
 	to: string; label: string; Label?: ComponentType; section?: string; home?: boolean; icon?: IconDefinition
 	/** active on this path only, not on the ones under it */
 	end?: boolean
+	/** set by the hubby as it goes (its live navigation): not in a phone's bottom bar */
+	live?: boolean
 }
 export interface NavDomain {
 	id: string
@@ -38,6 +40,9 @@ export interface NavDomain {
 	items: NavItem[]
 	icon?: IconDefinition
 	sections?: Record<string, IconDefinition>
+	/** its live navigation's action and search (core/hubby/navs.ts) */
+	action?: { label: string, onClick: () => void }
+	search?: string
 }
 
 // Always-present shell pages (not hubbies).
@@ -129,7 +134,11 @@ export function AppLayout() {
 	const hubbyNavs = useHubbyNavs()
 	const domains: NavDomain[] = useMemo(
 		() => visibleHubbies.map(m => m.isolated
-			? { id: m.id, label: m.label, items: hubbyNavs[m.id]?.items ?? [], icon: m.icon, sections: hubbyNavs[m.id]?.sections as NavDomain['sections'] }
+			? {
+				id: m.id, label: m.label, icon: m.icon, sections: hubbyNavs[m.id]?.sections as NavDomain['sections'],
+				items: [...(hubbyNavs[m.id]?.items ?? []), ...(hubbyNavs[m.id]?.live?.items ?? [])],
+				action: hubbyNavs[m.id]?.live?.action, search: hubbyNavs[m.id]?.live?.search
+			}
 			: { id: m.id, label: m.label, items: m.navItems, icon: m.icon, sections: m.navSections }),
 		[visibleHubbies, hubbyNavs]
 	)
@@ -230,8 +239,10 @@ export function AppLayout() {
 			<ModelConsent />
 			{/* on phones the hubby nav is a bar under the content (column, the bar last) */}
 			<div className="relative flex-1 flex max-sm:flex-col min-h-0 overflow-hidden">
-				{activeDomain && activeDomain.items.length > 0 && (
-					<HubbyNav items={activeDomain.items} icon={activeDomain.icon} sections={activeDomain.sections} />
+				{/* its column: its pages, or its live navigation (its action shows it even before any item) */}
+				{activeDomain && (activeDomain.items.length > 0 || activeDomain.action) && (
+					<HubbyNav items={activeDomain.items} icon={activeDomain.icon} sections={activeDomain.sections}
+						action={activeDomain.action ? { ...activeDomain.action, icon: faPlus } : undefined} search={activeDomain.search} />
 				)}
 				{onHubbiesScreen && (
 					<HubbyNav

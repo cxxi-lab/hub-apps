@@ -217,7 +217,7 @@ export interface AiChatResult {
 	content: string
 	toolCalls: Array<{ id: string, name: string, arguments: unknown, error?: string }>
 	finishReason: string | null
-	usage: { promptTokens: number, completionTokens: number } | null
+	usage: { promptTokens: number, completionTokens: number, tokensPerSecond?: number } | null
 }
 
 /** consent / missing: the user has to allow / download the model first (the app asks, then calls again) */

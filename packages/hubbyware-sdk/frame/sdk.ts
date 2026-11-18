@@ -100,6 +100,7 @@ window.addEventListener('message', event => {
 	else if (m.type === 'stream') streamListeners.get(m.stream)?.(m.event, m.data)
 	else if (m.type === 'changed') changeListeners.get(m.collection)?.forEach(l => l(m.doc))
 	else if (m.type === 'serve') void answer(m)
+	else if (m.type === 'nav-action') navAction?.()
 })
 
 // --- its API, for the other hubbies (docs/plan-api-hubbies.md) ---
@@ -238,7 +239,8 @@ export interface AiChatResult {
 	content: string
 	toolCalls: AiToolCall[]
 	finishReason: string | null
-	usage: { promptTokens: number, completionTokens: number } | null
+	/** `tokensPerSecond`: the engine's own speed (its generation alone) */
+	usage: { promptTokens: number, completionTokens: number, tokensPerSecond?: number } | null
 }
 
 export interface AiChatOptions {
@@ -325,9 +327,29 @@ export function usePath(): string {
 	return path
 }
 
+let navAction: (() => void) | null = null
+
+/** One link of its live navigation: a path of its own, its label, the section it sits under. */
+export interface NavEntry { path: string, label: string, section?: string }
+
 export const nav = {
 	navigate(path: string) {
 		post({ type: 'navigate', path })
+	},
+	/**
+	 * Its live navigation, set again whenever it changes (the AI hubby's conversations): links after
+	 * its pages in the app's column, under their sections, an action at the top (`action.onClick` when
+	 * clicked), a search field over them (`search`: its placeholder). Not in a phone's bottom bar: show
+	 * them in a page there. At most 500 links.
+	 */
+	setItems(items: NavEntry[], options: { action?: { label: string, onClick: () => void }, search?: string } = {}) {
+		navAction = options.action?.onClick ?? null
+		post({ type: 'nav', items: items.slice(0, 500), action: options.action ? { label: options.action.label } : null, search: options.search ?? null })
+	},
+	/** No live navigation any more. */
+	clearItems() {
+		navAction = null
+		post({ type: 'nav', items: [], action: null, search: null })
 	}
 }
 

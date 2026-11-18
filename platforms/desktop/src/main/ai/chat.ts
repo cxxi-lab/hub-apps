@@ -37,7 +37,8 @@ export interface ChatResult {
 	content: string
 	toolCalls: ToolCall[]
 	finishReason: string | null
-	usage: { promptTokens: number, completionTokens: number } | null
+	/** `tokensPerSecond`: the engine's own speed (its generation alone, not its start) */
+	usage: { promptTokens: number, completionTokens: number, tokensPerSecond?: number } | null
 }
 
 export type ChatOutcome =
@@ -133,6 +134,7 @@ export async function chat(hubby: string, request: unknown, onEvent: (kind: 'del
 interface Chunk {
 	choices?: Array<{ delta?: { content?: string | null, reasoning_content?: string | null, tool_calls?: Array<{ index: number, id?: string, function?: { name?: string, arguments?: string } }> }, finish_reason?: string | null }>
 	usage?: { prompt_tokens: number, completion_tokens: number }
+	timings?: { predicted_per_second?: number }
 }
 
 /** The engine's server-sent events, gathered (the text streamed as it comes, the tool calls at the end). */
@@ -143,6 +145,7 @@ async function readStream(body: ReadableStream<Uint8Array>, onEvent: (kind: 'del
 	let content = ''
 	let finishReason: string | null = null
 	let usage: ChatResult['usage'] = null
+	let tokensPerSecond: number | undefined
 	const calls = new Map<number, { id: string, name: string, args: string }>()
 	// the engine may keep the connection open after its last event: [DONE] ends the answer
 	let finished = false
@@ -161,6 +164,7 @@ async function readStream(body: ReadableStream<Uint8Array>, onEvent: (kind: 'del
 			try { chunk = JSON.parse(data) as Chunk }
 			catch { continue }
 			if (chunk.usage) usage = { promptTokens: chunk.usage.prompt_tokens, completionTokens: chunk.usage.completion_tokens }
+			if (chunk.timings?.predicted_per_second) tokensPerSecond = Math.round(chunk.timings.predicted_per_second * 10) / 10
 			for (const choice of chunk.choices ?? []) {
 				const d = choice.delta
 				if (d?.content) { content += d.content; onEvent('delta', d.content) }
@@ -181,5 +185,5 @@ async function readStream(body: ReadableStream<Uint8Array>, onEvent: (kind: 'del
 		try { return { id: c.id, name: c.name, arguments: c.args ? JSON.parse(c.args) as unknown : {} } }
 		catch { return { id: c.id, name: c.name, arguments: c.args, error: 'its arguments are not valid JSON' } }
 	})
-	return { content, toolCalls, finishReason, usage }
+	return { content, toolCalls, finishReason, usage: usage && tokensPerSecond ? { ...usage, tokensPerSecond } : usage }
 }
