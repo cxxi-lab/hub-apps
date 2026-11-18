@@ -1,0 +1,15 @@
+{
+	"version": 1,
+	"upstream": {
+		"llama.cpp": { "repo": "https://github.com/ggml-org/llama.cpp", "ref": "b12503" },
+		"stable-diffusion.cpp": { "repo": "https://github.com/leejet/stable-diffusion.cpp", "ref": "532d2c1" },
+		"qwentts.cpp": { "repo": "https://github.com/ServeurpersoCom/qwentts.cpp", "ref": "2edb35f" }
+	},
+	"url": "https://github.com/cxxi-lab/hubbyware-client/releases/download/ai-engine-v1/",
+	"files": {
+		"linux-x64": {
+			"asset": "ai-engine-linux-x64.tar.gz",
+			"sha256": ""
+		}
+	}
+}

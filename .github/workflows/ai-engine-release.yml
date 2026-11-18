@@ -1,0 +1,78 @@
+name: ai-engine-release
+
+# The local AI engine, a component of the platform (platforms/ai-engine/README.md): llama.cpp (text),
+# stable-diffusion.cpp (image) and qwentts.cpp (voice) servers, built on Vulkan at the refs
+# component.json pins, published as the GitHub release ai-engine-v<version> with SHA256SUMS. The
+# apps pin the archive's sha256 and download it only when a hubby needs the engine.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # the release
+
+jobs:
+  release:
+    # 24.04: a glibc (2.39) older than the desktops it runs on
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the component
+        id: component
+        run: |
+          echo "version=$(jq -r .version platforms/ai-engine/component.json)" >> "$GITHUB_OUTPUT"
+          for name in llama.cpp stable-diffusion.cpp qwentts.cpp; do
+            jq -r --arg n "$name" '.upstream[$n] | "\(.repo) \(.ref)"' platforms/ai-engine/component.json > "upstream-$name"
+          done
+
+      - name: Install the build tools (Vulkan headers, glslc, SPIR-V headers)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build libvulkan-dev glslc spirv-headers glslang-tools
+
+      - name: Fetch the sources
+        run: |
+          for name in llama.cpp stable-diffusion.cpp qwentts.cpp; do
+            read -r repo ref < "upstream-$name"
+            git clone --quiet "$repo" "src/$name"
+            git -C "src/$name" checkout --quiet "$ref"
+            git -C "src/$name" submodule update --quiet --init --recursive
+          done
+
+      - name: Build
+        run: |
+          set -e
+          # one self-contained binary per server: ggml and its Vulkan backend linked in, a portable CPU path
+          common="-G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=OFF"
+          cmake -S src/llama.cpp -B build/llama $common -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build build/llama --target llama-server
+          cmake -S src/stable-diffusion.cpp -B build/sd $common -DSD_VULKAN=ON
+          cmake --build build/sd --target sd-server
+          cmake -S src/qwentts.cpp -B build/tts $common
+          cmake --build build/tts --target tts-server
+          mkdir -p pkg/bin pkg/licenses
+          cp "$(find build/llama -name llama-server -type f | head -1)" "$(find build/sd -name sd-server -type f | head -1)" "$(find build/tts -name tts-server -type f | head -1)" pkg/bin/
+          for name in llama.cpp stable-diffusion.cpp qwentts.cpp; do cp "src/$name/LICENSE" "pkg/licenses/$name.LICENSE"; done
+          cp platforms/ai-engine/component.json pkg/
+          strip pkg/bin/*
+          ldd pkg/bin/* || true
+          ls -la pkg/bin
+
+      - name: Check the servers start
+        # no GPU here: each server only has to load and print its usage (some exit non-zero on --help)
+        run: |
+          for b in pkg/bin/*; do
+            "$b" --help > help.txt 2>&1 || true
+            if grep -qiE "usage|options" help.txt; then echo "ok $b"; else echo "FAIL $b"; tail -20 help.txt; exit 1; fi
+          done
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.component.outputs.version }}
+        run: |
+          set -e
+          mkdir dist
+          tar -C pkg -czf dist/ai-engine-linux-x64.tar.gz .
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+          gh release create "ai-engine-v$VERSION" dist/* --title "AI engine v$VERSION" --latest=false \
+            --notes "The local AI engine, a component of the platform (platforms/ai-engine/README.md). Copy SHA256SUMS into platforms/ai-engine/component.json."
