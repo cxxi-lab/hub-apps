@@ -88,6 +88,12 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	const theme = useTheme()
 	const accent = useAccent()
 	useEffect(() => { send({ type: 'theme', theme, accent }) }, [theme, accent])
+	// the app's window back: told to the frame (its own focus event doesn't fire then)
+	useEffect(() => {
+		const onFocus = () => send({ type: 'focus' })
+		window.addEventListener('focus', onFocus)
+		return () => window.removeEventListener('focus', onFocus)
+	}, [])
 	const stateKey = JSON.stringify(appState)
 	useEffect(() => { send({ type: 'state', state: appState }) }, [stateKey])
 

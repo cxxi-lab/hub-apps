@@ -90,6 +90,8 @@ window.addEventListener('message', event => {
 	else if (m.type === 'back') handleBack()
 	else if (m.type === 'path') pathListeners.forEach(l => l(m.path))
 	else if (m.type === 'theme') applyTheme(m.theme, m.accent)
+	// the app's window is back: the frame's own `focus`, as in the app (a hubby refreshing on it)
+	else if (m.type === 'focus') window.dispatchEvent(new FocusEvent('focus'))
 	else if (m.type === 'task') taskListeners.get(m.task.id)?.forEach(l => l(m.task))
 	else if (m.type === 'state') {
 		appState = m.state

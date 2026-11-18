@@ -84,6 +84,8 @@ export type HostMessage =
 	| { type: 'result', id: number, ok: false, error: string, failure?: CallError }
 	| { type: 'back' }
 	| { type: 'path', path: string }
+	/** the app's window got the focus back (a hubby refreshing then hears its window's `focus`) */
+	| { type: 'focus' }
 	/** the app's theme or accent changed */
 	| { type: 'theme', theme: 'light' | 'dark', accent?: string }
 	/** a task the frame follows changed (`tasks.follow`): its state */
