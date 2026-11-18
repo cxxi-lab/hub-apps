@@ -20,7 +20,7 @@ export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 // the design system's components, as the app's SDK hands them too
 export {
 	Button, IconButton, Checkbox, ChoiceSwitch, Form, InputField, Switch, Dropdown, ConfirmationModal, Modal,
-	Table, TableCell, TableHead, TableHeadGroup, TableRow, TableRowGroup, type FormData
+	Table, TableCell, TableHead, TableHeadGroup, TableRow, TableRowGroup, Markdown, type MarkdownProps, type FormData
 } from '@cxxi-lab/hubbyware-ui'
 
 // --- its collections ---
