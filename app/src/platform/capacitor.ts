@@ -211,6 +211,7 @@ export function createCapacitorPlatform(): Platform {
 		hubbyStore: import.meta.env.DEV ? null : createHubbyStore(),
 		localModels: null,
 		localAi: null,
+		agentBridge: null,
 		// served by the WebView (HubbyStore intercepts these hosts)
 		hubbyUrl: hubby => `https://${hubby}.hubby.localhost/`,
 		openAbout: () => unavailable('openAbout'),

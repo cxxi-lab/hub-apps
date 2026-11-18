@@ -49,6 +49,7 @@ export function createElectronPlatform(): Platform {
 		hubbyStore: import.meta.env.DEV ? null : window.api.hubbyStore,
 		localModels: window.api.localModels,
 		localAi: window.api.localAi,
+		agentBridge: window.api.agentBridge,
 		// served by the main process (its hubby:// protocol)
 		hubbyUrl: hubby => `hubby://${hubby}/`
 	}

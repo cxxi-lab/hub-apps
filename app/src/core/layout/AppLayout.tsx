@@ -8,6 +8,7 @@ import { HubbyUpdates } from '@core/hubby/HubbyUpdates'
 import { HubbyApiFrames } from '@core/hubby/HubbyApiFrames'
 import { ModelConsent } from '@core/ai/ModelConsent'
 import { AgentConfirm } from '@core/ai/AgentConfirm'
+import { startAgentBridge } from '@core/ai/agentBridge'
 import { setAvailableHubbies } from '@core/hubby/apis'
 import { useUpdating } from '@core/hubby/updates'
 import { HubbyNav } from '@core/layout/HubbyNav'
@@ -119,6 +120,8 @@ export function AppLayout() {
 	// the hubbies whose API may answer the others (docs/plan-api-hubbies.md): shown and unlocked
 	const answering = visibleHubbies.map(m => m.id).filter(id => !(hubbies.locked ?? []).includes(id)).join(',')
 	useEffect(() => { setAvailableHubbies(answering ? answering.split(',') : []) }, [answering])
+	// a device agent's requests through Hubbyware's MCP server (desktop): answered here, as the assistant's
+	useEffect(() => startAgentBridge(), [])
 
 	// An enabled hubby this device doesn't have yet is installed, then shown (on every device).
 	useEffect(() => {

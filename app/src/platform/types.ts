@@ -254,6 +254,22 @@ export interface LocalAiApi {
 	onEvent(cb: (event: { id: number, kind: 'delta' | 'reasoning', text: string }) => void): Unsubscribe
 }
 
+/** A device agent's request, through Hubbyware's MCP server (main: ai/mcp.ts), for the app to answer (core/ai/agentBridge.ts). */
+export interface AgentRequest {
+	rid: number
+	op: 'tools' | 'call'
+	/** the hubby the agent works for (the AI hubby), its conversation */
+	caller: string
+	conversation: string
+	name?: string
+	input?: unknown
+}
+
+export interface AgentBridgeApi {
+	onRequest(cb: (request: AgentRequest) => void): Unsubscribe
+	respond(rid: number, result: unknown, error?: string): void
+}
+
 export interface SystemNotification {
 	id: number
 	title: string
@@ -552,6 +568,8 @@ export interface Platform {
 	readonly localModels: LocalModelsApi | null
 	/** null: no local AI here (Android, for now) */
 	readonly localAi: LocalAiApi | null
+	/** null: no device agents here (they are desktop programs) */
+	readonly agentBridge: AgentBridgeApi | null
 	/**
 	 * Where an isolated hubby's frame loads from (its own origin: desktop hubby://<id>/, Android
 	 * https://<id>.hubby.localhost/); null where hubbies can't run isolated (yet).

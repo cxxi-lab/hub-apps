@@ -3,6 +3,9 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { applyMenu } from '../app/menu'
 import { localEngine, reapOrphanServer } from './engine'
 import { chat } from './chat'
+import { openMcpSession } from './mcp'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { deviceInfo, downloadModel, inspectRepo, installedModels, modelEvents, modelPlans, removeModel, setModelsDirectory, setUserModels } from './models'
 
 /**
@@ -56,6 +59,17 @@ export function setupLocalAi(): void {
 	app.on('will-quit', () => { void localEngine.stop(true) })
 	const model = process.env.HUB_AI_ENGINE_SELFTEST
 	if (model && !app.isPackaged) void selfTest(model)
+	// development: HUB_AGENT_MCP_DEVTEST=<a conversation id> opens an MCP session for the AI hubby
+	// once the window is up, its url and token in <userData>/mcp-dev.json (a test agent connects)
+	const devConversation = process.env.HUB_AGENT_MCP_DEVTEST
+	if (devConversation && !app.isPackaged) {
+		app.once('browser-window-created', (_e, win) => win.webContents.once('did-finish-load', () => {
+			void openMcpSession('ai', devConversation, win.webContents).then(s => {
+				writeFileSync(join(app.getPath('userData'), 'mcp-dev.json'), JSON.stringify({ url: s.url, token: s.token }), { mode: 0o600 })
+				console.log(`[ai:mcp] dev session for ${devConversation}: ${s.url}`)
+			})
+		}))
+	}
 }
 
 async function selfTest(model: string): Promise<void> {
