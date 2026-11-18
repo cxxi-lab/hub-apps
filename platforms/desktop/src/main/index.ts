@@ -3,6 +3,7 @@ import { APP_NAME } from './app/identity'
 export { APP_NAME }
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 
+import { setupLocalAi } from './ai'
 import { applyMenu } from './app/menu'
 import { acquireSingleInstanceLock, RELAUNCH_FLAG } from './app/restart'
 import { installSecurityHandlers } from './app/security'
@@ -76,6 +77,7 @@ app.whenReady().then(async () => {
 	setupPlayerBlocklist()
 	setupVpn()
 	setupCompanion()
+	setupLocalAi()
 	applyMenu()
 	setupTray()
 	setupSystemNotifications()

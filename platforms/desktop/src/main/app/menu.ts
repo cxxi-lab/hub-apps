@@ -1,10 +1,25 @@
 import { ipcMain, Menu } from 'electron'
 import { getDevMode, setDevMode } from './state'
 import { engine } from '../companion/engine'
+import { localEngine, type EngineInfo } from '../ai/engine'
+import path from 'node:path'
 import { openAboutWindow } from '../windows/about'
 import { openSettingsWindow } from '../windows/settings'
 
 let _authenticated = false
+
+/** The local AI engine (client docs/plan-ia-moteur.md): what it is doing, and stopping it. */
+function localAiItem(info: EngineInfo): Electron.MenuItemConstructorOptions {
+	const state = info.status === 'downloading' ? `downloading${info.progress !== null ? ` ${Math.round(info.progress * 100)} %` : '…'}`
+		: info.status === 'starting' ? 'starting…'
+		: info.status === 'on' ? `on (${path.basename(info.model ?? '')})`
+		: info.status === 'error' ? `error: ${info.error ?? 'unknown'}`
+		: 'off'
+	return {
+		label: `Local AI: ${state}`,
+		submenu: [{ label: 'Stop', enabled: info.status !== 'off', click: () => void localEngine.stop() }]
+	}
+}
 
 function buildMenu(): Electron.Menu {
 	const template: Electron.MenuItemConstructorOptions[] = [
@@ -26,6 +41,7 @@ function buildMenu(): Electron.Menu {
 					checked: engine.getInfo().status === 'on' || engine.getInfo().status === 'starting',
 					click: () => void (engine.getInfo().status === 'off' || engine.getInfo().status === 'error' ? engine.start() : engine.stop())
 				},
+				localAiItem(localEngine.getInfo()),
 				{ type: 'separator' },
 				{
 					label: 'Settings…',
