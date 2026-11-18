@@ -15,6 +15,7 @@
 		"types:sdk": "node scripts/emit-sdk-types.mjs",
 		"test:crypto": "esbuild src/core/crypto/files.test.ts --bundle --platform=node --format=esm --tsconfig=tsconfig.json --outfile=build/test/files.test.mjs --log-level=warning && node --test build/test/files.test.mjs",
 		"test:tasks": "esbuild src/core/api/tasks.test.ts --bundle --platform=node --define:import.meta.env='{\"DEV\":false}' --banner:js='globalThis.window={api:{platform:\"linux\",versions:{}}};' --format=esm --tsconfig=tsconfig.json --outfile=build/test/tasks.test.mjs --log-level=warning && node --test build/test/tasks.test.mjs",
+		"test:apis": "esbuild src/core/hubby/apis.test.ts --bundle --platform=node --format=esm --tsconfig=tsconfig.json --outfile=build/test/apis.test.mjs --log-level=warning && node --test build/test/apis.test.mjs",
 		"test:sync": "esbuild src/core/sync/sync.test.ts --bundle --platform=node --format=esm --tsconfig=tsconfig.json --outfile=build/test/sync.test.mjs --log-level=warning && node --test build/test/sync.test.mjs"
 	},
 	"dependencies": {

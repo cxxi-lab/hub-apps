@@ -5,6 +5,8 @@ import { hideAll, reveal, setBlurredHubbies, setHiddenHubbies, useHiddenHubbies,
 import { KeepAlive } from '@core/layout/KeepAlive'
 import { TopBar } from '@core/layout/TopBar'
 import { HubbyUpdates } from '@core/hubby/HubbyUpdates'
+import { HubbyApiFrames } from '@core/hubby/HubbyApiFrames'
+import { setAvailableHubbies } from '@core/hubby/apis'
 import { useUpdating } from '@core/hubby/updates'
 import { HubbyNav } from '@core/layout/HubbyNav'
 import { useHubbyNavs } from '@core/hubby/navs'
@@ -107,6 +109,9 @@ export function AppLayout() {
 
 	// Enabled hubbies in the user's order: the home page and the routes mounted (the top bar: the pinned ones).
 	const visibleHubbies = useMemo(() => enabledModules(hubbies, revealed), [hubbies, revealed, registry])
+	// the hubbies whose API may answer the others (docs/plan-api-hubbies.md): shown and unlocked
+	const answering = visibleHubbies.map(m => m.id).filter(id => !(hubbies.locked ?? []).includes(id)).join(',')
+	useEffect(() => { setAvailableHubbies(answering ? answering.split(',') : []) }, [answering])
 
 	// An enabled hubby this device doesn't have yet is installed, then shown (on every device).
 	useEffect(() => {
@@ -220,6 +225,7 @@ export function AppLayout() {
 			<SystemNotifications />
 			<TopBar domains={topBarDomains} activeDomainId={activeDomain?.id ?? null} />
 			<HubbyUpdates activeHubby={activeDomain?.id ?? null} />
+			<HubbyApiFrames />
 			{/* on phones the hubby nav is a bar under the content (column, the bar last) */}
 			<div className="relative flex-1 flex max-sm:flex-col min-h-0 overflow-hidden">
 				{activeDomain && activeDomain.items.length > 0 && (

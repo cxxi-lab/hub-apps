@@ -99,7 +99,50 @@ window.addEventListener('message', event => {
 	}
 	else if (m.type === 'stream') streamListeners.get(m.stream)?.(m.event, m.data)
 	else if (m.type === 'changed') changeListeners.get(m.collection)?.forEach(l => l(m.doc))
+	else if (m.type === 'serve') void answer(m)
 })
+
+// --- its API, for the other hubbies (docs/plan-api-hubbies.md) ---
+
+/** One of its API's methods: run in its frame, on what another hubby (`from`) sends. */
+export type ApiHandler = (input: any, context: { from: string }) => unknown
+
+let apiHandlers: Record<string, ApiHandler> = {}
+
+/** The methods it offers (its definition's `api`; what api.json describes). */
+export function serveApi(handlers: Record<string, ApiHandler>): void {
+	apiHandlers = handlers
+}
+
+async function answer(m: Extract<HostMessage, { type: 'serve' }>) {
+	const handler = Object.hasOwn(apiHandlers, m.method) ? apiHandlers[m.method] : undefined
+	try {
+		if (!handler) throw new Error(`this hubby has no method ${m.method}`)
+		post({ type: 'served', id: m.id, ok: true, value: await handler(m.input, { from: m.from }) })
+	}
+	catch (err) {
+		post({ type: 'served', id: m.id, ok: false, error: err instanceof Error ? err.message : String(err) })
+	}
+}
+
+/** What each hubby offering an interface gave (or why it failed). */
+export interface HubbyAnswer<T> {
+	hubby: string
+	result?: T
+	error?: string
+}
+
+/**
+ * The other hubbies' APIs (docs/plan-api-hubbies.md), within its scopes:
+ *  - `call(hubby, method, input)`: a method of a named hubby (scope `hubby:<hubby>:<method>`);
+ *  - `callAll(interface, input)`: every hubby offering that interface, without naming them (scope
+ *    `hubby:<interface>`).
+ * The host checks the input and the result against the offering hubby's api.json.
+ */
+export const hubbies = {
+	call: <T = unknown>(hubby: string, method: string, input: unknown = {}) => call<T>('hubbies.call', hubby, method, input),
+	callAll: <T = unknown>(method: string, input: unknown = {}) => call<Array<HubbyAnswer<T>>>('hubbies.callAll', method, input)
+}
 
 /** The app's state, for this hubby (pushed by the host). */
 export function useAppState(): AppState {

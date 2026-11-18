@@ -5,6 +5,7 @@ import { api } from '@core/api/client'
 import { describe, entryIcon, type HubbyInfo } from './describe'
 import { HubbyHost } from '@core/hubby/HubbyHost'
 import { registerModels, type ModelFile } from '@core/crypto/documents'
+import { registerApi } from './apis'
 import { declareHubby, type HubbyDeclaration } from './declarations'
 import type { HubbyManifest } from './types'
 
@@ -249,6 +250,9 @@ async function fromSources(): Promise<HubbyManifest[]> {
 		const id = path.split('/').at(-3)!
 		registerModels(id, [model])
 	}
+	// their APIs (docs/plan-api-hubbies.md)
+	const apis = import.meta.glob<Parameters<typeof registerApi>[1]>('@hub-hubbies/*/api.json', { import: 'default', eager: true })
+	for (const [path, api] of Object.entries(apis)) registerApi(path.split('/').at(-2)!, api)
 	const manifests: HubbyManifest[] = []
 	for (const [path, info] of Object.entries(infos)) {
 		const id = path.split('/').at(-2)!
@@ -285,9 +289,15 @@ async function fromBundles(): Promise<HubbyManifest[]> {
  * What an installed hubby's collections seal (its models.json, checked with its files): before
  * its code can write any. An entry from before the `models` flag: asked anyway, absent then.
  */
-async function loadModels(entry: HubbyDeclaration & { models?: boolean }): Promise<void> {
+async function loadModels(entry: HubbyDeclaration & { models?: boolean, api?: boolean }): Promise<void> {
 	const { id, models } = entry
 	declareHubby(entry)
+	// its API for the other hubbies (docs/plan-api-hubbies.md): unknown to them without it
+	if (entry.api === true) {
+		const res = await fetch(new URL(`modules/${id}/api.json`, document.baseURI)).catch(() => null)
+		if (res?.ok) registerApi(id, await res.json() as Parameters<typeof registerApi>[1])
+		else console.warn(`[hubbies] ${id}: its api.json is missing`)
+	}
 	if (models === false) return
 	const res = await fetch(new URL(`modules/${id}/models.json`, document.baseURI)).catch(() => null)
 	if (res?.ok) registerModels(id, await res.json() as Record<string, ModelFile>)

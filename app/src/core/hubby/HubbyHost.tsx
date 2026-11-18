@@ -17,6 +17,7 @@ import { useVpnStatus } from '@shared/hooks/useVpnStatus'
 import type { AppState, CallError, SurfaceState } from '@cxxi-lab/hubbyware-sdk/protocol'
 import { storageSet, storageSnapshot } from './storage'
 import { SurfaceViews, surfaceMethods, type WebviewElement } from './HubbySurfaces'
+import { callAll, callHubby, served, serveFrom } from './apis'
 
 /**
  * What a frame learns of the shell (its URL: a manifest reads it as it loads). The companion's
@@ -46,8 +47,9 @@ function apiPath(path: unknown): string {
  * with an opaque origin, loaded from the platform's hubby address (desktop hubby://<id>/, Android
  * https://<id>.hubby.localhost/) — and the host side of its messages: its pages become the app's
  * navigation, its calls are made with the session, only within the scopes the account allowed it.
+ * `headless`: a frame started only to answer its API (apis.ts): unseen, no page, no navigation.
  */
-export function HubbyHost({ hubby }: { hubby: string }) {
+export function HubbyHost({ hubby, headless = false }: { hubby: string, headless?: boolean }) {
 	const frame = useRef<HTMLIFrameElement>(null)
 	const navigate = useNavigate()
 	const { pathname } = useLocation()
@@ -57,7 +59,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	const base = `/${hubby}`
 	const inner = pathname === base ? '/' : pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : null
 	const base_ = platform.hubbyUrl(hubby)
-	const src = base_ ? `${base_}?capabilities=${frameCapabilities()}` : null
+	const src = base_ ? `${base_}?capabilities=${frameCapabilities()}${headless ? '&headless' : ''}` : null
 	// its web surfaces (D3): the webviews shown over the frame
 	const [surfaceStates, setSurfaceStates] = useState<Record<number, SurfaceState>>({})
 	// development: its files built again (`hubby dev`): the frame loads them (a new frame)
@@ -91,8 +93,8 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		frame.current?.contentWindow?.postMessage(envelope, '*')
 	}
 
-	useBackHandler(backDepth > 0, () => send({ type: 'back' }))
-	useEffect(() => { if (inner !== null) send({ type: 'path', path: inner }) }, [inner])
+	useBackHandler(!headless && backDepth > 0, () => send({ type: 'back' }))
+	useEffect(() => { if (!headless && inner !== null) send({ type: 'path', path: inner }) }, [inner])
 	const theme = useTheme()
 	const accent = useAccent()
 	useEffect(() => { send({ type: 'theme', theme, accent }) }, [theme, accent])
@@ -227,11 +229,27 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 				else delete copy[id]
 				return copy
 			}), surfaceElements, (path, options) => caller.api(path, options)),
+			// the other hubbies' APIs (docs/plan-api-hubbies.md), within its scopes
+			'hubbies.call': (target: unknown, method: unknown, input: unknown) => {
+				if (typeof target !== 'string' || typeof method !== 'string') throw new Error('hubbies.call(hubby, method, input)')
+				const scope = `hubby:${target}:${method}`
+				if (!granted(scope)) throw new Error(`scope_denied: ${scope}`)
+				return callHubby(hubby, target, method, input)
+			},
+			'hubbies.callAll': (method: unknown, input: unknown) => {
+				if (typeof method !== 'string') throw new Error('hubbies.callAll(interface, input)')
+				const scope = `hubby:${method}`
+				if (!granted(scope)) throw new Error(`scope_denied: ${scope}`)
+				return callAll(hubby, method, input)
+			},
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')
 				return null
 			}
 		}
+
+		// this frame answers its API's calls once it is ready (again, after a new build)
+		let stopServing: (() => void) | null = null
 
 		const onMessage = async (event: MessageEvent) => {
 			// only this frame's messages (an opaque origin can't be checked: its window can)
@@ -243,9 +261,14 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 				case 'ready':
 					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent(), apiBase: getApiBaseUrl(), storage: storageSnapshot(hubby) })
 					send({ type: 'state', state: state.current.appState })
+					stopServing?.()
+					stopServing = serveFrom(hubby, { headless, serve: (id, method, input, from) => send({ type: 'serve', id, method, input, from }) })
 					break
 				case 'register':
-					setHubbyNav(hubby, m.pages, m.sections)
+					if (!headless) setHubbyNav(hubby, m.pages, m.sections)
+					break
+				case 'served':
+					served(m.id, m.ok, m.ok ? m.value : undefined, m.ok ? undefined : m.error)
 					break
 				case 'call': {
 					const method = methods[m.method]
@@ -265,9 +288,10 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 					setBackDepth(m.depth)
 					break
 				case 'navigate':
-					navigate(`${base}${m.path === '/' ? '' : m.path}`)
+					if (!headless) navigate(`${base}${m.path === '/' ? '' : m.path}`)
 					break
 				case 'key':
+					if (headless) break
 					// the app's shortcuts (Ctrl+Alt reveal…) don't see keys typed in the frame: replayed here
 					window.dispatchEvent(new KeyboardEvent('keydown', { key: m.key, ctrlKey: m.ctrl, altKey: m.alt, shiftKey: m.shift, metaKey: m.meta }))
 					break
@@ -276,6 +300,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		window.addEventListener('message', onMessage)
 		return () => {
 			window.removeEventListener('message', onMessage)
+			stopServing?.()
 			following.forEach(stop => stop())
 			following.clear()
 			streams.forEach(controller => controller.abort())
@@ -287,6 +312,9 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		}
 	}, [hubby])
 
+	if (headless) {
+		return src ? <iframe key={build} ref={frame} title={`${hubby} (API)`} src={src} sandbox="allow-scripts" className="hidden" aria-hidden /> : null
+	}
 	if (!src) {
 		return <div className="flex-1 flex items-center justify-center text-sm text-steel-400">This hubby runs isolated: not available on this platform yet.</div>
 	}

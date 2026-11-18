@@ -2,7 +2,7 @@ import { createElement, Fragment, StrictMode, useEffect, useRef, useState, type 
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import type { HubbyPage } from '../protocol'
-import { connect, nav, register, useInit, usePath } from './sdk'
+import { connect, nav, register, serveApi, useInit, usePath, type ApiHandler } from './sdk'
 
 /**
  * A hubby's front (docs/spec-hubby.md § 6) in its frame, in one of two forms:
@@ -13,6 +13,8 @@ import { connect, nav, register, useInit, usePath } from './sdk'
  *    location follows the app's, so `useLocation`, `useNavigate`, `Link` and the paths
  *    `/<id>/…` work as they do in the app.
  * Either way the host builds the navigation (the column on desktop, the bottom bar on phones).
+ * Its `api`: the methods it offers the other hubbies (docs/plan-api-hubbies.md), described by its
+ * api.json; they run in its frame — the one open, else one the host starts unseen to answer.
  */
 export interface HubbyPageDefinition {
 	/** relative to the hubby: '/', '/settings', '/:id' */
@@ -27,6 +29,7 @@ export interface PagesDefinition {
 	pages: HubbyPageDefinition[]
 	/** the sections' icons in the navigation, by title */
 	navSections?: Record<string, unknown>
+	api?: Record<string, ApiHandler>
 }
 
 /** The form of a hubby's manifest (what the frame uses of it; the rest is the host's or left out). */
@@ -36,6 +39,7 @@ export interface ManifestDefinition {
 	routes: Array<{ path: string, Component: ComponentType, persistent?: boolean, prefix?: boolean }>
 	/** contexts around all its pages, outermost first */
 	providers?: Array<ComponentType<{ children: ReactNode }>>
+	api?: Record<string, ApiHandler>
 	pages?: never
 }
 
@@ -151,6 +155,12 @@ function ManifestRoot({ definition }: { definition: ManifestDefinition }) {
 
 /** Runs a hubby in its frame: announces its pages to the host, renders the one it is on. */
 export function start(definition: HubbyDefinition): void {
+	if (definition.api) serveApi(definition.api)
+	// a frame started only to answer its API: no page
+	if (new URLSearchParams(location.search).has('headless')) {
+		connect()
+		return
+	}
 	const root = createRoot(document.getElementById('root')!)
 	if (definition.pages !== undefined) {
 		const pages: HubbyPage[] = definition.pages.map(p => ({ path: p.path, title: p.title, icon: p.icon, section: p.nav ? (p.nav.section ?? '') : undefined }))

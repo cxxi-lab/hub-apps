@@ -1,0 +1,165 @@
+import { validate, type Schema } from './schema'
+
+/**
+ * The hubbies' APIs (docs/plan-api-hubbies.md): what each installed hubby offers (its api.json,
+ * read with its files), and the calls between them. A method runs in the offering hubby's frame —
+ * the one open, else one started unseen (HubbyApiFrames), stopped after a while without a call.
+ * The host checks the caller's scope (HubbyHost), the input and the result against the schemas.
+ */
+
+export interface ApiMethod {
+	description: string
+	input: Schema
+	output: Schema
+	effect: 'read' | 'write'
+	/** the interface it implements (callAll), if any */
+	interface?: string
+}
+
+const apis = new Map<string, Record<string, ApiMethod>>()
+// the hubbies that may answer: active, shown (not hidden by its Privacy), not locked
+let available = new Set<string>()
+
+/** Takes an installed hubby's api.json into account. */
+export function registerApi(hubby: string, api: { methods?: Record<string, ApiMethod> }): void {
+	if (api.methods && typeof api.methods === 'object') apis.set(hubby, api.methods)
+}
+
+/** The hubbies that may answer now (the app's layout says: active, shown, unlocked). */
+export function setAvailableHubbies(ids: string[]): void {
+	available = new Set(ids)
+	// an unseen frame of a hubby gone (locked, hidden again): stopped
+	let stopped = false
+	for (const [hubby, timer] of headless) {
+		if (!available.has(hubby)) { clearTimeout(timer); headless.delete(hubby); stopped = true }
+	}
+	if (stopped) changed()
+}
+
+/** The hubbies offering an interface, with the method that implements it. */
+export function offering(iface: string): Array<{ hubby: string, method: string }> {
+	const found: Array<{ hubby: string, method: string }> = []
+	for (const [hubby, methods] of apis) {
+		if (!available.has(hubby)) continue
+		for (const [method, m] of Object.entries(methods)) {
+			if (m.interface === iface) found.push({ hubby, method })
+		}
+	}
+	return found
+}
+
+// --- the frames that answer ---
+
+interface Server {
+	serve: (id: number, method: string, input: unknown, from: string) => void
+	headless: boolean
+}
+
+const servers = new Map<string, Set<Server>>()
+const serverWaiters = new Map<string, Set<() => void>>()
+
+/** A frame of the hubby, ready to answer (HubbyHost, once it said `ready`); returns its removal. */
+export function serveFrom(hubby: string, server: Server): () => void {
+	const set = servers.get(hubby) ?? new Set()
+	servers.set(hubby, set)
+	set.add(server)
+	serverWaiters.get(hubby)?.forEach(w => w())
+	serverWaiters.delete(hubby)
+	return () => { set.delete(server) }
+}
+
+const pending = new Map<number, { resolve: (v: unknown) => void, reject: (e: Error) => void, timer: ReturnType<typeof setTimeout> }>()
+let nextId = 1
+
+/** A frame's answer to a `serve`. */
+export function served(id: number, ok: boolean, value: unknown, error?: string): void {
+	const p = pending.get(id)
+	if (!p) return
+	pending.delete(id)
+	clearTimeout(p.timer)
+	if (ok) p.resolve(value)
+	else p.reject(new Error(error ?? 'failed'))
+}
+
+// --- the frames started only to answer (unseen) ---
+
+const IDLE_MS = 120_000
+const START_MS = 20_000
+const CALL_MS = 30_000
+
+const headless = new Map<string, ReturnType<typeof setTimeout>>()
+let headlessIds: string[] = []
+const headlessListeners = new Set<() => void>()
+const changed = () => {
+	headlessIds = [...headless.keys()]
+	headlessListeners.forEach(l => l())
+}
+
+/** Keeps the hubby's unseen frame for IDLE_MS more (started if it isn't). */
+function keepHeadless(hubby: string) {
+	const timer = headless.get(hubby)
+	if (timer) clearTimeout(timer)
+	headless.set(hubby, setTimeout(() => { headless.delete(hubby); changed() }, IDLE_MS))
+	if (!timer) changed()
+}
+
+async function frameOf(hubby: string): Promise<Server> {
+	const pick = () => {
+		const all = [...(servers.get(hubby) ?? [])]
+		return all.find(s => !s.headless) ?? all[0]
+	}
+	const ready = pick()
+	if (ready) {
+		if (ready.headless) keepHeadless(hubby)
+		return ready
+	}
+	keepHeadless(hubby)
+	await new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(() => {
+			serverWaiters.get(hubby)?.delete(done)
+			reject(new Error(`${hubby} did not start`))
+		}, START_MS)
+		const done = () => { clearTimeout(timer); resolve() }
+		const set = serverWaiters.get(hubby) ?? new Set()
+		serverWaiters.set(hubby, set)
+		set.add(done)
+	})
+	return pick()!
+}
+
+/** A method of a named hubby, for `caller` (its scope already checked). */
+export async function callHubby(caller: string, hubby: string, method: string, input: unknown): Promise<unknown> {
+	if (!available.has(hubby)) throw new Error(`${hubby} is not available`)
+	const methods = apis.get(hubby)
+	const m = methods && Object.hasOwn(methods, method) ? methods[method] : undefined
+	if (!m) throw new Error(`${hubby} offers no method ${method}`)
+	const invalid = validate(m.input, input)
+	if (invalid) throw new Error(`invalid input for ${hubby} ${method}: ${invalid}`)
+	const server = await frameOf(hubby)
+	const id = nextId++
+	const value = await new Promise<unknown>((resolve, reject) => {
+		const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${hubby} ${method}: no answer`)) }, CALL_MS)
+		pending.set(id, { resolve, reject, timer })
+		server.serve(id, method, input, caller)
+	})
+	const wrong = validate(m.output, value)
+	if (wrong) throw new Error(`${hubby} ${method} gave an invalid result: ${wrong}`)
+	return value
+}
+
+/** Every hubby offering the interface: what each gave, or why it failed. */
+export function callAll(caller: string, iface: string, input: unknown): Promise<Array<{ hubby: string, result?: unknown, error?: string }>> {
+	return Promise.all(offering(iface).map(({ hubby, method }) => callHubby(caller, hubby, method, input).then(
+		result => ({ hubby, result }),
+		(err: unknown) => ({ hubby, error: err instanceof Error ? err.message : String(err) })
+	)))
+}
+
+/** The hubbies whose unseen frame runs (HubbyApiFrames), and their changes. */
+export const headlessFrames = {
+	subscribe(listener: () => void): () => void {
+		headlessListeners.add(listener)
+		return () => { headlessListeners.delete(listener) }
+	},
+	current: (): string[] => headlessIds
+}

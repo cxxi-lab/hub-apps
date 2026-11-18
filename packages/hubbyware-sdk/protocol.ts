@@ -75,6 +75,9 @@ export type GuestMessage =
 	| { type: 'back-depth', depth: number }
 	| { type: 'key', key: string, ctrl: boolean, alt: boolean, shift: boolean, meta: boolean }
 	| { type: 'navigate', path: string }
+	/** the answer to a `serve` (its id): what one of its API's methods gave, or why it failed */
+	| { type: 'served', id: number, ok: true, value: unknown }
+	| { type: 'served', id: number, ok: false, error: string }
 
 /** Host → guest. */
 export type HostMessage =
@@ -100,6 +103,11 @@ export type HostMessage =
 	| { type: 'player', event: 'ready' | 'closed' | 'action' | 'navigate', value?: string }
 	/** an event of one of its web surfaces (the webview the host shows for it) */
 	| { type: 'surface', surface: number, event: SurfaceEvent, detail: Record<string, unknown> }
+	/**
+	 * Another hubby (`from`) calls a method of this hubby's API (docs/plan-api-hubbies.md): its input
+	 * checked against its api.json; the frame answers with `served` (same id)
+	 */
+	| { type: 'serve', id: number, method: string, input: unknown, from: string }
 
 export const PROTOCOL = 'hubby/1'
 
