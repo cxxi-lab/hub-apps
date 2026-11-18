@@ -1,7 +1,9 @@
 // The runtime a hubby's frame loads next to the hubby's own code (docs/plan-hubby-architecture.md
 // § 4 ter): React, the design system and the guest SDK, as ES hubbies sharing one React, plus the
 // base stylesheet. A hubby imports them by name (react, react/jsx-runtime, react-dom/client,
-// @fortawesome/react-fontawesome, @cxxi-lab/hubbyware-ui, @cxxi-lab/hubbyware-sdk/frame), mapped to these files by the frame's import map.
+// react-router, @fortawesome/react-fontawesome, @cxxi-lab/hubbyware-ui, @cxxi-lab/hubbyware-sdk — the
+// SDK's common API, docs/plan-isolation.md § 2 — and @cxxi-lab/hubbyware-sdk/frame, the form of the
+// first isolated hubbies), mapped to these files by the frame's import map.
 //   <out>/hubby-runtime/<name>.js, <out>/hubby-runtime/runtime.css
 // Run by the app build (build/sharedRuntime.ts, after the hubbies), or by hand:
 //   node scripts/build-hubby-runtime.mjs [out]
@@ -25,12 +27,14 @@ export const RUNTIME = {
 	'react/jsx-runtime': 'jsx-runtime',
 	'react-dom/client': 'react-dom-client',
 	'@fortawesome/react-fontawesome': 'fontawesome-react',
+	'react-router': 'react-router',
 	'@cxxi-lab/hubbyware-ui': 'ui',
+	'@cxxi-lab/hubbyware-sdk': 'sdk-common',
 	'@cxxi-lab/hubbyware-sdk/frame': 'sdk'
 }
 
 
-const NPM = ['react', 'react/jsx-runtime', 'react-dom/client', '@fortawesome/react-fontawesome']
+const NPM = ['react', 'react/jsx-runtime', 'react-dom/client', 'react-router', '@fortawesome/react-fontawesome']
 
 export async function buildHubbyRuntime(out) {
 	const outDir = join(resolve(out), 'hubby-runtime')
@@ -38,7 +42,7 @@ export async function buildHubbyRuntime(out) {
 	// (lib mode wants real files as entries; this place resolves the packages as the app does)
 	const generated = join(APP, 'node_modules/.cache/hubby-runtime')
 	mkdirSync(generated, { recursive: true })
-	const entry = { ui: require.resolve('@cxxi-lab/hubbyware-ui'), sdk: require.resolve('@cxxi-lab/hubbyware-sdk/frame') }
+	const entry = { ui: require.resolve('@cxxi-lab/hubbyware-ui'), sdk: require.resolve('@cxxi-lab/hubbyware-sdk/frame'), 'sdk-common': require.resolve('@cxxi-lab/hubbyware-sdk/common') }
 	for (const spec of NPM) {
 		const mod = require(spec)
 		const keys = Object.keys(mod).filter(k => k !== 'default' && IDENTIFIER.test(k))
@@ -55,6 +59,8 @@ export async function buildHubbyRuntime(out) {
 		publicDir: false,
 		plugins: [react(), tailwindcss(), svgr()],
 		define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+		// the packages' production builds (react-router's exports pick by condition)
+		resolve: { conditions: ['module', 'browser', 'production'] },
 		build: {
 			outDir,
 			emptyOutDir: true,
@@ -94,7 +100,7 @@ export async function buildHubbyRuntime(out) {
 </html>
 `)
 	// the hubby's own code (its index.js, at the root) defines it; the SDK runs it
-	writeFileSync(join(outDir, 'boot.js'), "import definition from '/index.js'\nimport { start } from '@cxxi-lab/hubbyware-sdk/frame'\nstart(definition)\n")
+	writeFileSync(join(outDir, 'boot.js'), "import definition from '/index.js'\nimport { start } from '@cxxi-lab/hubbyware-sdk'\nstart(definition)\n")
 	console.log(`hubby runtime → ${outDir}`)
 }
 

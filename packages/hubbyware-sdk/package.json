@@ -1,6 +1,6 @@
 {
 	"name": "@cxxi-lab/hubbyware-sdk",
-	"version": "3.6.1",
+	"version": "3.7.0",
 	"description": "The contract of Hubbyware's hubbies: the SDK a hubby builds on (provided by the host app at run time), and the SDK of the hubbies running isolated in their frame. Formerly @cxxi-lab/hub-sdk.",
 	"license": "MIT",
 	"type": "module",
@@ -9,6 +9,7 @@
 			"types": "./types/index.d.ts"
 		},
 		"./frame": "./frame/index.ts",
+		"./common": "./frame/common.ts",
 		"./protocol": "./protocol.ts",
 		"./version.json": "./version.json",
 		"./shared.json": "./shared.json",

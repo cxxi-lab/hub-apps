@@ -28,6 +28,28 @@ export interface TaskState {
 	finishedAt: string | null
 }
 
+/** What the app tells a frame of its own state (pushed at start, then at each change). */
+export interface AppState {
+	phone: boolean
+	/** the app's private mode (its hidden hubbies revealed) */
+	privateMode: boolean
+	/** this hubby shown (not hidden by its Privacy, or revealed) */
+	visible: boolean
+	/** this hubby's amounts blurred (its Privacy) */
+	amountsBlurred: boolean
+	/** bumped when the blurred amounts shown are hidden again (Ctrl+Alt+Q, a page left) */
+	blurEpoch: number
+	/** the VPN tunnel ready for this hubby (true when it doesn't go out through it) */
+	tunnelReady: boolean
+}
+
+/** A failed call, as the frame rebuilds it (an ApiError when it has a status). */
+export interface CallError {
+	message: string
+	status?: number
+	detail?: string | null
+}
+
 /** Guest → host. */
 export type GuestMessage =
 	| { type: 'ready', at: number }
@@ -42,13 +64,19 @@ export type HostMessage =
 	/** `theme`, `accent`: the app's (a host from before themes sends none: dark, blue) */
 	| { type: 'init', hubby: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string }
 	| { type: 'result', id: number, ok: true, value: unknown }
-	| { type: 'result', id: number, ok: false, error: string }
+	| { type: 'result', id: number, ok: false, error: string, failure?: CallError }
 	| { type: 'back' }
 	| { type: 'path', path: string }
 	/** the app's theme or accent changed */
 	| { type: 'theme', theme: 'light' | 'dark', accent?: string }
 	/** a task the frame follows changed (`tasks.follow`): its state */
 	| { type: 'task', task: TaskState }
+	/** the app's state, for this hubby (at start, then at each change) */
+	| { type: 'state', state: AppState }
+	/** an event of a stream the frame opened (`stream.open`, its id) */
+	| { type: 'stream', stream: number, event: string, data: unknown }
+	/** a document of one of its collections changed (another window, another device) */
+	| { type: 'changed', collection: string, doc: string }
 
 export const PROTOCOL = 'hubby/1'
 

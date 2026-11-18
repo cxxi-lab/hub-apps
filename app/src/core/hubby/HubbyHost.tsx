@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { api } from '@core/api/client'
+import { api, ApiError } from '@core/api/client'
 import { collection } from './collections'
 import { createOAuth } from './oauth'
 import { hubbyApi } from './tokens'
@@ -11,6 +11,24 @@ import { platform } from '@platform'
 import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage } from '@cxxi-lab/hubbyware-sdk/protocol'
 import { setHubbyNav } from './navs'
 import { currentAccent, currentTheme, useAccent, useTheme } from '@core/theme/theme'
+import { useAmountsBlurred, useBlurEpoch, useHubbyVisible, usePrivateMode } from '@core/privacy/hidden'
+import { useVpnStatus } from '@shared/hooks/useVpnStatus'
+import type { AppState, CallError } from '@cxxi-lab/hubbyware-sdk/protocol'
+
+/** The calls a frame may make to the server, as its hubby (the server checks what it declares). */
+const API_PATHS = /^\/api\/cap\//
+
+/** A request's options from a frame: a method, plain headers, a string body; nothing else. */
+function requestOptions(options: unknown): RequestInit {
+	const o = (options ?? {}) as { method?: unknown, headers?: unknown, body?: unknown }
+	const headers = Object.fromEntries(Object.entries((o.headers ?? {}) as Record<string, unknown>).filter(([, v]) => typeof v === 'string')) as Record<string, string>
+	return { method: typeof o.method === 'string' ? o.method : undefined, headers, body: typeof o.body === 'string' ? o.body : undefined }
+}
+
+function apiPath(path: unknown): string {
+	if (typeof path !== 'string' || !API_PATHS.test(path)) throw new Error('a hubby calls its capabilities (/api/cap/…)')
+	return path
+}
 
 /**
  * An isolated hubby (docs/plan-hubby-architecture.md § 4 ter): its frame — a sandboxed iframe
@@ -29,9 +47,20 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	const inner = pathname === base ? '/' : pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : null
 	const src = platform.hubbyUrl(hubby)
 
+	// the app's state, as the frame gets it (pushed at each change)
+	const vpn = useVpnStatus()
+	const appState: AppState = {
+		phone,
+		privateMode: usePrivateMode(),
+		visible: useHubbyVisible(hubby),
+		amountsBlurred: useAmountsBlurred(hubby),
+		blurEpoch: useBlurEpoch(),
+		tunnelReady: vpn.status === 'connected' && (vpn.hubby == null || vpn.hubby === hubby)
+	}
+
 	// the latest values the message handler reads (it is set up once)
-	const state = useRef({ inner, phone, scopes })
-	state.current = { inner, phone, scopes }
+	const state = useRef({ inner, phone, scopes, appState })
+	state.current = { inner, phone, scopes, appState }
 
 	const send = (message: HostMessage) => {
 		const envelope: Envelope<HostMessage> = { protocol: PROTOCOL, message }
@@ -44,6 +73,8 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 	const theme = useTheme()
 	const accent = useAccent()
 	useEffect(() => { send({ type: 'theme', theme, accent }) }, [theme, accent])
+	const stateKey = JSON.stringify(appState)
+	useEffect(() => { send({ type: 'state', state: appState }) }, [stateKey])
 
 	useEffect(() => {
 		const granted = (scope: string) => hasScope(state.current.scopes, hubby, scope)
@@ -60,6 +91,12 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 		// changes of those it follows
 		const tasks = hubbyApi(hubby).tasks
 		const held = new Map<string, Task>()
+		// its server calls and streams, as the hubby
+		const caller = hubbyApi(hubby)
+		const streams = new Map<number, AbortController>()
+		// the collections whose changes it follows
+		const watching = new Map<string, () => void>()
+		const docs = (name: unknown) => own(name) as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
 		const following = new Map<string, () => void>()
 		const hold = (task: Task) => { held.set(task.id, task); return task.state }
 		const heldTask = async (id: unknown): Promise<Task> => {
@@ -105,6 +142,32 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 				if (typeof id === 'string') { following.get(id)?.(); following.delete(id) }
 				return null
 			},
+			'api': (path: unknown, options: unknown) => caller.api(apiPath(path), requestOptions(options)),
+			'stream.open': (id: unknown, path: unknown, options: unknown) => {
+				if (typeof id !== 'number') throw new Error('invalid stream id')
+				const controller = new AbortController()
+				streams.set(id, controller)
+				return caller.apiStream(apiPath(path), { ...requestOptions(options), signal: controller.signal }, (event, data) => send({ type: 'stream', stream: id, event, data }))
+					.finally(() => streams.delete(id))
+			},
+			'stream.abort': (id: unknown) => {
+				if (typeof id === 'number') streams.get(id)?.abort()
+				return null
+			},
+			// its collections, whole (docs/plan-isolation.md § 2)
+			...Object.fromEntries(['find', 'findAll', 'get', 'create', 'createWithId', 'update', 'replace', 'remove', 'batch'].map(m => [
+				`collections.${m}`, (name: unknown, ...args: unknown[]) => docs(name)[m](...args)
+			])),
+			'collection.watch': (name: unknown) => {
+				const key = String(name)
+				if (!watching.has(key)) watching.set(key, own(name).onChange(doc => send({ type: 'changed', collection: key, doc })))
+				return null
+			},
+			'collection.unwatch': (name: unknown) => {
+				watching.get(String(name))?.()
+				watching.delete(String(name))
+				return null
+			},
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')
 				return null
@@ -120,6 +183,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			switch (m.type) {
 				case 'ready':
 					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
+					send({ type: 'state', state: state.current.appState })
 					break
 				case 'register':
 					setHubbyNav(hubby, m.pages, m.sections)
@@ -131,7 +195,10 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 						send({ type: 'result', id: m.id, ok: true, value: await method(...m.args) })
 					}
 					catch (err) {
-						send({ type: 'result', id: m.id, ok: false, error: err instanceof Error ? err.message : String(err) })
+						const failure: CallError = err instanceof ApiError
+							? { message: err.message, status: err.status, detail: err.detail }
+							: { message: err instanceof Error ? err.message : String(err) }
+						send({ type: 'result', id: m.id, ok: false, error: failure.message, failure })
 					}
 					break
 				}
@@ -152,6 +219,10 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			window.removeEventListener('message', onMessage)
 			following.forEach(stop => stop())
 			following.clear()
+			streams.forEach(controller => controller.abort())
+			streams.clear()
+			watching.forEach(stop => stop())
+			watching.clear()
 		}
 	}, [hubby])
 

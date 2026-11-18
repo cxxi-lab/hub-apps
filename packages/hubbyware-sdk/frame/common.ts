@@ -1,0 +1,130 @@
+// @cxxi-lab/hubbyware-sdk inside a hubby's frame: the SDK's common API (docs/plan-isolation.md § 2,
+// "isolation first"), the same names a hubby has in the app. Everything goes to the host by
+// message: the frame has no token, no cookie, no access to the app. What the app's SDK has and this
+// one doesn't (`platform`, the app's components, webviews…) is left out on purpose: a hubby using
+// it can't run isolated yet.
+import { createElement, useEffect, useState, type ReactNode } from 'react'
+import { call, useAppState, watchCollection } from './sdk'
+
+export { api, apiStream, ApiError, errorMessage, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type OAuthConnection, type Task, type TaskState } from './sdk'
+export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
+export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
+
+// --- its collections ---
+
+/** What the platform adds to every document. */
+export interface HubbyDocument {
+	id: string
+	_createdAt: string
+	_updatedAt: string
+	_version: number
+}
+
+/** A filter's value: equality, or operators (`in` takes a list). Fields: indexed ones only. */
+export type FilterValue = string | number | boolean | null
+	| { eq?: FilterValue, ne?: FilterValue, in?: FilterValue[], gt?: FilterValue, gte?: FilterValue, lt?: FilterValue, lte?: FilterValue, exists?: boolean, prefix?: string }
+
+export interface CollectionQuery {
+	filter?: Record<string, FilterValue>
+	/** fields along an index, `-` for descending (e.g. '-_updatedAt'); default '-_updatedAt' */
+	sort?: string
+	/** 1–200, default 50 */
+	limit?: number
+	cursor?: string
+}
+
+export interface CollectionPage<T> {
+	data: T[]
+	next: string | null
+}
+
+export type BatchOperation<T> =
+	| { op: 'create', data: Partial<T> }
+	| { op: 'update', id: string, data: Partial<T>, version?: number }
+	| { op: 'delete', id: string }
+
+/**
+ * One of the hubby's collections, kept on the device and synced (the host holds them, seals their
+ * encrypted fields: the frame never sees the key). `collection(hubby, name)` (the form of the
+ * hubbies from before isolation) is accepted, the hubby being always this one.
+ */
+export function collection<T extends object>(hubbyOrName: string, maybeName?: string) {
+	const name = maybeName ?? hubbyOrName
+	type D = T & HubbyDocument
+	const c = <R>(method: string, ...args: unknown[]) => call<R>(`collections.${method}`, name, ...args)
+	return {
+		find: (q: CollectionQuery = {}) => c<CollectionPage<D>>('find', q),
+		findAll: (q: Omit<CollectionQuery, 'cursor' | 'limit'> = {}) => c<D[]>('findAll', q),
+		get: (id: string) => c<D>('get', id),
+		create: (data: Partial<T>) => c<D>('create', data),
+		createWithId: (id: string, data: Partial<T>) => c<D>('createWithId', id, data),
+		update: (id: string, data: Partial<T>, version?: number) => c<D>('update', id, data, version),
+		replace: (id: string, data: T) => c<D>('replace', id, data),
+		remove: (id: string) => c<void>('remove', id),
+		batch: (operations: BatchOperation<T>[]) => c<Array<D | null>>('batch', operations),
+		/** Called with a document's id each time one changes (here, in another window, another device). */
+		onChange: (listener: (id: string) => void) => watchCollection(name, listener)
+	}
+}
+
+// --- the app's state, for this hubby ---
+
+/** Whether the hubby is shown (its Privacy). Only its own: `id` is accepted for the app's form. */
+export function useHubbyVisible(_id?: string): boolean {
+	return useAppState().visible
+}
+
+/** Whether the app is in private mode (its hidden hubbies revealed). */
+export function usePrivateMode(): boolean {
+	return useAppState().privateMode
+}
+
+/** Whether the hubby's amounts are blurred (its Privacy). */
+export function useAmountsBlurred(_id?: string): boolean {
+	return useAppState().amountsBlurred
+}
+
+/** For a hubby going out through the VPN: whether its tunnel is up. */
+export function useTunnelReady(): boolean {
+	return useAppState().tunnelReady
+}
+
+/**
+ * An amount of the hubby (money, a balance…): blurred when its Privacy asks for it, a click shows
+ * that one until it is clicked again or the app hides them all again (as in the app).
+ */
+export function Amount({ children, className = '' }: { hubby?: string, children: ReactNode, className?: string }) {
+	const { amountsBlurred, blurEpoch } = useAppState()
+	const [shown, setShown] = useState(false)
+	useEffect(() => setShown(false), [blurEpoch])
+	if (!amountsBlurred) return createElement('span', { className }, children)
+	return createElement('span', {
+		role: 'button',
+		tabIndex: 0,
+		title: shown ? 'Hide the amount' : 'Show the amount',
+		onClick: (e: { stopPropagation(): void }) => { e.stopPropagation(); setShown(v => !v) },
+		onKeyDown: (e: { key: string, preventDefault(): void }) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShown(v => !v) } },
+		className: `${className} cursor-pointer transition-[filter] ${shown ? '' : 'blur-[6px] select-none'}`
+	}, children)
+}
+
+// --- helpers (as in the app) ---
+
+export function formatDuration(seconds: number | null): string {
+	if (seconds === null) return '—'
+	const h = Math.floor(seconds / 3600)
+	const m = Math.floor((seconds % 3600) / 60)
+	const s = seconds % 60
+	const pad = (n: number) => String(n).padStart(2, '0')
+	return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
+export function formatDate(iso: string | null): string {
+	if (!iso) return '—'
+	return new Date(iso).toLocaleDateString()
+}
+
+/** What a hubby.json says of the hubby, for its definition (as in the app; the host reads the rest). */
+export function describe(info: { label: string, description?: string }): { label: string, description?: string } {
+	return { label: info.label, description: info.description }
+}

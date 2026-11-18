@@ -16,6 +16,10 @@ import { useVpnStatus } from '@shared/hooks/useVpnStatus'
 import { ensureIntegrationForUrl as ensureIntegration } from '@shared/web/integrations'
 import { getPlayerConfig as playerConfig, type PlayerConfig } from '@shared/web/players'
 import { syncPlayerBlocklist as syncBlocklist } from '@shared/web/playerBlocklist'
+import { collection as hubbyCollection } from '@core/hubby/collections'
+import { useAmountsBlurred as amountsBlurred, useHubbyVisible as hubbyVisible } from '@core/privacy/hidden'
+import { Amount as AppAmount } from '@core/privacy/Amount'
+import { createElement, type ReactNode } from 'react'
 
 export * from './contract'
 
@@ -101,3 +105,37 @@ export function syncPlayerBlocklist(): Promise<void> {
  * (hubby.json `oauth`): list them, connect an account, get access tokens narrowed to its scopes.
  */
 export const oauth = createOAuth(call)
+
+/**
+ * One of the hubby's collections (docs/spec-hubby.md § 5): `collection(name)`, the hubby being the
+ * SDK's (the common API, docs/plan-isolation.md § 2); `collection(hubby, name)` still accepted
+ * here, until the hubbies run isolated. `T`: its declared fields.
+ */
+export function collection<T extends object>(hubbyOrName: string, name?: string) {
+	if (name !== undefined) return hubbyCollection<T>(hubbyOrName, name)
+	if (!bound || !hubby) throw new Error('collection(name) needs the SDK of a hubby (shared/sdk.js?hubby=<id>)')
+	return hubbyCollection<T>(hubby, hubbyOrName)
+}
+
+/** Whether the hubby is shown (its Privacy: hidden unless revealed); another's by its id. */
+export function useHubbyVisible(id?: string): boolean {
+	return hubbyVisible(id ?? hubby ?? '')
+}
+
+/** Whether the hubby's amounts are blurred (its Privacy); another's by its id. */
+export function useAmountsBlurred(id?: string): boolean {
+	return amountsBlurred(id ?? hubby ?? '')
+}
+
+/** An amount of the hubby, blurred when its Privacy asks for it (another hubby's: `hubby`). */
+export function Amount(props: { hubby?: string, children: ReactNode, className?: string }) {
+	return createElement(AppAmount, { ...props, hubby: props.hubby ?? hubby ?? '' })
+}
+
+/**
+ * A hubby's definition, in the form of its manifest (docs/plan-isolation.md § 2): in the app, the
+ * manifest itself; in its frame, the same definition runs isolated (navItems, routes, providers).
+ */
+export function defineHubby<D extends object>(definition: D): D {
+	return definition
+}

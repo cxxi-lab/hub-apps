@@ -1,14 +1,45 @@
 import { useEffect, useState } from 'react'
 import { onBackDepth, handleBack } from '@cxxi-lab/hubbyware-ui'
-import { PROTOCOL, type Envelope, type GuestMessage, type HostMessage, type HubbyPage, type TaskState } from '../protocol'
+import { PROTOCOL, type AppState, type CallError, type Envelope, type GuestMessage, type HostMessage, type HubbyPage, type TaskState } from '../protocol'
 
 /**
  * The hubby SDK inside its frame (prototype): every call goes to the host by message and comes
  * back as a promise. The frame has no token, no cookie, no access to the app.
  */
 
+/**
+ * Non-2xx response (as in the app: `message` stays `HTTP <status>`, `detail` carries the server's
+ * explanation when there is one).
+ */
+export class ApiError extends Error {
+	readonly status: number
+	readonly detail: string | null
+	constructor(status: number, detail: string | null) {
+		super(`HTTP ${status}`)
+		this.name = 'ApiError'
+		this.status = status
+		this.detail = detail
+	}
+}
+
+/** Best human-readable message for a caught error: server detail first. */
+export function errorMessage(err: unknown, fallback = 'Something went wrong'): string {
+	if (err instanceof ApiError) return err.detail ?? err.message
+	if (err instanceof Error) return err.message || fallback
+	return fallback
+}
+
+function failureOf(error: string, failure?: CallError): Error {
+	if (failure?.status !== undefined) return new ApiError(failure.status, failure.detail ?? null)
+	return new Error(failure?.message ?? error)
+}
+
 let nextId = 1
 const pending = new Map<number, { resolve: (v: unknown) => void, reject: (e: Error) => void }>()
+const stateListeners = new Set<(state: AppState) => void>()
+const streamListeners = new Map<number, (event: string, data: unknown) => void>()
+const changeListeners = new Map<string, Set<(id: string) => void>>()
+let appState: AppState = { phone: false, privateMode: false, visible: true, amountsBlurred: false, blurEpoch: 0, tunnelReady: true }
 const initListeners = new Set<(init: Extract<HostMessage, { type: 'init' }>) => void>()
 const pathListeners = new Set<(path: string) => void>()
 const taskListeners = new Map<string, Set<(state: TaskState) => void>>()
@@ -40,7 +71,7 @@ window.addEventListener('message', event => {
 		pending.delete(m.id)
 		if (!p) return
 		if (m.ok) p.resolve(m.value)
-		else p.reject(new Error(m.error))
+		else p.reject(failureOf(m.error, m.failure))
 	}
 	else if (m.type === 'init') {
 		applyTheme(m.theme, m.accent)
@@ -51,7 +82,76 @@ window.addEventListener('message', event => {
 	else if (m.type === 'path') pathListeners.forEach(l => l(m.path))
 	else if (m.type === 'theme') applyTheme(m.theme, m.accent)
 	else if (m.type === 'task') taskListeners.get(m.task.id)?.forEach(l => l(m.task))
+	else if (m.type === 'state') {
+		appState = m.state
+		stateListeners.forEach(l => l(m.state))
+	}
+	else if (m.type === 'stream') streamListeners.get(m.stream)?.(m.event, m.data)
+	else if (m.type === 'changed') changeListeners.get(m.collection)?.forEach(l => l(m.doc))
 })
+
+/** The app's state, for this hubby (pushed by the host). */
+export function useAppState(): AppState {
+	const [value, setValue] = useState(appState)
+	useEffect(() => {
+		stateListeners.add(setValue)
+		setValue(appState)
+		return () => { stateListeners.delete(setValue) }
+	}, [])
+	return value
+}
+
+/** A request's options as they cross to the host: a JSON or text body, plain headers. */
+function plainOptions(options: RequestInit = {}): { method?: string, headers?: Record<string, string>, body?: string } {
+	if (options.body !== undefined && options.body !== null && typeof options.body !== 'string') {
+		throw new Error('a hubby\'s request body is a string (JSON): files go through the host')
+	}
+	const headers: Record<string, string> = {}
+	new Headers(options.headers ?? {}).forEach((value, key) => { headers[key] = value })
+	return { method: options.method, headers, body: (options.body as string | null | undefined) ?? undefined }
+}
+
+/** A call to the server's API, as the hubby (the host makes it): its JSON, an ApiError otherwise. */
+export function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+	return call<T>('api', path, plainOptions(options))
+}
+
+let nextStream = 1
+
+/** A server-sent event stream, as the hubby (the host reads it): resolves once it ends. */
+export async function apiStream(path: string, options: RequestInit, onEvent: (event: string, data: unknown) => void): Promise<void> {
+	const id = nextStream++
+	const signal = options.signal
+	const abort = () => { void call('stream.abort', id) }
+	streamListeners.set(id, onEvent)
+	signal?.addEventListener('abort', abort)
+	try {
+		if (signal?.aborted) return
+		const { signal: _signal, ...rest } = options
+		await call('stream.open', id, path, plainOptions(rest))
+	}
+	finally {
+		streamListeners.delete(id)
+		signal?.removeEventListener('abort', abort)
+	}
+}
+
+/** Called with a document's id each time one of the collection changes (here or elsewhere). */
+export function watchCollection(name: string, listener: (id: string) => void): () => void {
+	let set = changeListeners.get(name)
+	if (!set) {
+		changeListeners.set(name, set = new Set())
+		void call('collection.watch', name)
+	}
+	set.add(listener)
+	return () => {
+		set.delete(listener)
+		if (set.size === 0) {
+			changeListeners.delete(name)
+			void call('collection.unwatch', name)
+		}
+	}
+}
 
 /** A call to the host (the platform API, through it). */
 export function call<T>(method: string, ...args: unknown[]): Promise<T> {

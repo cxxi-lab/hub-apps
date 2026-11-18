@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { platform, type HubbyPackage, type RestrictedHubbyPackage } from '@platform'
 import { api } from '@core/api/client'
-import { entryIcon } from './describe'
+import { describe, entryIcon, type HubbyInfo } from './describe'
 import { HubbyHost } from '@core/hubby/HubbyHost'
 import { registerModels, type ModelFile } from '@core/crypto/documents'
 import { declareHubby, type HubbyDeclaration } from './declarations'
@@ -189,8 +189,8 @@ function isolatedManifest(entry: { id: string, label: string, description?: stri
 	const Page = () => <HubbyHost hubby={entry.id} />
 	return {
 		id: entry.id,
-		label: entry.label,
-		description: entry.description,
+		// what its hubby.json says the app enforces (local, the shell's capabilities, the VPN…)
+		...describe({ version: entry.version ?? '', sdk: '', ...(entry as Partial<HubbyInfo>), label: entry.label }),
 		icon: entry.icon ? entryIcon(entry as HubbyPackage) : undefined,
 		isolated: true,
 		navItems: [],
@@ -221,7 +221,7 @@ async function fromSources(): Promise<HubbyManifest[]> {
 		if (!info.isolated) continue
 		const id = path.split('/').at(-2)!
 		HUBBY_VERSIONS[id] = info.version
-		manifests.push(isolatedManifest({ id, label: info.label, description: info.description }))
+		manifests.push(isolatedManifest({ ...info, id, icon: undefined }))
 	}
 	for (const m of manifests) {
 		const info = Object.entries(infos).find(([path]) => path.split('/').at(-2) === m.id)?.[1]

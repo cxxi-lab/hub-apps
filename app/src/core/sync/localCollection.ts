@@ -198,6 +198,19 @@ export function localCollection<T extends object>(module: string, name: string) 
 			found(e, id)
 			await removeWithReferences(e, id)
 		},
+		/**
+		 * Called with a document's id each time one of this collection changes (written here, in
+		 * another window, or received from another device). Returns how to stop.
+		 */
+		onChange(listener: (id: string) => void): () => void {
+			let stop: (() => void) | null = null
+			let stopped = false
+			void sync().then(e => {
+				if (stopped) return
+				stop = e.replica.subscribe((collection, doc) => { if (collection === name) listener(doc) })
+			})
+			return () => { stopped = true; stop?.() }
+		},
 		/** Several operations, in order. */
 		async batch(operations: BatchOperation<T>[]): Promise<Array<D | null>> {
 			const out: Array<D | null> = []
