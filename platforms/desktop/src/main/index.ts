@@ -23,7 +23,6 @@ import { setupLocalStore } from './store/localStore'
 import { setupTheme } from './app/theme'
 import { createWindow, showMainWindow } from './windows/main'
 import './windows/settings'
-import './windows/hubby'
 import './windows/about'
 import { installWebviewHandlers } from './windows/webview'
 

@@ -149,10 +149,9 @@ export function installHubbies(ids: string[]): void {
 		changed()
 		store.install(id)
 			.then(async entry => {
-				const manifest = (entry as { isolated?: boolean }).isolated
-					? await loadModels(entry).then(() => isolatedManifest(entry as HubbyPackage & { label: string }))
-					: await loadBundle(entry)
-				if (!manifest) throw new Error('the hubby did not load')
+				if (!(entry as { isolated?: boolean }).isolated) throw new Error(`${id} doesn't run isolated: not loaded`)
+				await loadModels(entry)
+				const manifest = isolatedManifest(entry as HubbyPackage & { label: string })
 				HUBBY_VERSIONS[id] = entry.version
 				INSTALLS.delete(id)
 				place([manifest])
@@ -234,15 +233,15 @@ function SettingsLink({ label, to }: { label: string, to: string }) {
 	)
 }
 
-/** A hubby's manifest among its entry's exports. */
-function manifestOf(exports: Record<string, unknown>): HubbyManifest | null {
-	const value = Object.values(exports).find(v => typeof v === 'object' && v !== null && 'id' in v && 'routes' in v && 'navItems' in v)
-	return (value as HubbyManifest | undefined) ?? null
+/** Every hubby runs isolated (docs/plan-isolation.md): one that doesn't isn't loaded. */
+function refused(id: string): null {
+	console.error(`[hubbies] ${id} doesn't run isolated: not loaded (a hubby runs in its frame, hubby.json "isolated": true)`)
+	return null
 }
 
 async function fromSources(): Promise<HubbyManifest[]> {
-	// the hubbies' sources, next to the app (@hub-hubbies: build/sharedRuntime.ts, HUB_HUBBIES_DIR)
-	const entries = import.meta.glob<Record<string, unknown>>('@hub-hubbies/*/manifest.tsx')
+	// the hubbies' sources, next to the app (@hub-hubbies: build/sharedRuntime.ts, HUB_HUBBIES_DIR):
+	// their hubby.json and models; their frames load their built files
 	const infos = import.meta.glob<HubbyDeclaration & { version: string, icon?: string, label: string, description?: string, isolated?: boolean }>('@hub-hubbies/*/hubby.json', { import: 'default', eager: true })
 	for (const info of Object.values(infos)) declareHubby(info)
 	const models = import.meta.glob<ModelFile>('@hub-hubbies/*/models/*.json', { import: 'default', eager: true })
@@ -250,21 +249,12 @@ async function fromSources(): Promise<HubbyManifest[]> {
 		const id = path.split('/').at(-3)!
 		registerModels(id, [model])
 	}
-	const hubbies = await Promise.all(Object.values(entries).map(load => load()))
-	const manifests = hubbies.map(manifestOf).filter((m): m is HubbyManifest => m !== null)
-	// the isolated hubbies: their frame, never their code
+	const manifests: HubbyManifest[] = []
 	for (const [path, info] of Object.entries(infos)) {
-		if (!info.isolated) continue
 		const id = path.split('/').at(-2)!
+		if (!info.isolated) { refused(id); continue }
 		HUBBY_VERSIONS[id] = info.version
 		manifests.push(isolatedManifest({ ...info, id, icon: undefined }))
-	}
-	for (const m of manifests) {
-		const info = Object.entries(infos).find(([path]) => path.split('/').at(-2) === m.id)?.[1]
-		if (!info) continue
-		HUBBY_VERSIONS[m.id] = info.version
-		// the store shows the icon hubby.json names before the hubby is installed
-		if (m.icon && info.icon !== m.icon.iconName) console.warn(`[hubbies] ${m.id}: hubby.json names the icon "${info.icon}", the manifest shows "${m.icon.iconName}"`)
 	}
 	return manifests
 }
@@ -281,14 +271,12 @@ async function fromBundles(): Promise<HubbyManifest[]> {
 	}
 	const loaded = await Promise.all(catalog.map(async entry => {
 		if (entry.version) HUBBY_VERSIONS[entry.id] = entry.version
-		// an isolated hubby: its frame, never its code in the app
-		if ((entry as { isolated?: boolean }).isolated) {
-			return loadModels(entry).then(() => isolatedManifest(entry as HubbyPackage & { label: string }), err => {
-				console.error(`[hubbies] ${entry.id} failed to load`, err)
-				return null
-			})
-		}
-		return loadBundle(entry)
+		// its frame, never its code in the app
+		if (!(entry as { isolated?: boolean }).isolated) return refused(entry.id)
+		return loadModels(entry).then(() => isolatedManifest(entry as HubbyPackage & { label: string }), err => {
+			console.error(`[hubbies] ${entry.id} failed to load`, err)
+			return null
+		})
 	}))
 	return loaded.filter((m): m is HubbyManifest => m !== null)
 }
@@ -304,29 +292,6 @@ async function loadModels(entry: HubbyDeclaration & { models?: boolean }): Promi
 	const res = await fetch(new URL(`modules/${id}/models.json`, document.baseURI)).catch(() => null)
 	if (res?.ok) registerModels(id, await res.json() as Record<string, ModelFile>)
 	else if (models) throw new Error(`${id}: its models are missing`)
-}
-
-/** Loads an installed hubby's bundle (its models and styles first); null when it fails. */
-async function loadBundle(entry: HubbyDeclaration & { css: boolean, models?: boolean }): Promise<HubbyManifest | null> {
-	const { id, css } = entry
-	const base = new URL('modules/', document.baseURI)
-	try {
-		await loadModels(entry)
-		if (css && !document.head.querySelector(`link[data-module="${id}"]`)) {
-			const link = document.createElement('link')
-			link.rel = 'stylesheet'
-			link.href = new URL(`${id}/style.css`, base).href
-			link.dataset.hubby = id
-			document.head.append(link)
-		}
-		const manifest = manifestOf(await import(/* @vite-ignore */ new URL(`${id}/index.js`, base).href))
-		if (!manifest) console.error(`[hubbies] ${id}: no manifest exported`)
-		return manifest
-	}
-	catch (err) {
-		console.error(`[hubbies] ${id} failed to load`, err)
-		return null
-	}
 }
 
 /**

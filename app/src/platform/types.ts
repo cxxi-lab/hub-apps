@@ -82,16 +82,6 @@ export interface CompanionMessage {
 	replyId: number | null
 }
 
-/** A hubby's window as the host knows it (its component stays in the hubby). */
-export interface HubbyWindowInfo {
-	hubbyId: string
-	id: string
-	title: string
-	width?: number
-	height?: number
-	menu?: { label: string, accelerator?: string }
-}
-
 /** Unsubscribe handle returned by every `on…` listener. */
 export type Unsubscribe = () => void
 
@@ -429,10 +419,6 @@ export interface Platform {
 	openSettings(target?: string): Promise<void>
 	/** In the Settings window: a screen another window asked for. */
 	onSettingsGoto(cb: (target: string) => void): Unsubscribe
-	/** Opens a hubby's window (HubbyManifest.windows), registered beforehand. */
-	openHubbyWindow(hubbyId: string, windowId: string): Promise<void>
-	/** The windows of the active hubbies: what the app menu offers (replaces the previous list). */
-	registerHubbyWindows(windows: HubbyWindowInfo[]): Promise<void>
 	openAbout(): Promise<void>
 
 	getAppVersion(): Promise<string>

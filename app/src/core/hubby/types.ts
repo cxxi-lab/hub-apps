@@ -1,7 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core'
 import type { PlatformCapabilities } from '@platform'
-import type { ContributionPoints } from './contributions'
 
 export interface HubbyNavItem {
 	to: string
@@ -14,17 +13,6 @@ export interface HubbyNavItem {
 	icon?: IconDefinition
 	/** the page the hubby opens on (default: the first item) */
 	home?: boolean
-}
-
-export interface HubbyWindow {
-	/** unique in the hubby ([a-z0-9-]) */
-	id: string
-	title: string
-	Component: ComponentType
-	width?: number
-	height?: number
-	/** an entry of the app menu (Window) opening it */
-	menu?: { label: string, accelerator?: string }
 }
 
 export interface HubbyRoute {
@@ -80,8 +68,7 @@ export interface HubbyManifest {
 	routes: HubbyRoute[]
 	/**
 	 * Hubbies this one cannot work without (ids): it is only active while they all are, and
-	 * the Hubbies screen says so. For a feature that only makes sense with another hubby, prefer
-	 * a contribution of that hubby (`contributes`).
+	 * the Hubbies screen says so.
 	 */
 	requires?: string[]
 	/**
@@ -89,13 +76,9 @@ export interface HubbyManifest {
 	 * hubby's settings and its plumbing in the app, e.g. 'notifications' (the top bar's badge).
 	 */
 	supports?: HubbySupport[]
-	/** What this hubby offers the others, by contribution point (see ContributionPoints). */
-	contributes?: Partial<ContributionPoints>
 	/**
 	 * Contexts this hubby needs around the whole app while it is active (e.g. a job followed from
 	 * any page), outermost first.
 	 */
 	providers?: Array<ComponentType<{ children: ReactNode }>>
-	/** Windows of its own (desktop only), opened with platform.openHubbyWindow(hubbyId, id). */
-	windows?: HubbyWindow[]
 }

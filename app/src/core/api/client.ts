@@ -104,7 +104,7 @@ export function taskOf(response: Response): string | null {
 	return response.headers.get('Location')?.match(/^\/api\/cap\/tasks\/([0-9a-f]{24})$/)?.[1] ?? null
 }
 
-/** A call to the API as someone (the account, a hubby: the SDK binds each hubby's, src/sdk/index.ts). */
+/** A call to the API as someone (the account, a hubby: the host binds each hubby's, core/hubby/tokens.ts). */
 export type ApiCall = <T>(path: string, options?: RequestInit) => Promise<T>
 
 /** A call as the account (the app itself). */

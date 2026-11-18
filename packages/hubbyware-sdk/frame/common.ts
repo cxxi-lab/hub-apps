@@ -9,7 +9,12 @@ import { call, currentInit, useAppState, watchCollection } from './sdk'
 export { api, apiStream, ApiError, errorMessage, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type OAuthConnection, type Task, type TaskState } from './sdk'
 export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
 export { BottomBar, type BottomBarEntry, type BottomBarTab } from './BottomBar'
-export { platform, storage } from './platform'
+export { platform, storage, type Capabilities, type FramePlatform } from './platform'
+export type {
+	CompanionActivity, CompanionApi, CompanionEngineInfo, CompanionEngineStatus, CompanionLogEntry, CompanionMessage, CompanionProfile,
+	HubbyManifest, HubbyNavItem, HubbyRoute, ListResponse, NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions,
+	NativePlayerPanel, PaginatedResponse, SingleResponse, TimelineItem, Unsubscribe
+} from './types'
 export { WebSurface, type WebSurfaceElement, type WebSurfaceProps } from './WebSurface'
 export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 // the design system's components, as the app's SDK hands them too

@@ -12,7 +12,6 @@
 		"paths": {
 			"@/*": ["src/*"],
 			"@core/*": ["src/core/*"],
-			"@cxxi-lab/hubbyware-sdk": ["src/sdk/index.ts"],
 			"@shared/*": ["src/shared/*"],
 
 			"@platform": ["src/platform"],

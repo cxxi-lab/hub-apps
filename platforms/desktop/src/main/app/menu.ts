@@ -2,7 +2,6 @@ import { ipcMain, Menu } from 'electron'
 import { getDevMode, setDevMode } from './state'
 import { engine } from '../companion/engine'
 import { openAboutWindow } from '../windows/about'
-import { hubbyWindows, onHubbyWindowsChange, openHubbyWindow } from '../windows/hubby'
 import { openSettingsWindow } from '../windows/settings'
 
 let _authenticated = false
@@ -28,12 +27,6 @@ function buildMenu(): Electron.Menu {
 					click: () => void (engine.getInfo().status === 'off' || engine.getInfo().status === 'error' ? engine.start() : engine.stop())
 				},
 				{ type: 'separator' },
-				// the windows of the active hubbies that ask for a menu entry
-				...hubbyWindows().filter(w => w.menu).map<Electron.MenuItemConstructorOptions>(w => ({
-					label: w.menu!.label,
-					accelerator: w.menu!.accelerator,
-					click: () => openHubbyWindow(w.hubbyId, w.id)
-				})),
 				{
 					label: 'Settings…',
 					accelerator: 'CommandOrControl+,',
@@ -66,8 +59,6 @@ function buildMenu(): Electron.Menu {
 export function applyMenu(): void {
 	Menu.setApplicationMenu(buildMenu())
 }
-
-onHubbyWindowsChange(applyMenu)
 
 ipcMain.on('auth:state-changed', (_, value: boolean) => {
 	if (_authenticated === value) return

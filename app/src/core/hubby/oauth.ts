@@ -6,7 +6,7 @@ import { ApiError, type ApiCall } from '@core/api/client'
  * account allows it the provider (`app:oauth:<provider>`, its permissions), then it lists the
  * connections, connects an account (the consent opens in the browser, the server takes the
  * provider's answer) and gets access tokens narrowed to its scopes. Every call is the hubby's
- * (its token): the SDK binds it (src/sdk/index.ts), the host too for an isolated one.
+ * (its token): the host binds it for each hubby (HubbyHost).
  */
 
 /** An account connected at a provider, as the hubby sees it. */

@@ -1,4 +1,5 @@
 import { call, currentInit, onHostMessage } from './sdk'
+import type { CompanionApi, NativePlayerAction, NativeIcon, NativePlayerApi, NativePlayerOptions, NativePlayerPanel } from './types'
 
 /**
  * The shell, as a hubby's frame sees it (docs/plan-isolation.md, phase 4): its capabilities (in the
@@ -37,23 +38,46 @@ function on<T>(set: Set<Listener<T>>, cb: Listener<T>): () => void {
 }
 
 /** The fullscreen native player (Android, `capabilities.nativePlayer`), through the host. */
-const player = {
-	open: (options: unknown) => call<void>('player.open', options),
+const player: NativePlayerApi = {
+	open: (options: NativePlayerOptions) => call<void>('player.open', options),
 	exec: (script: string) => call<void>('player.exec', script),
 	reload: () => call<void>('player.reload'),
 	close: () => call<void>('player.close'),
-	setActions: (actions: unknown, icons: unknown) => call<void>('player.setActions', actions, icons),
-	showPanel: (panel: unknown) => call<void>('player.showPanel', panel),
+	setActions: (actions: NativePlayerAction[], icons: { menu: NativeIcon, close: NativeIcon }) => call<void>('player.setActions', actions, icons),
+	showPanel: (panel: NativePlayerPanel | null) => call<void>('player.showPanel', panel),
 	onReady: (cb: () => void) => on(listeners.ready, cb),
 	onClosed: (cb: () => void) => on(listeners.closed, cb),
 	onAction: (cb: (id: string) => void) => on(listeners.action, cb),
 	onNavigate: (cb: (direction: 'prev' | 'next') => void) => on(listeners.navigate, cb)
 }
 
-export const platform = {
-	name: 'frame' as const,
+/** What the shell can do here (the frame's URL: set by the host). */
+export interface Capabilities {
+	webview?: boolean
+	nativePlayer?: boolean
+	vpn?: boolean
+	vpnPerWebview?: boolean
+	/** never in a frame (docs/plan-isolation.md D5) */
+	companion?: boolean
+	[name: string]: boolean | undefined
+}
+
+export interface FramePlatform {
+	name: 'frame'
+	capabilities: Capabilities
+	player: NativePlayerApi
+	/**
+	 * Not in a frame (D5: the companion waits for the AI chantier): undefined. Typed for the code
+	 * kept until then, reached only behind `capabilities.companion`, never true here.
+	 */
+	companion: CompanionApi
+}
+
+export const platform: FramePlatform = {
+	name: 'frame',
 	capabilities: readCapabilities(),
-	player
+	player,
+	companion: undefined as unknown as CompanionApi
 }
 
 // --- the hubby's own storage ---

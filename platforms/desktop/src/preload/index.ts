@@ -9,7 +9,6 @@ import type {
 	CompanionMessage,
 	CompanionActivity,
 	CompanionLogEntry,
-	HubbyWindowInfo,
 	HubbyPackage,
 	RestrictedHubbyPackage,
 	StoredDocument,
@@ -93,9 +92,7 @@ const api = {
 
 	/** Opens an OAuth consent page; resolves with the redirect URL it ended on (null: closed). */
 
-	openHubbyWindow: (hubbyId: string, windowId: string): Promise<void> => ipcRenderer.invoke('hubby-window:open', hubbyId, windowId),
 
-	registerHubbyWindows: (windows: HubbyWindowInfo[]): Promise<void> => ipcRenderer.invoke('hubby-windows:register', windows),
 
 	localStore: {
 		list: (account: string, hubby: string, scope: string, collection?: string): Promise<StoredDocument[]> => ipcRenderer.invoke('store:list', account, hubby, scope, collection),

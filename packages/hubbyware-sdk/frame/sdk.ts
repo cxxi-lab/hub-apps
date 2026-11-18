@@ -234,8 +234,20 @@ export interface OAuthConnection { id: string, provider: string, email: string, 
  */
 export const oauth = {
 	connections: () => call<OAuthConnection[]>('oauth.connections'),
-	/** the consent opens in the browser; resolves once the account consented */
-	connect: (provider: string, options: { connection?: string } = {}) => call<OAuthConnection | null>('oauth.connect', provider, options),
+	/**
+	 * the consent opens in the browser; resolves once the account consented. `signal`: stops
+	 * waiting here (an AbortSignal can't cross to the host: the consent page stays open there)
+	 */
+	connect: (provider: string, options: { connection?: string, signal?: AbortSignal } = {}) => {
+		const { signal, ...rest } = options
+		const consented = call<OAuthConnection | null>('oauth.connect', provider, rest)
+		if (!signal) return consented
+		return Promise.race([consented, new Promise<never>((_, reject) => {
+			const abort = () => reject(new DOMException('The connection was cancelled', 'AbortError'))
+			if (signal.aborted) abort()
+			else signal.addEventListener('abort', abort, { once: true })
+		})])
+	},
 	/** an access token, for the hubby's scopes only */
 	accessToken: (connection: string) => call<{ accessToken: string, expiresAt: number }>('oauth.accessToken', connection),
 }

@@ -41,18 +41,7 @@ function render(): void {
 			)
 		})
 	}
-	else if (windowKind === 'hubby') {
-		// A hubby's own window (HubbyManifest.windows), opened by the desktop for an active hubby.
-		const params = new URLSearchParams(window.location.search)
-		const Window = HUBBY_MANIFESTS.find(m => m.id === params.get('hubby'))?.windows?.find(w => w.id === params.get('id'))?.Component
-		initBaseUrl().then(() => {
-			root.render(
-				<StrictMode>
-					{Window ? <Window /> : <div className="p-6 text-sm text-steel-300">This window belongs to a hubby that is not installed.</div>}
-				</StrictMode>
-			)
-		})
-	}
+
 	else if (windowKind === 'update') {
 		root.render(
 			<StrictMode>

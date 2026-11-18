@@ -129,15 +129,6 @@ export function AppLayout() {
 	)
 
 
-	// The windows of the active hubbies, for the app menu (desktop): the menu offers a hubby's
-	// windows only while it is active.
-	useEffect(() => {
-		if (!platform.capabilities.nativeWindows) return
-		platform.registerHubbyWindows(visibleHubbies.flatMap(m => (m.windows ?? []).map(w => ({
-			hubbyId: m.id, id: w.id, title: w.title, width: w.width, height: w.height, menu: w.menu
-		})))).catch(err => console.warn('[hubbies] windows not registered', err))
-	}, [visibleHubbies])
-
 	const registeredPaths = useMemo(
 		() => new Set([...CORE_SHELL_PAGES.map(p => p.path), ...visibleHubbies.flatMap(m => m.routes.map(r => r.path))]),
 		[visibleHubbies]

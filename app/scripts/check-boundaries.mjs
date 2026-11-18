@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Hubby boundaries of the app (see app/src/sdk):
+// Hubby boundaries of the app (the hubbies run isolated: docs/plan-isolation.md):
 //  - a hubby (src/hubbies/<id>, in development only: the hubbies have their own repositories) imports
 //    only its own files and packages: the SDK (@cxxi-lab/hubbyware-sdk),
 //    the design system (@cxxi-lab/hubbyware-ui), npm ones;
