@@ -1,5 +1,5 @@
 import { app, ipcMain, type WebContents } from 'electron'
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -7,10 +7,10 @@ import { delimiter, join } from 'node:path'
 import { openMcpSession, type McpSession } from './mcp'
 
 /**
- * The device's AI agents as the chat's engines (client docs/plan-ia-agent.md, phase 4): Claude Code
+ * The device's AI agent as the chat's engine (client docs/plan-ia-agent.md, phase 4): Claude Code,
  * driven directly (its unmodified binary, `claude -p`, the user's own login — never read nor
- * touched), and Codex over ACP (the Agent Client Protocol, through Zed's adapter; another ACP agent
- * is one more entry of ACP_AGENTS). Each turn runs in an empty folder, with Hubbyware's MCP server as its
+ * touched). The only one, by the user's choice (19 Nov.); an ACP client for other agents was written
+ * and dropped (git history: a95b805). Each turn runs in an empty folder, with Hubbyware's MCP server as its
  * only tools (the agent's own — shell, files, web — off or refused): Hubbyware confirms every change
  * and send itself. The agent's session is kept on this device (resumed next turn); elsewhere, the
  * conversation is replayed (the transcript the hubby gives).
@@ -19,7 +19,7 @@ import { openMcpSession, type McpSession } from './mcp'
 export interface EngineInfo {
 	id: string
 	label: string
-	kind: 'claude' | 'acp'
+	kind: 'claude'
 	available: boolean
 	version: string | null
 	/** null: unknown (the agent says it when a turn starts) */
@@ -47,27 +47,6 @@ export interface AgentRunResult {
 }
 
 type Emit = (event: { kind: 'delta' | 'status' | 'tool' | 'denied', text: string }) => void
-
-interface AcpAgent {
-	id: string
-	label: string
-	bin: string
-	args: string[]
-	signIn: string
-	/** its settings, for this run (an env var naming a file Hubbyware writes): its own tools off */
-	settings?: { env: string, value: unknown }
-}
-
-const ACP_AGENTS: AcpAgent[] = [
-	// Codex through Zed's ACP adapter (codex-acp): the user's OpenAI login
-	{ id: 'codex', label: 'Codex', bin: 'codex-acp', args: [], signIn: 'run `codex login` in a terminal' }
-]
-
-// development: HUB_AGENT_ACP_TEST=<a script> adds a test ACP agent (node <script>)
-function acpAgents(): AcpAgent[] {
-	const test = process.env.HUB_AGENT_ACP_TEST
-	return test && !app.isPackaged ? [...ACP_AGENTS, { id: 'acp-test', label: 'ACP test agent', bin: process.execPath, args: [test], signIn: '' }] : ACP_AGENTS
-}
 
 const SYSTEM = [
 	'You are the assistant in Hubbyware\'s chat (a personal app: the user\'s calendar, workouts, mail…, in "hubbies").',
@@ -119,12 +98,6 @@ export async function engines(): Promise<EngineInfo[]> {
 		out.push({ id: 'claude-code', label: 'Claude Code', kind: 'claude', available: true, version, signedIn, note: signedIn === false ? 'run `claude` once in a terminal to sign in' : null })
 	}
 	else out.push({ id: 'claude-code', label: 'Claude Code', kind: 'claude', available: false, version: null, signedIn: null, note: 'not installed (claude.com/claude-code)' })
-	for (const a of acpAgents()) {
-		const bin = await which(a.bin)
-		if (!bin) continue
-		const version = a.id === 'acp-test' ? 'test' : (await run(bin, ['--version']))?.trim().split('\n')[0]?.slice(0, 40) ?? null
-		out.push({ id: a.id, label: a.label, kind: 'acp', available: true, version, signedIn: null, note: null })
-	}
 	return out
 }
 
@@ -237,138 +210,6 @@ async function runClaude(req: AgentRunRequest, key: string, mcp: McpSession, emi
 	return attempt(null)
 }
 
-// --- ACP agents: JSON-RPC over stdio ---
-
-class AcpConnection {
-	private next = 1
-	private pending = new Map<number, { resolve: (v: unknown) => void, reject: (e: Error) => void }>()
-	private buffer = ''
-	stderr = ''
-	onNotification: (method: string, params: Record<string, unknown>) => void = () => {}
-	onRequest: (method: string, params: Record<string, unknown>) => Promise<unknown> = async method => { throw Object.assign(new Error(`no method ${method}`), { code: -32601 }) }
-
-	constructor(readonly child: ChildProcessWithoutNullStreams) {
-		child.stdout.on('data', (chunk: Buffer) => {
-			this.buffer += chunk.toString('utf8')
-			let nl
-			while ((nl = this.buffer.indexOf('\n')) >= 0) {
-				const line = this.buffer.slice(0, nl).trim()
-				this.buffer = this.buffer.slice(nl + 1)
-				if (line) this.receive(line)
-			}
-		})
-		child.stderr.on('data', (chunk: Buffer) => { this.stderr = (this.stderr + chunk.toString('utf8')).slice(-4000) })
-		child.on('close', () => { for (const p of this.pending.values()) p.reject(new Error(`the agent stopped: ${this.stderr.trim().split('\n').slice(-2).join(' ') || 'no answer'}`)); this.pending.clear() })
-	}
-
-	private write(msg: unknown) { if (this.child.stdin.writable) this.child.stdin.write(`${JSON.stringify(msg)}\n`) }
-
-	private receive(line: string) {
-		let m: { id?: number | string, method?: string, params?: Record<string, unknown>, result?: unknown, error?: { message?: string, code?: number } }
-		try { m = JSON.parse(line) }
-		catch { return }
-		if (m.method && m.id !== undefined) {
-			this.onRequest(m.method, m.params ?? {}).then(
-				result => this.write({ jsonrpc: '2.0', id: m.id, result }),
-				(err: Error & { code?: number }) => this.write({ jsonrpc: '2.0', id: m.id, error: { code: err.code ?? -32603, message: err.message } })
-			)
-		}
-		else if (m.method) this.onNotification(m.method, m.params ?? {})
-		else if (typeof m.id === 'number') {
-			const p = this.pending.get(m.id)
-			this.pending.delete(m.id)
-			if (m.error) p?.reject(Object.assign(new Error(m.error.message ?? 'failed'), { code: m.error.code }))
-			else p?.resolve(m.result)
-		}
-	}
-
-	request<T>(method: string, params: unknown): Promise<T> {
-		const id = this.next++
-		return new Promise((resolve, reject) => {
-			this.pending.set(id, { resolve: v => resolve(v as T), reject })
-			this.write({ jsonrpc: '2.0', id, method, params })
-		})
-	}
-
-	notify(method: string, params: unknown) { this.write({ jsonrpc: '2.0', method, params }) }
-}
-
-interface AcpInit { protocolVersion?: number, agentCapabilities?: { loadSession?: boolean, mcpCapabilities?: { http?: boolean } }, authMethods?: Array<{ id: string, name?: string }> }
-
-async function runAcp(agent: AcpAgent, req: AgentRunRequest, key: string, mcp: McpSession, toolNames: () => Promise<string[]>, emit: Emit, signal: AbortSignal): Promise<AgentRunResult> {
-	const bin = await which(agent.bin)
-	if (!bin) throw new Error(`${agent.label} is not installed`)
-	const cwd = workFolder(agent.id)
-	const env: NodeJS.ProcessEnv = { ...process.env, PATH: await userPath(), ...(agent.id === 'acp-test' ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }
-	if (agent.settings) {
-		const file = join(app.getPath('userData'), 'agents', `${agent.id}.settings.json`)
-		writeFileSync(file, JSON.stringify(agent.settings.value, null, 2), { mode: 0o600 })
-		env[agent.settings.env] = file
-	}
-	const child = spawn(bin, agent.args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
-	const conn = new AcpConnection(child)
-	const ours = new Set(await toolNames())
-	let content = ''
-	let loading = false
-	let sessionId: string | null = null
-	conn.onNotification = (method, params) => {
-		if (method !== 'session/update' || loading) return
-		const u = params.update as { sessionUpdate?: string, content?: { type?: string, text?: string }, title?: string, status?: string } | undefined
-		if (u?.sessionUpdate === 'agent_message_chunk' && u.content?.type === 'text') {
-			content += u.content.text ?? ''
-			emit({ kind: 'delta', text: u.content.text ?? '' })
-		}
-		else if (u?.sessionUpdate === 'tool_call') emit({ kind: 'tool', text: String(u.title ?? '') })
-	}
-	// the agent asks before using a tool: Hubbyware's own go ahead (they ask the user themselves); anything else refused
-	conn.onRequest = async (method, params) => {
-		if (method !== 'session/request_permission') throw Object.assign(new Error(`${method} is not offered`), { code: -32601 })
-		const call = params.toolCall as { title?: string, rawInput?: unknown, kind?: string } | undefined
-		const options = (params.options ?? []) as Array<{ optionId: string, kind: string }>
-		const said = `${call?.title ?? ''} ${JSON.stringify(call?.rawInput ?? '')}`
-		const isOurs = [...ours].some(name => said.includes(name)) || /hubbyware/i.test(said)
-		const pick = options.find(o => o.kind === (isOurs ? 'allow_once' : 'reject_once')) ?? options.find(o => o.kind.startsWith(isOurs ? 'allow' : 'reject'))
-		if (!isOurs) emit({ kind: 'denied', text: call?.title ?? 'a tool' })
-		return pick ? { outcome: { outcome: 'selected', optionId: pick.optionId } } : { outcome: { outcome: 'cancelled' } }
-	}
-	const stop = () => {
-		if (sessionId) conn.notify('session/cancel', { sessionId })
-		setTimeout(() => child.kill('SIGTERM'), 3000)
-	}
-	signal.addEventListener('abort', stop)
-	try {
-		const init = await conn.request<AcpInit>('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'hubbyware', version: app.getVersion() } })
-		if (!init.agentCapabilities?.mcpCapabilities?.http) throw new Error(`${agent.label} can't reach Hubbyware's tools (it doesn't take an HTTP MCP server)`)
-		const mcpServers = [{ type: 'http', name: 'hubbyware', url: mcp.url, headers: [{ name: 'Authorization', value: `Bearer ${mcp.token}` }] }]
-		const known = readSessions()[key]
-		let resumed = false
-		if (known && init.agentCapabilities?.loadSession) {
-			loading = true
-			try { await conn.request('session/load', { sessionId: known, cwd, mcpServers }); sessionId = known; resumed = true }
-			catch { keepSession(key, null) }
-			loading = false
-		}
-		if (!sessionId) {
-			try { sessionId = (await conn.request<{ sessionId: string }>('session/new', { cwd, mcpServers })).sessionId }
-			catch (err) {
-				if (/auth/i.test((err as Error).message) || (err as { code?: number }).code === -32000) throw new Error(`${agent.label} is not signed in: ${agent.signIn}`)
-				throw err
-			}
-		}
-		const text = resumed ? req.text : firstPrompt(req)
-		const instructions = `${SYSTEM} Today is ${new Date().toDateString()}.${req.instructions ? ` ${req.instructions}` : ''}`
-		const out = await conn.request<{ stopReason?: string }>('session/prompt', { sessionId, prompt: [{ type: 'text', text: resumed ? text : `[Instructions from Hubbyware] ${instructions}\n\n${text}` }] })
-		if (init.agentCapabilities?.loadSession) keepSession(key, sessionId)
-		if (out.stopReason === 'refusal') throw new Error(`${agent.label} refused to answer`)
-		return { content: content.trim(), resumed, usage: null }
-	}
-	finally {
-		signal.removeEventListener('abort', stop)
-		child.stdin.end()
-		setTimeout(() => { if (child.exitCode === null) child.kill('SIGTERM') }, 2000)
-	}
-}
-
 // --- the app's side ---
 
 const runs = new Map<number, AbortController>()
@@ -382,16 +223,8 @@ async function runAgent(contents: WebContents, id: number, caller: string, req: 
 	const key = `${caller}:${req.conversation}:${req.engine}`
 	try {
 		emit({ kind: 'status', text: 'starting' })
-		if (req.engine === 'claude-code') return await runClaude(req, key, mcp, emit, controller.signal)
-		const agent = acpAgents().find(a => a.id === req.engine)
-		if (!agent) throw new Error(`no engine ${req.engine} here`)
-		const names = async () => {
-			// the tool names the agent may ask about (to tell Hubbyware's from its own)
-			const res = await fetch(mcp.url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mcp.token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) })
-			const body = await res.json() as { result?: { tools?: Array<{ name: string }> } }
-			return (body.result?.tools ?? []).map(t => t.name)
-		}
-		return await runAcp(agent, req, key, mcp, names, emit, controller.signal)
+		if (req.engine !== 'claude-code') throw new Error(`no engine ${req.engine} here`)
+		return await runClaude(req, key, mcp, emit, controller.signal)
 	}
 	finally {
 		mcp.close()
