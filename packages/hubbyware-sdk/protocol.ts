@@ -62,7 +62,7 @@ export type GuestMessage =
 /** Host → guest. */
 export type HostMessage =
 	/** `theme`, `accent`: the app's (a host from before themes sends none: dark, blue) */
-	| { type: 'init', hubby: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string }
+	| { type: 'init', hubby: string, path: string, phone: boolean, scopes: string[], theme?: 'light' | 'dark', accent?: string, apiBase?: string }
 	| { type: 'result', id: number, ok: true, value: unknown }
 	| { type: 'result', id: number, ok: false, error: string, failure?: CallError }
 	| { type: 'back' }

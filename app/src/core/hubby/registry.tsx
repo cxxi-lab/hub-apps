@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { useNavigate } from 'react-router'
 import { platform, type HubbyPackage, type RestrictedHubbyPackage } from '@platform'
 import { api } from '@core/api/client'
 import { describe, entryIcon, type HubbyInfo } from './describe'
@@ -185,9 +186,13 @@ export async function uninstallHubby(id: string): Promise<void> {
  * the app; one route, /<id> and everything under it, shows its frame; its navigation is the one
  * the frame announces.
  */
-function isolatedManifest(entry: { id: string, label: string, description?: string, icon?: HubbyPackage['icon'], version?: string }): HubbyManifest {
+function isolatedManifest(entry: { id: string, label: string, description?: string, icon?: HubbyPackage['icon'], version?: string, settingsPage?: unknown }): HubbyManifest {
 	const Page = () => <HubbyHost hubby={entry.id} />
+	// its own settings are a page of its frame (hubby.json `settingsPage`): its part of the Hubbies
+	// screen opens it (a frame can't open a modal over the app from inside that screen)
+	const settingsPage = typeof entry.settingsPage === 'string' && entry.settingsPage.startsWith(`/${entry.id}/`) ? entry.settingsPage : null
 	return {
+		...(settingsPage ? { Settings: () => <SettingsLink label={entry.label} to={settingsPage} /> } : {}),
 		id: entry.id,
 		// what its hubby.json says the app enforces (local, the shell's capabilities, the VPN…)
 		...describe({ version: entry.version ?? '', sdk: '', ...(entry as Partial<HubbyInfo>), label: entry.label }),
@@ -196,6 +201,19 @@ function isolatedManifest(entry: { id: string, label: string, description?: stri
 		navItems: [],
 		routes: [{ path: `/${entry.id}`, Component: Page, persistent: true, prefix: true }]
 	}
+}
+
+function SettingsLink({ label, to }: { label: string, to: string }) {
+	const navigate = useNavigate()
+	return (
+		<button
+			type="button"
+			onClick={() => navigate(to)}
+			className="self-start h-9 px-4 rounded border border-steel-700 bg-steel-800 hover:bg-steel-700 text-sm text-steel-100 cursor-pointer"
+		>
+			Open {label}'s settings
+		</button>
+	)
 }
 
 /** A hubby's manifest among its entry's exports. */

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { api, ApiError } from '@core/api/client'
+import { getApiBaseUrl } from '@core/api/baseUrl'
 import { collection } from './collections'
 import { createOAuth } from './oauth'
 import { hubbyApi } from './tokens'
@@ -182,7 +183,7 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			const m = data.message
 			switch (m.type) {
 				case 'ready':
-					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent() })
+					send({ type: 'init', hubby, path: state.current.inner ?? '/', phone: state.current.phone, scopes: [], theme: currentTheme(), accent: currentAccent(), apiBase: getApiBaseUrl() })
 					send({ type: 'state', state: state.current.appState })
 					break
 				case 'register':
@@ -234,7 +235,9 @@ export function HubbyHost({ hubby }: { hubby: string }) {
 			ref={frame}
 			title={hubby}
 			src={src}
-			sandbox="allow-scripts allow-forms"
+			// popups: its links open outside the app (the system's browser, the shell decides), as a
+			// mail's links and attachments do
+			sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
 			className="flex-1 min-h-0 w-full border-0 bg-steel-900"
 		/>
 	)

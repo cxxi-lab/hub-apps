@@ -7,7 +7,7 @@
 //   <out>/hubby-runtime/<name>.js, <out>/hubby-runtime/runtime.css
 // Run by the app build (build/sharedRuntime.ts, after the hubbies), or by hand:
 //   node scripts/build-hubby-runtime.mjs [out]
-import { build } from 'vite'
+import { build, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import svgr from 'vite-plugin-svgr'
@@ -74,12 +74,17 @@ export async function buildHubbyRuntime(out) {
 	// nothing else inline), the base styles then the hubby's, the boot script. No network.
 	const importMap = JSON.stringify({ imports: Object.fromEntries(Object.entries(RUNTIME).map(([spec, name]) => [spec, `/_runtime/${name}.js`])) })
 	const mapHash = createHash('sha256').update(importMap).digest('base64')
+	// media from the server only (its signed assets, its proxied images: docs/plan-isolation.md D4),
+	// the production one and the local one (the app switches between them); still no connection
+	const env = loadEnv('production', APP, 'VITE_')
+	const servers = [env.VITE_SERVER_URL_PROD, env.VITE_SERVER_URL_DEV].filter(Boolean).map(u => new URL(u).origin).join(' ')
 	const csp = [
 		"default-src 'none'",
 		`script-src 'self' 'sha256-${mapHash}'`,
 		"style-src 'self' 'unsafe-inline'",
 		"font-src 'self' data:",
-		"img-src 'self' data: blob:",
+		`img-src 'self' data: blob: ${servers}`,
+		`media-src 'self' blob: ${servers}`,
 		"connect-src 'none'"
 	].join('; ')
 	writeFileSync(join(outDir, 'frame.html'), `<!doctype html>

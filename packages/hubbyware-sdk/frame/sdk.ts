@@ -162,6 +162,11 @@ export function call<T>(method: string, ...args: unknown[]): Promise<T> {
 	})
 }
 
+/** The host's `init`, as received (null before it). */
+export function currentInit(): Extract<HostMessage, { type: 'init' }> | null {
+	return init
+}
+
 export function useInit() {
 	const [value, setValue] = useState(init)
 	useEffect(() => {

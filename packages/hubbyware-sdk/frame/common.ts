@@ -4,10 +4,11 @@
 // one doesn't (`platform`, the app's components, webviews…) is left out on purpose: a hubby using
 // it can't run isolated yet.
 import { createElement, useEffect, useState, type ReactNode } from 'react'
-import { call, useAppState, watchCollection } from './sdk'
+import { call, currentInit, useAppState, watchCollection } from './sdk'
 
 export { api, apiStream, ApiError, errorMessage, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type OAuthConnection, type Task, type TaskState } from './sdk'
 export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
+export { BottomBar, type BottomBarEntry, type BottomBarTab } from './BottomBar'
 export { useBackHandler, useMediaQuery } from '@cxxi-lab/hubbyware-ui'
 // the design system's components, as the app's SDK hands them too
 export {
@@ -125,6 +126,15 @@ const NO_CONTRIBUTIONS: never[] = []
  */
 export function useContributions(_point: string): never[] {
 	return NO_CONTRIBUTIONS
+}
+
+/**
+ * The server's base URL (its origin is the one the frame may show media from: signed assets,
+ * proxied images). Not to call it: the frame can't reach the network, `api()` goes through the
+ * host. Empty until the host's `init`.
+ */
+export function getApiBaseUrl(_path?: string): string {
+	return currentInit()?.apiBase ?? ''
 }
 
 // --- helpers (as in the app) ---
