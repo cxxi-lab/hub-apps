@@ -18,6 +18,11 @@ import type { AppState, CallError, SurfaceState } from '@cxxi-lab/hubbyware-sdk/
 import { storageSet, storageSnapshot } from './storage'
 import { SurfaceViews, surfaceMethods, type WebviewElement } from './HubbySurfaces'
 import { callAll, callHubby, isAvailable, served, serveFrom } from './apis'
+import { askModelConsent } from '@core/ai/ModelConsent'
+import type { AiChatRequest } from '@platform'
+
+// ai.chat's ids, unique across the frames (the main process tells their answers apart by them)
+let nextChat = 1
 
 /**
  * What a frame learns of the shell (its URL: a manifest reads it as it loads). The companion's
@@ -250,6 +255,32 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 				if (!isAvailable(target)) throw new Error(`${target} is not available`)
 				if (!headless) navigate(`/${target}${path === '/' ? '' : path}`)
 				return null
+			},
+			// a model of its own on this device (client docs/plan-ia-moteur.md § 6): its answer streams
+			// as `stream` events of `id`; the first use asks the user (the model allowed, downloaded)
+			'ai.chat': async (id: unknown, request: unknown) => {
+				if (!granted('app:ai')) throw new Error('scope_denied: app:ai')
+				const ai = platform.localAi
+				if (!ai) throw new Error('local AI is not available on this device')
+				if (typeof id !== 'number') throw new Error('invalid stream id')
+				const chatId = nextChat++
+				const controller = new AbortController()
+				streams.set(id, controller)
+				controller.signal.addEventListener('abort', () => ai.abort(chatId))
+				const off = ai.onEvent(e => { if (e.id === chatId) send({ type: 'stream', stream: id, event: e.kind, data: e.text }) })
+				try {
+					for (let attempt = 0; ; attempt++) {
+						const out = await ai.chat(chatId, hubby, request as AiChatRequest)
+						if (out.ok) return out.result
+						const model = (request as { model?: unknown } | null)?.model
+						if ((out.code === 'consent' || out.code === 'missing') && attempt === 0 && typeof model === 'string' && await askModelConsent(hubby, model)) continue
+						throw new Error(`${out.code}: ${out.message}`)
+					}
+				}
+				finally {
+					off()
+					streams.delete(id)
+				}
 			},
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')

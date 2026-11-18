@@ -6,7 +6,7 @@
 import { createElement, useEffect, useState, type ReactNode } from 'react'
 import { call, currentInit, useAppState, watchCollection } from './sdk'
 
-export { api, apiStream, ApiError, errorMessage, hubbies, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type ApiHandler, type HubbyAnswer, type TimelineEntry, type OAuthConnection, type Task, type TaskState } from './sdk'
+export { ai, api, apiStream, ApiError, errorMessage, hubbies, nav, notifications, oauth, settings, tasks, useAppState, useInit, usePath, type AiChatOptions, type AiChatRequest, type AiChatResult, type AiMessage, type AiTool, type AiToolCall, type ApiHandler, type HubbyAnswer, type TimelineEntry, type OAuthConnection, type Task, type TaskState } from './sdk'
 export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } from './hubby'
 export { BottomBar, type BottomBarEntry, type BottomBarTab } from './BottomBar'
 export { platform, storage, type Capabilities, type FramePlatform } from './platform'

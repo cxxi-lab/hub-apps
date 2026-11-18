@@ -6,6 +6,7 @@ import { KeepAlive } from '@core/layout/KeepAlive'
 import { TopBar } from '@core/layout/TopBar'
 import { HubbyUpdates } from '@core/hubby/HubbyUpdates'
 import { HubbyApiFrames } from '@core/hubby/HubbyApiFrames'
+import { ModelConsent } from '@core/ai/ModelConsent'
 import { setAvailableHubbies } from '@core/hubby/apis'
 import { useUpdating } from '@core/hubby/updates'
 import { HubbyNav } from '@core/layout/HubbyNav'
@@ -226,6 +227,7 @@ export function AppLayout() {
 			<TopBar domains={topBarDomains} activeDomainId={activeDomain?.id ?? null} />
 			<HubbyUpdates activeHubby={activeDomain?.id ?? null} />
 			<HubbyApiFrames />
+			<ModelConsent />
 			{/* on phones the hubby nav is a bar under the content (column, the bar last) */}
 			<div className="relative flex-1 flex max-sm:flex-col min-h-0 overflow-hidden">
 				{activeDomain && activeDomain.items.length > 0 && (

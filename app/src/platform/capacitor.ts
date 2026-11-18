@@ -14,6 +14,7 @@ import { createLocalStore } from './capacitorLocalStore'
 
 const capabilities: PlatformCapabilities = {
 	companion: false,
+	localAi: false,
 	vpn: true,
 	vpnPerWebview: false,
 	privateMode: true,
@@ -209,6 +210,7 @@ export function createCapacitorPlatform(): Platform {
 		localStore: createLocalStore(),
 		hubbyStore: import.meta.env.DEV ? null : createHubbyStore(),
 		localModels: null,
+		localAi: null,
 		// served by the WebView (HubbyStore intercepts these hosts)
 		hubbyUrl: hubby => `https://${hubby}.hubby.localhost/`,
 		openAbout: () => unavailable('openAbout'),

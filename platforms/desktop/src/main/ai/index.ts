@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 
 import { applyMenu } from '../app/menu'
 import { localEngine } from './engine'
+import { chat } from './chat'
 import { deviceInfo, downloadModel, installedModels, modelEvents, modelPlans, removeModel, setModelsDirectory } from './models'
 
 /**
@@ -29,6 +30,16 @@ export function setupLocalAi(): void {
 		setModelsDirectory(res.filePaths[0])
 		return res.filePaths[0]
 	})
+	// ai.chat (the app has checked the hubby's scope): the answer streams to the window that asked
+	const chats = new Map<number, AbortController>()
+	ipcMain.handle('ai:chat', (e, id: unknown, hubby: unknown, request: unknown) => {
+		if (typeof id !== 'number' || typeof hubby !== 'string') return { ok: false, code: 'invalid', message: 'invalid chat' }
+		const controller = new AbortController()
+		chats.set(id, controller)
+		return chat(hubby, request, (kind, text) => { if (!e.sender.isDestroyed()) e.sender.send('ai:chat:event', { id, kind, text }) }, controller.signal)
+			.finally(() => chats.delete(id))
+	})
+	ipcMain.on('ai:chat:abort', (_e, id: unknown) => { if (typeof id === 'number') chats.get(id)?.abort() })
 	modelEvents.on('changed', () => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('ai-models:changed') })
 	app.on('will-quit', () => { void localEngine.stop(true) })
 	const model = process.env.HUB_AI_ENGINE_SELFTEST

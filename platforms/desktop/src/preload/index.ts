@@ -117,6 +117,13 @@ const api = {
 		onFailure: (cb: (failure: { hubby: string, name: string, error: string }) => void): (() => void) => subscribe('ai-models:failed', cb)
 	},
 
+	// ai.chat (main: ai/chat.ts): its answer streams as ai:chat:event
+	localAi: {
+		chat: (id: number, hubby: string, request: unknown) => ipcRenderer.invoke('ai:chat', id, hubby, request),
+		abort: (id: number): void => { ipcRenderer.send('ai:chat:abort', id) },
+		onEvent: (cb: (event: { id: number, kind: 'delta' | 'reasoning', text: string }) => void): (() => void) => subscribe('ai:chat:event', cb)
+	},
+
 	systemNotifications: {
 		sync: (items: SystemNotification[]): void => {
 			ipcRenderer.send('system-notifications:sync', items)

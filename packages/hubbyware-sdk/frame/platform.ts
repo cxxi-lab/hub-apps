@@ -57,6 +57,8 @@ export interface Capabilities {
 	nativePlayer?: boolean
 	vpn?: boolean
 	vpnPerWebview?: boolean
+	/** AI models run on this device (`ai.chat`) */
+	localAi?: boolean
 	/** never in a frame (docs/plan-isolation.md D5) */
 	companion?: boolean
 	[name: string]: boolean | undefined

@@ -14,6 +14,7 @@ declare global {
 
 const capabilities: PlatformCapabilities = {
 	companion: true,
+	localAi: true,
 	vpn: true,
 	vpnPerWebview: true,
 	privateMode: true,
@@ -47,6 +48,7 @@ export function createElectronPlatform(): Platform {
 		push: null,
 		hubbyStore: import.meta.env.DEV ? null : window.api.hubbyStore,
 		localModels: window.api.localModels,
+		localAi: window.api.localAi,
 		// served by the main process (its hubby:// protocol)
 		hubbyUrl: hubby => `hubby://${hubby}/`
 	}

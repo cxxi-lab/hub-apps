@@ -207,6 +207,71 @@ export async function apiStream(path: string, options: RequestInit, onEvent: (ev
 	}
 }
 
+// --- its AI models (client docs/plan-ia-moteur.md § 6) ---
+
+export interface AiMessage {
+	role: 'system' | 'user' | 'assistant' | 'tool'
+	content: string
+	/** an assistant's tool calls, sent back with their results */
+	tool_calls?: Array<{ id: string, type: 'function', function: { name: string, arguments: string } }>
+	/** a tool message: the call it answers */
+	tool_call_id?: string
+}
+
+export interface AiTool { type: 'function', function: { name: string, description?: string, parameters?: Record<string, unknown> } }
+
+export interface AiChatRequest {
+	/** one of its models, by its name in its hubby.json "ai" */
+	model: string
+	messages: AiMessage[]
+	tools?: AiTool[]
+	temperature?: number
+	/** at most 8192 (default 1024) */
+	maxTokens?: number
+	/** let a reasoning model think first (its thoughts: onReasoning); default false */
+	reasoning?: boolean
+}
+
+export interface AiToolCall { id: string, name: string, arguments: unknown, error?: string }
+
+export interface AiChatResult {
+	content: string
+	toolCalls: AiToolCall[]
+	finishReason: string | null
+	usage: { promptTokens: number, completionTokens: number } | null
+}
+
+export interface AiChatOptions {
+	/** the answer as it comes */
+	onDelta?: (text: string) => void
+	onReasoning?: (text: string) => void
+	signal?: AbortSignal
+}
+
+/**
+ * The AI models it declares (its hubby.json "ai"), run on the user's device — nothing leaves it
+ * (scope `app:ai`; `platform.capabilities.localAi`). The first use asks the user to allow (and
+ * download) the model; refused, the call fails.
+ */
+export const ai = {
+	async chat(request: AiChatRequest, options: AiChatOptions = {}): Promise<AiChatResult> {
+		const id = nextStream++
+		const abort = () => { void call('stream.abort', id) }
+		streamListeners.set(id, (event, data) => {
+			if (event === 'delta') options.onDelta?.(String(data))
+			else if (event === 'reasoning') options.onReasoning?.(String(data))
+		})
+		options.signal?.addEventListener('abort', abort)
+		try {
+			return await call<AiChatResult>('ai.chat', id, request)
+		}
+		finally {
+			streamListeners.delete(id)
+			options.signal?.removeEventListener('abort', abort)
+		}
+	}
+}
+
 /** Called with a document's id each time one of the collection changes (here or elsewhere). */
 export function watchCollection(name: string, listener: (id: string) => void): () => void {
 	let set = changeListeners.get(name)

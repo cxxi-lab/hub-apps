@@ -203,6 +203,35 @@ export interface LocalModelsApi {
 	onFailure(cb: (failure: { hubby: string, name: string, error: string }) => void): Unsubscribe
 }
 
+/** What a hubby asks a local model (`ai.chat`, client docs/plan-ia-moteur.md § 6). */
+export interface AiChatRequest {
+	model: string
+	messages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool', content: string, tool_calls?: unknown[], tool_call_id?: string }>
+	tools?: Array<{ type: 'function', function: { name: string, description?: string, parameters?: Record<string, unknown> } }>
+	temperature?: number
+	maxTokens?: number
+	reasoning?: boolean
+}
+
+export interface AiChatResult {
+	content: string
+	toolCalls: Array<{ id: string, name: string, arguments: unknown, error?: string }>
+	finishReason: string | null
+	usage: { promptTokens: number, completionTokens: number } | null
+}
+
+/** consent / missing: the user has to allow / download the model first (the app asks, then calls again) */
+export type AiChatOutcome =
+	| { ok: true, result: AiChatResult }
+	| { ok: false, code: 'consent' | 'missing' | 'unavailable' | 'invalid' | 'failed', message: string }
+
+/** The local models, as the hubbies use them (main: ai/chat.ts). */
+export interface LocalAiApi {
+	chat(id: number, hubby: string, request: AiChatRequest): Promise<AiChatOutcome>
+	abort(id: number): void
+	onEvent(cb: (event: { id: number, kind: 'delta' | 'reasoning', text: string }) => void): Unsubscribe
+}
+
 export interface SystemNotification {
 	id: number
 	title: string
@@ -377,6 +406,8 @@ export interface PlatformCapabilities {
 	mute: boolean
 	/** developer "local server" toggle */
 	devMode: boolean
+	/** AI models running on the device (`ai.chat`) */
+	localAi: boolean
 }
 
 /**
@@ -497,6 +528,8 @@ export interface Platform {
 	readonly hubbyStore: HubbyStoreApi | null
 	/** null: no local AI models here (Android, for now) */
 	readonly localModels: LocalModelsApi | null
+	/** null: no local AI here (Android, for now) */
+	readonly localAi: LocalAiApi | null
 	/**
 	 * Where an isolated hubby's frame loads from (its own origin: desktop hubby://<id>/, Android
 	 * https://<id>.hubby.localhost/); null where hubbies can't run isolated (yet).
