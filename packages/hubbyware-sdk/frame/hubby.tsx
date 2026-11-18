@@ -36,7 +36,7 @@ export interface ManifestDefinition {
 	routes: Array<{ path: string, Component: ComponentType, persistent?: boolean, prefix?: boolean }>
 	/** contexts around all its pages, outermost first */
 	providers?: Array<ComponentType<{ children: ReactNode }>>
-	[other: string]: unknown
+	pages?: never
 }
 
 export type HubbyDefinition = PagesDefinition | ManifestDefinition
@@ -115,12 +115,12 @@ function ManifestPages({ definition }: { definition: ManifestDefinition }) {
 	const { pathname } = useLocation()
 	const matches = (route: ManifestDefinition['routes'][number]) => pathname === route.path || (!!route.prefix && pathname.startsWith(`${route.path}/`))
 	const pages = definition.routes.map(route => route.persistent
-		? createElement(KeepAlive, { key: route.path, when: matches(route) }, createElement(route.Component))
+		? createElement(KeepAlive, { key: route.path, when: matches(route), children: createElement(route.Component) })
 		: matches(route) ? createElement(route.Component, { key: route.path }) : null)
 	const content = definition.routes.some(matches)
 		? createElement(Fragment, null, ...pages)
 		: createElement(Fragment, null, ...pages, createElement('p', { key: '_none', className: 'p-6 text-sm text-steel-400' }, `Nothing at ${pathname}`))
-	return (definition.providers ?? []).reduceRight<ReactNode>((inner, Provider) => createElement(Provider, null, inner), content)
+	return (definition.providers ?? []).reduceRight<ReactNode>((inner, Provider) => createElement(Provider, { children: inner }), content)
 }
 
 /** Waits for the host's `init` (the hubby's id, its path), then runs the hubby inside react-router. */
@@ -147,7 +147,7 @@ function ManifestRoot({ definition }: { definition: ManifestDefinition }) {
 /** Runs a hubby in its frame: announces its pages to the host, renders the one it is on. */
 export function start(definition: HubbyDefinition): void {
 	const root = createRoot(document.getElementById('root')!)
-	if ('pages' in definition) {
+	if (definition.pages !== undefined) {
 		const pages: HubbyPage[] = definition.pages.map(p => ({ path: p.path, title: p.title, icon: p.icon, section: p.nav ? (p.nav.section ?? '') : undefined }))
 		root.render(createElement(StrictMode, null, createElement(PagesRouter, { definition })))
 		connect()

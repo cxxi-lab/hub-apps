@@ -8,7 +8,7 @@
 		"./platform": "./src/platform/types.ts"
 	},
 	"scripts": {
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && tsc -p ../packages/hubbyware-sdk",
 		"check:boundaries": "node scripts/check-boundaries.mjs",
 		"build": "vite build",
 		"build:mobile": "vite build",
