@@ -278,6 +278,8 @@ export interface AgentEngine {
 
 export interface AgentRunRequest {
 	engine: string
+	/** the session of the account's device whose engine runs it (another one: relayed, core/ai/remote.ts); none: this one */
+	device?: string | null
 	conversation: string
 	text: string
 	transcript?: string | null

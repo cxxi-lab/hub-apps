@@ -46,7 +46,7 @@ app.commandLine.appendSwitch('force-webrtc-ip-handling-policy', 'disable_non_pro
 
 // Dev only: Chrome DevTools Protocol on loopback, so tooling can drive and
 // inspect the UI (touch emulation, screenshots, console).
-if (!app.isPackaged) app.commandLine.appendSwitch('remote-debugging-port', '9222')
+if (!app.isPackaged) app.commandLine.appendSwitch('remote-debugging-port', process.env.HUB_DEVTOOLS_PORT ?? '9222')
 
 ipcMain.handle('app:version', () => app.getVersion())
 

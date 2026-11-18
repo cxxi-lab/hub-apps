@@ -21,6 +21,7 @@ import { callAll, callHubby, isAvailable, served, serveFrom } from './apis'
 import { askModelConsent } from '@core/ai/ModelConsent'
 import { agentCall, agentTools, assistantHubbies, hubbiesWithApis, setAssistantHubbies } from '@core/ai/agent'
 import { onAgentCall } from '@core/ai/agentBridge'
+import { remoteDevices, remoteRun, thisDevice } from '@core/ai/remote'
 import type { AgentRunRequest } from '@platform'
 import type { AiChatRequest } from '@platform'
 
@@ -318,12 +319,36 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
 				return platform.agentBridge ? platform.agentBridge.engines() : []
 			},
+			// the account's devices and the engines each offers (this one: current; the remote engine)
+			'agent.devices': async () => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				return remoteDevices()
+			},
+			'agent.thisDevice': async () => {
+				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
+				return thisDevice()
+			},
 			'agent.run': async (id: unknown, request: unknown) => {
 				if (!granted('app:agent')) throw new Error('scope_denied: app:agent')
-				const bridge = platform.agentBridge
-				if (!bridge) throw new Error('device agents are not available on this device')
 				if (typeof id !== 'number') throw new Error('invalid stream id')
 				const req = request as AgentRunRequest
+				// on another of the account's devices: relayed there, sealed (its go-aheads asked here)
+				if (req?.device && req.device !== await thisDevice()) {
+					const controller = new AbortController()
+					streams.set(id, controller)
+					try {
+						return await remoteRun(req.device, hubby, req, {
+							signal: controller.signal,
+							onEvent: (kind, text) => send({ type: 'stream', stream: id, event: kind, data: text }),
+							onCall: call => send({ type: 'stream', stream: id, event: 'call', data: call })
+						})
+					}
+					finally {
+						streams.delete(id)
+					}
+				}
+				const bridge = platform.agentBridge
+				if (!bridge) throw new Error('device agents are not available on this device')
 				const runId = nextChat++
 				const controller = new AbortController()
 				streams.set(id, controller)

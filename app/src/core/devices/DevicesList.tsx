@@ -4,7 +4,7 @@ import { fetchSessions, revokeSession, type DeviceSession } from '@core/api/sess
 import { errorMessage } from '@core/api/client'
 
 /** What a user agent says, shortly: the app and its version, the system. */
-function describe(session: DeviceSession): { name: string; detail: string | null } {
+export function describe(session: Pick<DeviceSession, 'userAgent' | 'client'>): { name: string; detail: string | null } {
 	const agent = session.userAgent ?? ''
 	const app = agent.match(/\bhub(?:-dev)?\/([\d.]+)/i)?.[1]
 	const android = agent.match(/Android ([\d.]+)/)?.[1]

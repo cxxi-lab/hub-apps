@@ -21,8 +21,8 @@ const asking = new Map<string, Promise<Held>>()
 /** asked again this long before it runs out */
 const MARGIN = 60_000
 
-/** The session of the account's token (its `sid`), null without one. */
-async function session(): Promise<string | null> {
+/** The session of the account's token (its `sid`: this device, for the server), null without one. */
+export async function session(): Promise<string | null> {
 	const { token } = await getAuthData()
 	if (!token) return null
 	try {

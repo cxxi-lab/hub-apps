@@ -39,6 +39,16 @@ type ServerEvent =
 	| { type: 'reload' }
 	/** a local-first module's data got new operations (docs/plan-local-first.md § 3.4) */
 	| { type: 'sync', module: string, position: number }
+	/** a sealed message from another session of the account, for one of them (core/ai/remote.ts) */
+	| { type: 'relay', from: string, to: string, sealed: string }
+
+const relayListeners = new Set<(event: { from: string, to: string, sealed: string }) => void>()
+
+/** Called with every relayed message on the account's topic (each for one session: the listener filters). */
+export function onRelayEvent(listener: (event: { from: string, to: string, sealed: string }) => void): () => void {
+	relayListeners.add(listener)
+	return () => { relayListeners.delete(listener) }
+}
 
 const syncListeners = new Set<(module: string, position: number) => void>()
 
@@ -159,6 +169,9 @@ function apply(event: ServerEvent): void {
 	else if (event.type === 'sync') {
 		syncListeners.forEach(listener => listener(event.module, event.position))
 	}
+	else if (event.type === 'relay') {
+		relayListeners.forEach(listener => listener(event))
+	}
 	else {
 		void load().catch(() => {})
 	}
@@ -177,8 +190,13 @@ async function listen(live: Live, signal: AbortSignal): Promise<void> {
 	await readEventStream(response.body, (_name, data) => apply(data as ServerEvent))
 }
 
+// each connect() a generation: one started meanwhile (or a stop) makes an earlier one give up — never
+// two streams open at once (each event applied twice)
+let generation = 0
+
 /** Reads the list and (re)connects to the hub, or polls without one. */
 async function connect(): Promise<void> {
+	const mine = ++generation
 	stream?.abort()
 	stream = null
 	if (renewTimer) clearTimeout(renewTimer)
@@ -187,10 +205,12 @@ async function connect(): Promise<void> {
 		live = await load()
 	}
 	catch (err) {
+		if (mine !== generation) return
 		console.warn('[notifications] not read', err)
 		retryLater()
 		return
 	}
+	if (mine !== generation || !started) return
 	if (!live) {
 		pollTimer ??= setInterval(() => { void load().catch(() => {}) }, POLL_MS)
 		return
@@ -227,6 +247,7 @@ export function startNotifications(): () => void {
 	window.addEventListener('focus', onFocus)
 	return () => {
 		started = false
+		generation++
 		window.removeEventListener('focus', onFocus)
 		stream?.abort()
 		stream = null

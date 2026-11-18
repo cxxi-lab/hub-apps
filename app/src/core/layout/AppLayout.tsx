@@ -9,6 +9,7 @@ import { HubbyApiFrames } from '@core/hubby/HubbyApiFrames'
 import { ModelConsent } from '@core/ai/ModelConsent'
 import { AgentConfirm } from '@core/ai/AgentConfirm'
 import { startAgentBridge } from '@core/ai/agentBridge'
+import { startRemote } from '@core/ai/remote'
 import { setAvailableHubbies } from '@core/hubby/apis'
 import { useUpdating } from '@core/hubby/updates'
 import { HubbyNav } from '@core/layout/HubbyNav'
@@ -122,6 +123,8 @@ export function AppLayout() {
 	useEffect(() => { setAvailableHubbies(answering ? answering.split(',') : []) }, [answering])
 	// a device agent's requests through Hubbyware's MCP server (desktop): answered here, as the assistant's
 	useEffect(() => startAgentBridge(), [])
+	// this device's presence and engines for the account's other devices, and the turns they ask it
+	useEffect(() => startRemote(), [])
 
 	// An enabled hubby this device doesn't have yet is installed, then shown (on every device).
 	useEffect(() => {

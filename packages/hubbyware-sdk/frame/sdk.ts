@@ -292,8 +292,21 @@ export interface AgentEngine {
 	note: string | null
 }
 
+/** One of the account's devices (`ai.agent.devices`). */
+export interface AgentDevice {
+	id: string
+	label: string
+	detail: string | null
+	online: boolean
+	seenAt: string | null
+	current: boolean
+	engines: Array<{ id: string, label: string }>
+}
+
 export interface AgentRunRequest {
 	engine: string
+	/** the device whose engine runs it (`ai.agent.devices`: another one, the turn is relayed there, its go-aheads asked here); none: this one */
+	device?: string | null
 	conversation: string
 	/** the user's new message */
 	text: string
@@ -354,8 +367,12 @@ export const ai = {
 		call: (conversation: string, tool: string, input: unknown) => call<AgentCallResult>('agent.call', conversation, tool, input),
 		access: () => call<{ opened: string[], hubbies: Array<{ hubby: string, label: string, methods: number, writes: boolean, outward: boolean }> }>('agent.access'),
 		setAccess: (ids: string[]) => call<string[]>('agent.setAccess', ids),
-		/** the device's AI agents that may be a conversation's engine (desktop: Claude Code, ACP agents) */
+		/** the device's AI agents that may be a conversation's engine (desktop: Claude Code) */
 		engines: () => call<AgentEngine[]>('agent.engines'),
+		/** the account's devices (this one: current), up or not, and the engines each offers (a turn may run on one) */
+		devices: () => call<AgentDevice[]>('agent.devices'),
+		/** this device's id among them */
+		thisDevice: () => call<string | null>('agent.thisDevice'),
 		/**
 		 * A turn with one of them: its text as it comes (onDelta), Hubbyware's record of each call it
 		 * made (onCall: the trace to keep), the tools it tried that aren't Hubbyware's (onDenied).

@@ -1,7 +1,7 @@
 import { fetchSettings, updateSettings } from '@core/api/settings'
 import { allApis, callHubby, isAvailable, type ApiMethod } from '@core/hubby/apis'
 import { HUBBY_MANIFESTS } from '@core/hubby/registry'
-import { askAgentConfirmation } from './AgentConfirm'
+import { askAgentConfirmation, type AgentAnswer } from './AgentConfirm'
 
 /**
  * An AI assistant acting on the user's hubbies (client docs/plan-ia-agent.md, phase 1): its tools are
@@ -78,6 +78,16 @@ export async function agentTools(exclude?: string): Promise<{ tools: AgentTool[]
 	}
 }
 
+/** Who says yes or no for a conversation: this device's dialog, or (a turn run here for another device) that device's user. */
+type Confirmer = (tool: AgentTool, input: unknown) => Promise<AgentAnswer>
+const confirmers = new Map<string, Confirmer>()
+
+/** The go-aheads of `conversation`'s calls asked elsewhere (core/ai/remote.ts), or here again (null). */
+export function setConversationConfirmer(conversation: string, confirmer: Confirmer | null): void {
+	if (confirmer) confirmers.set(conversation, confirmer)
+	else confirmers.delete(conversation)
+}
+
 // the methods allowed for a whole conversation (write only; never outward), for this session
 const allowedIn = new Map<string, Set<string>>()
 
@@ -92,7 +102,7 @@ export async function agentCall(caller: string, conversation: string, name: stri
 		const already = tool.effect === 'write' && allowedIn.get(conversation)?.has(name)
 		if (already) confirmation = 'allowed-for-conversation'
 		else {
-			const answer = await askAgentConfirmation(tool, input)
+			const answer = await (confirmers.get(conversation) ?? askAgentConfirmation)(tool, input)
 			if (answer === 'deny') return { ...base, confirmation: 'denied', ok: false, error: 'the user did not allow it' }
 			if (answer === 'always' && tool.effect === 'write') {
 				const set = allowedIn.get(conversation) ?? new Set()
