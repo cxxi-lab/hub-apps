@@ -141,7 +141,24 @@ export interface HubbyAnswer<T> {
  */
 export const hubbies = {
 	call: <T = unknown>(hubby: string, method: string, input: unknown = {}) => call<T>('hubbies.call', hubby, method, input),
-	callAll: <T = unknown>(method: string, input: unknown = {}) => call<Array<HubbyAnswer<T>>>('hubbies.callAll', method, input)
+	callAll: <T = unknown>(method: string, input: unknown = {}) => call<Array<HubbyAnswer<T>>>('hubbies.callAll', method, input),
+	/** Opens a page of another hubby (its path, a query allowed: one of its items). */
+	open: (hubby: string, path: string) => call<null>('hubbies.open', hubby, path)
+}
+
+/**
+ * The interface `timeline.items` (scope `hubby:timeline.items`), as the platform defines it: a
+ * hubby's dated items between `start` and `end` (ISO date-times), each opening one of its pages
+ * (`href`: its path, `hubbies.open`). Every hubby's answer is checked against it.
+ */
+export interface TimelineEntry {
+	id: string
+	/** ISO date-time */
+	date: string
+	title: string
+	href: string
+	/** #rrggbb */
+	color?: string
 }
 
 /** The app's state, for this hubby (pushed by the host). */

@@ -17,7 +17,7 @@ import { useVpnStatus } from '@shared/hooks/useVpnStatus'
 import type { AppState, CallError, SurfaceState } from '@cxxi-lab/hubbyware-sdk/protocol'
 import { storageSet, storageSnapshot } from './storage'
 import { SurfaceViews, surfaceMethods, type WebviewElement } from './HubbySurfaces'
-import { callAll, callHubby, served, serveFrom } from './apis'
+import { callAll, callHubby, isAvailable, served, serveFrom } from './apis'
 
 /**
  * What a frame learns of the shell (its URL: a manifest reads it as it loads). The companion's
@@ -52,12 +52,14 @@ function apiPath(path: unknown): string {
 export function HubbyHost({ hubby, headless = false }: { hubby: string, headless?: boolean }) {
 	const frame = useRef<HTMLIFrameElement>(null)
 	const navigate = useNavigate()
-	const { pathname } = useLocation()
+	const { pathname, search } = useLocation()
 	const phone = useMediaQuery('(width < 40rem)')
 	const scopes = useHubbyScopes()
 	const [backDepth, setBackDepth] = useState(0)
 	const base = `/${hubby}`
-	const inner = pathname === base ? '/' : pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : null
+	// its page, with its query (a link to one of its items: `?session=…`)
+	const page = pathname === base ? '/' : pathname.startsWith(`${base}/`) ? pathname.slice(base.length) : null
+	const inner = page === null ? null : page + search
 	const base_ = platform.hubbyUrl(hubby)
 	const src = base_ ? `${base_}?capabilities=${frameCapabilities()}${headless ? '&headless' : ''}` : null
 	// its web surfaces (D3): the webviews shown over the frame
@@ -241,6 +243,13 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 				const scope = `hubby:${method}`
 				if (!granted(scope)) throw new Error(`scope_denied: ${scope}`)
 				return callAll(hubby, method, input)
+			},
+			// a page of another hubby (an item of its, shown here: Planner's calendar)
+			'hubbies.open': (target: unknown, path: unknown) => {
+				if (typeof target !== 'string' || typeof path !== 'string' || !path.startsWith('/')) throw new Error('hubbies.open(hubby, path)')
+				if (!isAvailable(target)) throw new Error(`${target} is not available`)
+				if (!headless) navigate(`/${target}${path === '/' ? '' : path}`)
+				return null
 			},
 			'notifications.upsert': () => {
 				if (!granted('app:notifications')) throw new Error('scope_denied: app:notifications')

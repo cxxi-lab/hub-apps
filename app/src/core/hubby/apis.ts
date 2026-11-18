@@ -36,6 +36,38 @@ export function setAvailableHubbies(ids: string[]): void {
 	if (stopped) changed()
 }
 
+/** Whether the hubby may answer (and be opened from another one) now. */
+export const isAvailable = (hubby: string): boolean => available.has(hubby)
+
+/**
+ * The interfaces the platform defines (their contract, whoever implements them): what is sent to
+ * each hubby offering one and what each gives back are checked against it too, so the caller can
+ * rely on it (the SDK's types: TimelineEntry).
+ */
+const ISO = '^\\d{4}-\\d{2}-\\d{2}T'
+export const INTERFACES: Record<string, { input: Schema, output: Schema }> = {
+	// dated items for a calendar (Planner): between start and end, ISO date-times
+	'timeline.items': {
+		input: { type: 'object', required: ['start', 'end'], properties: { start: { type: 'string', pattern: ISO }, end: { type: 'string', pattern: ISO } } },
+		output: {
+			type: 'array',
+			maxItems: 1000,
+			items: {
+				type: 'object',
+				required: ['id', 'date', 'title', 'href'],
+				properties: {
+					id: { type: 'string', maxLength: 200 },
+					date: { type: 'string', pattern: ISO },
+					title: { type: 'string', maxLength: 500 },
+					// a page of the hubby giving it (its path, a query allowed)
+					href: { type: 'string', pattern: '^/' },
+					color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' }
+				}
+			}
+		}
+	}
+}
+
 /** The hubbies offering an interface, with the method that implements it. */
 export function offering(iface: string): Array<{ hubby: string, method: string }> {
 	const found: Array<{ hubby: string, method: string }> = []
@@ -148,9 +180,18 @@ export async function callHubby(caller: string, hubby: string, method: string, i
 }
 
 /** Every hubby offering the interface: what each gave, or why it failed. */
-export function callAll(caller: string, iface: string, input: unknown): Promise<Array<{ hubby: string, result?: unknown, error?: string }>> {
+export async function callAll(caller: string, iface: string, input: unknown): Promise<Array<{ hubby: string, result?: unknown, error?: string }>> {
+	const contract = Object.hasOwn(INTERFACES, iface) ? INTERFACES[iface] : undefined
+	const invalid = contract && validate(contract.input, input)
+	if (invalid) throw new Error(`invalid input for ${iface}: ${invalid}`)
 	return Promise.all(offering(iface).map(({ hubby, method }) => callHubby(caller, hubby, method, input).then(
-		result => ({ hubby, result }),
+		result => {
+			const wrong = contract && validate(contract.output, result)
+			if (wrong) throw new Error(`${hubby} gave an invalid ${iface}: ${wrong}`)
+			return { hubby, result }
+		}
+	).then(
+		answer => answer,
 		(err: unknown) => ({ hubby, error: err instanceof Error ? err.message : String(err) })
 	)))
 }

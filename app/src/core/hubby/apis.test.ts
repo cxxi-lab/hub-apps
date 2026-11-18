@@ -44,10 +44,10 @@ function frame(hubby: string, handlers: Record<string, (input: any) => unknown>)
 test('a named hubby: checked in and out, answered by its frame', async () => {
 	setAvailableHubbies(['workout'])
 	const stop = frame('workout', {
-		'timeline.items': ({ start }) => [{ title: `Run from ${start}` }],
+		'timeline.items': ({ start }) => [{ id: 's1', date: start, title: 'Run', href: '/history?session=s1' }],
 		'sessions.broken': () => ({ not: 'an array' })
 	})
-	assert.deepEqual(await callHubby('planner', 'workout', 'timeline.items', { start: '2026-11-18' }), [{ title: 'Run from 2026-11-18' }])
+	assert.deepEqual(await callHubby('planner', 'workout', 'timeline.items', { start: '2026-11-18T00:00:00Z' }), [{ id: 's1', date: '2026-11-18T00:00:00Z', title: 'Run', href: '/history?session=s1' }])
 	await assert.rejects(callHubby('planner', 'workout', 'timeline.items', {}), /invalid input for workout timeline.items: \$.start: required/)
 	await assert.rejects(callHubby('planner', 'workout', 'sessions.broken', {}), /gave an invalid result: \$: expected array/)
 	await assert.rejects(callHubby('planner', 'workout', 'toString', {}), /offers no method toString/)
@@ -55,18 +55,25 @@ test('a named hubby: checked in and out, answered by its frame', async () => {
 	stop()
 })
 
-test('an interface: every hubby offering it, each answer or failure', async () => {
+test('an interface: every hubby offering it, each answer or failure, its contract checked', async () => {
 	setAvailableHubbies(['workout', 'budget'])
+	const range = { start: '2026-11-01T00:00:00.000Z', end: '2026-12-01T00:00:00.000Z' }
+	const run = { id: 's1', date: '2026-11-18T07:00:00.000Z', title: 'Run', href: '/history?session=s1', color: '#059669' }
+	let budget: () => unknown = () => { throw new Error('no bills here') }
 	const stops = [
-		frame('workout', { 'timeline.items': () => [{ title: 'Run' }] }),
-		frame('budget', { 'items': () => { throw new Error('no bills here') } })
+		frame('workout', { 'timeline.items': () => [run] }),
+		frame('budget', { 'items': () => budget() })
 	]
-	assert.deepEqual(await callAll('planner', 'timeline.items', { start: '2026-11-18' }), [
-		{ hubby: 'workout', result: [{ title: 'Run' }] },
+	assert.deepEqual(await callAll('planner', 'timeline.items', range), [
+		{ hubby: 'workout', result: [run] },
 		{ hubby: 'budget', error: 'no bills here' }
 	])
+	// the interface's contract, whatever the hubby's own api.json says
+	await assert.rejects(callAll('planner', 'timeline.items', { start: 'today' }), /invalid input for timeline.items: \$.end: required/)
+	budget = () => [{ id: 'b1', date: '2026-11-20', title: 'Rent', href: 'rent' }]
+	assert.match((await callAll('planner', 'timeline.items', range))[1].error ?? '', /budget gave an invalid timeline.items: \$\[0\].date: does not match its pattern/)
 	// a hubby locked or hidden meanwhile: no longer asked
-	setAvailableHubbies(['budget'])
-	assert.deepEqual((await callAll('planner', 'timeline.items', { start: 'x' })).map(a => a.hubby), ['budget'])
+	setAvailableHubbies(['workout'])
+	assert.deepEqual((await callAll('planner', 'timeline.items', range)).map(a => a.hubby), ['workout'])
 	stops.forEach(stop => stop())
 })

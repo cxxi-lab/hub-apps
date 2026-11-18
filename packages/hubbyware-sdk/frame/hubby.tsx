@@ -73,6 +73,8 @@ function PagesRouter({ definition }: { definition: PagesDefinition }) {
 // --- the manifest's form ---
 
 const pathOnly = (path: string) => path.split(/[?#]/)[0] || '/'
+/** Its query (`?session=…`), '' without one. */
+const queryOf = (path: string) => { const at = path.indexOf('?'); return at < 0 ? '' : path.slice(at).split('#')[0] }
 
 /** The app's path of a page of the hubby (`/` → `/<id>`), and back (null: not one of its pages). */
 const absolute = (id: string, inner: string) => `/${id}${inner === '/' ? '' : inner}`
@@ -90,10 +92,11 @@ function LocationSync({ id }: { id: string }) {
 	const hostPath = useRef(host)
 	hostPath.current = host
 
-	// the app moved (its navigation, back): the frame follows, without a new history entry
+	// the app moved (its navigation, back, a link of another hubby to one of its items): the frame
+	// follows, its query too, without a new history entry
 	useEffect(() => {
-		const target = absolute(id, pathOnly(host))
-		if (target !== location.pathname) navigate(target, { replace: true })
+		const target = absolute(id, pathOnly(host)) + queryOf(host)
+		if (target !== location.pathname + location.search) navigate(target, { replace: true })
 	}, [host])
 
 	// the hubby moved (a link, navigate()): the app follows
@@ -103,7 +106,7 @@ function LocationSync({ id }: { id: string }) {
 			console.warn(`[hubby] ${location.pathname} is not a page of ${id}: a hubby only navigates in its own pages`)
 			return
 		}
-		if (inner !== pathOnly(hostPath.current)) nav.navigate(inner + location.search)
+		if (inner + location.search !== pathOnly(hostPath.current) + queryOf(hostPath.current)) nav.navigate(inner + location.search)
 	}, [location.pathname, location.search])
 	return null
 }
