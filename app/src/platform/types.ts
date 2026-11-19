@@ -252,7 +252,31 @@ export interface LocalAiApi {
 	chat(id: number, hubby: string, request: AiChatRequest): Promise<AiChatOutcome>
 	abort(id: number): void
 	onEvent(cb: (event: { id: number, kind: 'delta' | 'reasoning', text: string }) => void): Unsubscribe
+	image(id: number, hubby: string, request: unknown): Promise<AiOutcome<AiImageResult>>
+	speech(id: number, hubby: string, request: unknown): Promise<AiOutcome<AiSpeechResult>>
+	/** the user picks a file for the hubby (null: cancelled) */
+	importFile(hubby: string, kind: AiImportKind): Promise<AiImportedFile | null>
+	/** the files a hubby imported (every one: null) */
+	importedFiles(hubby: string | null): Promise<AiImportedFile[]>
+	forgetFile(sha256: string): Promise<void>
 }
+
+export type AiImportKind = 'checkpoint' | 'lora' | 'audio'
+
+/** A file imported for a hubby's AI (desktop main: ai/imports.ts). */
+export interface AiImportedFile {
+	sha256: string
+	kind: AiImportKind
+	name: string
+	size: number
+	family: 'sdxl' | 'sd1' | 'flux' | 'unknown' | null
+	seconds: number | null
+	users: string[]
+}
+
+export interface AiImageResult { image: string, width: number, height: number, seed: number | null, seconds: number }
+export interface AiSpeechResult { audio: string, seconds: number }
+export type AiOutcome<T> = { ok: true, result: T } | { ok: false, code: 'consent' | 'missing' | 'unavailable' | 'invalid' | 'refused' | 'failed', message: string }
 
 /** A device agent's request, through Hubbyware's MCP server (main: ai/mcp.ts), for the app to answer (core/ai/agentBridge.ts). */
 export interface AgentRequest {

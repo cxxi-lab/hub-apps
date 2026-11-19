@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@cxxi-lab/hubbyware-ui'
-import { platform } from '@platform'
+import { type AiImportedFile, platform } from '@platform'
 import type { LocalModelsApi, LocalModelsState, ModelFit, ModelPlan } from '@platform'
 import { errorMessage } from '@core/api/client'
 
@@ -58,7 +58,12 @@ export function SettingsModels() {
 	const models = platform.localModels
 	const [state, setState] = useState<LocalModelsState | null>(null)
 	const [error, setError] = useState<string | null>(null)
-	const load = useCallback(() => models?.state().then(setState).catch(e => setError(errorMessage(e))), [models])
+	// files imported for a hubby (an image model, a LoRA, a voice sample): referenced where they are
+	const [imported, setImported] = useState<AiImportedFile[]>([])
+	const load = useCallback(() => {
+		void platform.localAi?.importedFiles(null).then(setImported).catch(() => {})
+		return models?.state().then(setState).catch(e => setError(errorMessage(e)))
+	}, [models])
 	useEffect(() => {
 		if (!models) return
 		void load()
@@ -110,6 +115,27 @@ export function SettingsModels() {
 					</div>
 				))}
 			</section>
+			{imported.length > 0 && (
+				<section className="bg-steel-900 border border-steel-700 rounded-md p-5 flex flex-col gap-4" data-testid="imported-files">
+					<div>
+						<h2 className="m-0 mb-1 text-sm font-semibold text-white uppercase tracking-wider">Imported files</h2>
+						<p className="m-0 text-xs text-steel-300">Image models, LoRA and voice samples you gave a hubby. They stay where they are on this device; forgetting one doesn't delete it.</p>
+					</div>
+					{imported.map(f => (
+						<div key={f.sha256} className="flex flex-wrap items-center gap-3 border-t border-steel-800 pt-3">
+							<div className="flex-1 min-w-0">
+								<div className="text-sm text-white truncate">{f.name}</div>
+								<div className="text-xs text-steel-400">
+									{f.kind === 'checkpoint' ? 'Image model' : f.kind === 'lora' ? 'LoRA' : 'Voice sample'}
+									{f.family && f.family !== 'unknown' ? ` · ${f.family.toUpperCase()}` : ''}
+									{f.seconds ? ` · ${f.seconds} s` : ` · ${gb(f.size)}`} · for {f.users.join(', ')}
+								</div>
+							</div>
+							<Button label="Forget" color="secondary" onClick={() => void platform.localAi?.forgetFile(f.sha256).then(() => load()).catch(e => setError(errorMessage(e)))} />
+						</div>
+					))}
+				</section>
+			)}
 		</div>
 	)
 }

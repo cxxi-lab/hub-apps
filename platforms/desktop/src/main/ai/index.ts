@@ -3,6 +3,9 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { applyMenu } from '../app/menu'
 import { localEngine, reapOrphanServer } from './engine'
 import { chat } from './chat'
+import { generateImage } from './image'
+import { speak } from './speech'
+import { forgetFile, importedFiles, importFile, type ImportKind } from './imports'
 import { openMcpSession } from './mcp'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -55,6 +58,26 @@ export function setupLocalAi(): void {
 			.finally(() => chats.delete(id))
 	})
 	ipcMain.on('ai:chat:abort', (_e, id: unknown) => { if (typeof id === 'number') chats.get(id)?.abort() })
+	// ai.image, ai.speech (the app has checked the hubby's scope), aborted like a chat (same ids)
+	ipcMain.handle('ai:image', (_e, id: unknown, hubby: unknown, request: unknown) => {
+		if (typeof id !== 'number' || typeof hubby !== 'string') return { ok: false, code: 'invalid', message: 'invalid image' }
+		const controller = new AbortController()
+		chats.set(id, controller)
+		return generateImage(hubby, request, controller.signal).finally(() => chats.delete(id))
+	})
+	ipcMain.handle('ai:speech', (_e, id: unknown, hubby: unknown, request: unknown) => {
+		if (typeof id !== 'number' || typeof hubby !== 'string') return { ok: false, code: 'invalid', message: 'invalid speech' }
+		const controller = new AbortController()
+		chats.set(id, controller)
+		return speak(hubby, request, controller.signal).finally(() => chats.delete(id))
+	})
+	// files the user imports for a hubby (a checkpoint, a LoRA, a voice sample): the dialog is the consent
+	ipcMain.handle('ai-files:add', (e, hubby: unknown, kind: unknown) => {
+		if (typeof hubby !== 'string' || !['checkpoint', 'lora', 'audio'].includes(String(kind))) throw new Error('a kind of file: checkpoint, lora or audio')
+		return importFile(hubby, kind as ImportKind, BrowserWindow.fromWebContents(e.sender))
+	})
+	ipcMain.handle('ai-files:list', (_e, hubby: unknown) => importedFiles(typeof hubby === 'string' ? hubby : null))
+	ipcMain.handle('ai-files:forget', (_e, sha256: unknown) => forgetFile(String(sha256)))
 	modelEvents.on('changed', () => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('ai-models:changed') })
 	app.on('will-quit', () => { void localEngine.stop(true) })
 	const model = process.env.HUB_AI_ENGINE_SELFTEST

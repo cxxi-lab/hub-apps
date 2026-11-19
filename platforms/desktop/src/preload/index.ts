@@ -131,7 +131,14 @@ const api = {
 	localAi: {
 		chat: (id: number, hubby: string, request: unknown) => ipcRenderer.invoke('ai:chat', id, hubby, request),
 		abort: (id: number): void => { ipcRenderer.send('ai:chat:abort', id) },
-		onEvent: (cb: (event: { id: number, kind: 'delta' | 'reasoning', text: string }) => void): (() => void) => subscribe('ai:chat:event', cb)
+		onEvent: (cb: (event: { id: number, kind: 'delta' | 'reasoning', text: string }) => void): (() => void) => subscribe('ai:chat:event', cb),
+		// ai.image, ai.speech (main: ai/image.ts, ai/speech.ts); abort() stops them too
+		image: (id: number, hubby: string, request: unknown) => ipcRenderer.invoke('ai:image', id, hubby, request),
+		speech: (id: number, hubby: string, request: unknown) => ipcRenderer.invoke('ai:speech', id, hubby, request),
+		// files imported for a hubby (main: ai/imports.ts)
+		importFile: (hubby: string, kind: 'checkpoint' | 'lora' | 'audio') => invoke('ai-files:add', hubby, kind),
+		importedFiles: (hubby: string | null) => invoke('ai-files:list', hubby),
+		forgetFile: (sha256: string): Promise<void> => invoke('ai-files:forget', sha256)
 	},
 
 	// a device agent's requests through Hubbyware's MCP server (main ai/mcp.ts), answered by the app

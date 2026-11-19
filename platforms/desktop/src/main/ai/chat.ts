@@ -1,4 +1,5 @@
-import { localEngine } from './engine'
+import path from 'node:path'
+import { localEngine, textServer } from './engine'
 import { modelFiles, modelPlans } from './models'
 
 /**
@@ -9,9 +10,13 @@ import { modelFiles, modelPlans } from './models'
  * sane, the engine runs it; the answer streams (`delta`), tool calls gathered at the end.
  */
 
+/** A part of a user's message for a vision model: text, or an image (a data: URL, JPEG/PNG/WebP). */
+export type ContentPart = { type: 'text', text: string } | { type: 'image', data: string }
+
 export interface ChatMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool'
-	content: string
+	/** text; a user's message to a vision model may be parts (text and images) */
+	content: string | ContentPart[]
 	/** an assistant's tool calls, as it made them (sent back with their results) */
 	tool_calls?: Array<{ id: string, type: 'function', function: { name: string, arguments: string } }>
 	/** a tool message: the call it answers */
@@ -51,22 +56,36 @@ const MAX_MESSAGES = 400
 const MAX_CHARS = 400_000
 const MAX_TOOLS = 64
 const MAX_TOKENS = 8_192
+const MAX_IMAGES = 4
+const MAX_IMAGE_CHARS = 8_000_000
+const IMAGE_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/
 
 function invalid(message: string): ChatOutcome {
 	return { ok: false, code: 'invalid', message }
 }
 
 /** The request as the engine gets it (only what it should see), or why not. */
-function checked(request: unknown): { body: Record<string, unknown>, model: string } | ChatOutcome {
+function checked(request: unknown): { body: Record<string, unknown>, model: string, images: boolean } | ChatOutcome {
 	const r = request as Partial<ChatRequest> | null
 	if (!r || typeof r !== 'object' || typeof r.model !== 'string' || !NAME.test(r.model)) return invalid('model: a model it declares, by name')
 	if (!Array.isArray(r.messages) || r.messages.length === 0 || r.messages.length > MAX_MESSAGES) return invalid(`messages: 1 to ${MAX_MESSAGES}`)
 	let chars = 0
+	let images = 0
 	const messages = []
 	for (const m of r.messages) {
-		if (!m || !ROLES.has(m.role) || typeof m.content !== 'string') return invalid('a message is { role: system|user|assistant|tool, content: string }')
-		chars += m.content.length
-		const out: Record<string, unknown> = { role: m.role, content: m.content }
+		if (!m || !ROLES.has(m.role) || (typeof m.content !== 'string' && !(m.role === 'user' && Array.isArray(m.content)))) return invalid('a message is { role: system|user|assistant|tool, content: string } (a user\'s: or parts)')
+		let content: unknown = m.content
+		if (Array.isArray(m.content)) {
+			const parts = []
+			for (const p of m.content) {
+				if (p?.type === 'text' && typeof p.text === 'string') { chars += p.text.length; parts.push({ type: 'text', text: p.text }) }
+				else if (p?.type === 'image' && typeof p.data === 'string' && p.data.length <= MAX_IMAGE_CHARS && IMAGE_URL.test(p.data)) { images++; parts.push({ type: 'image_url', image_url: { url: p.data } }) }
+				else return invalid('a part is { type: text, text } or { type: image, data: a data: URL (JPEG, PNG, WebP) }')
+			}
+			content = parts
+		}
+		else chars += m.content.length
+		const out: Record<string, unknown> = { role: m.role, content }
 		if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
 			out.tool_calls = m.tool_calls.map(c => ({ id: String(c?.id ?? ''), type: 'function', function: { name: String(c?.function?.name ?? ''), arguments: String(c?.function?.arguments ?? '{}') } }))
 		}
@@ -77,6 +96,7 @@ function checked(request: unknown): { body: Record<string, unknown>, model: stri
 		messages.push(out)
 	}
 	if (chars > MAX_CHARS) return invalid(`messages: at most ${MAX_CHARS} characters`)
+	if (images > MAX_IMAGES) return invalid(`at most ${MAX_IMAGES} images`)
 	const body: Record<string, unknown> = {
 		messages,
 		stream: true,
@@ -92,13 +112,8 @@ function checked(request: unknown): { body: Record<string, unknown>, model: stri
 		}
 		if (r.tools.length) body.tools = r.tools.map(t => ({ type: 'function', function: { name: t.function.name, description: t.function.description ?? '', parameters: t.function.parameters ?? { type: 'object', properties: {} } } }))
 	}
-	return { body, model: r.model }
+	return { body, model: r.model, images: images > 0 }
 }
-
-// the engine runs one model at a time: a switch waits for the answers under way
-let inFlight = 0
-let idle: Array<() => void> = []
-const settled = () => new Promise<void>(resolve => inFlight === 0 ? resolve() : idle.push(resolve))
 
 /** One chat; `onEvent` hears the answer as it comes ('delta': text, 'reasoning': its thoughts). */
 export async function chat(hubby: string, request: unknown, onEvent: (kind: 'delta' | 'reasoning', text: string) => void, signal: AbortSignal): Promise<ChatOutcome> {
@@ -113,21 +128,20 @@ export async function chat(hubby: string, request: unknown, onEvent: (kind: 'del
 	if (!files) return { ok: false, code: 'missing', message: `${req.model} is not downloaded yet` }
 	if (plan.family !== 'text') return invalid(`${req.model} is not a text model`)
 
-	if (localEngine.getInfo().model !== files[0]) await settled()
-	inFlight++
+	// a vision model: its projector (mmproj) beside it
+	const mmproj = files.find(f => /mmproj/i.test(path.basename(f)))
+	const main = files.find(f => f !== mmproj)!
+	if (req.images && !mmproj) return invalid(`${req.model} doesn't see images`)
 	try {
-		await localEngine.text(files[0])
-		const res = await localEngine.request('/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body), signal })
-		if (!res.ok || !res.body) return { ok: false, code: 'failed', message: `the engine answered ${res.status}: ${(await res.text()).slice(0, 300)}` }
-		return { ok: true, result: await readStream(res.body, onEvent) }
+		return await localEngine.use(textServer(main, mmproj ? { mmproj } : {}), async () => {
+			const res = await localEngine.request('/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body), signal })
+			if (!res.ok || !res.body) return { ok: false as const, code: 'failed' as const, message: `the engine answered ${res.status}: ${(await res.text()).slice(0, 300)}` }
+			return { ok: true as const, result: await readStream(res.body, onEvent) }
+		})
 	}
 	catch (err) {
 		if (signal.aborted) return { ok: false, code: 'failed', message: 'aborted' }
 		return { ok: false, code: 'failed', message: err instanceof Error ? err.message : String(err) }
-	}
-	finally {
-		inFlight--
-		if (inFlight === 0) { const waiting = idle; idle = []; waiting.forEach(w => w()) }
 	}
 }
 

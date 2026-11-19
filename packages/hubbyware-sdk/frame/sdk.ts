@@ -210,9 +210,13 @@ export async function apiStream(path: string, options: RequestInit, onEvent: (ev
 
 // --- its AI models (client docs/plan-ia-moteur.md § 6) ---
 
+/** A part of a user's message to a vision model: text, or an image (a data: URL: JPEG, PNG, WebP). */
+export type AiContentPart = { type: 'text', text: string } | { type: 'image', data: string }
+
 export interface AiMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool'
-	content: string
+	/** text; a user's message to a vision model (its declared model has a projector, mmproj) may be parts */
+	content: string | AiContentPart[]
 	/** an assistant's tool calls, sent back with their results */
 	tool_calls?: Array<{ id: string, type: 'function', function: { name: string, arguments: string } }>
 	/** a tool message: the call it answers */
@@ -265,6 +269,54 @@ export interface AiRepoModel {
 	fit: 'runs' | 'slow' | 'cannot'
 	reason: string
 }
+
+export type AiImportKind = 'checkpoint' | 'lora' | 'audio'
+
+/** A file imported for this hubby's AI on this device (`ai.files`). */
+export interface AiImportedFile {
+	sha256: string
+	kind: AiImportKind
+	name: string
+	size: number
+	/** a checkpoint's or a LoRA's family: a LoRA runs on a checkpoint of its family */
+	family: 'sdxl' | 'sd1' | 'flux' | 'unknown' | null
+	/** an audio sample's length */
+	seconds: number | null
+	users: string[]
+}
+
+export interface AiImageRequest {
+	checkpoint: string
+	loras?: Array<{ lora: string, strength?: number }>
+	prompt: string
+	negative?: string
+	/** multiples of 64, 256-1536 (default 832 × 1216) */
+	width?: number
+	height?: number
+	/** default 30 */
+	steps?: number
+	/** default 5 */
+	cfg?: number
+	/** stable-diffusion.cpp's names (default dpm++2m_sde, karras) */
+	sampler?: string
+	scheduler?: string
+	seed?: number
+	format?: 'jpeg' | 'png'
+}
+
+export interface AiImageResult { image: string, width: number, height: number, seed: number | null, seconds: number }
+
+export interface AiSpeechRequest {
+	model: string
+	sample: string
+	transcript: string
+	text: string
+	seed?: number
+	temperature?: number
+	language?: string
+}
+
+export interface AiSpeechResult { audio: string, seconds: number }
 
 /** One of an AI assistant's tools: an API method of a hubby opened to it. */
 export interface AgentTool {
@@ -395,6 +447,36 @@ export const ai = {
 				options.signal?.removeEventListener('abort', abort)
 			}
 		}
+	},
+	/**
+	 * An image (client docs/plan-ia-compagnon.md): an image model the user imported for this hubby (a
+	 * checkpoint, by its sha256), LoRA it imported (of the same family), the prompt; the platform adds
+	 * its safety negative to every image and refuses a prompt naming a minor. A JPEG data: URL by default.
+	 */
+	async image(request: AiImageRequest, options: { signal?: AbortSignal } = {}): Promise<AiImageResult> {
+		const id = nextStream++
+		const abort = () => { void call('stream.abort', id) }
+		options.signal?.addEventListener('abort', abort)
+		try { return await call<AiImageResult>('ai.image', id, request) }
+		finally { options.signal?.removeEventListener('abort', abort) }
+	},
+	/**
+	 * Speech in a voice: a voice model it declares (hubby.json "ai", family voice), conditioned by a
+	 * sample the user imported for it (a WAV, by its sha256) and what it says; a fixed seed keeps the
+	 * voice even. A WAV data: URL (24 kHz mono). The first use asks the user like a chat's model.
+	 */
+	async speech(request: AiSpeechRequest, options: { signal?: AbortSignal } = {}): Promise<AiSpeechResult> {
+		const id = nextStream++
+		const abort = () => { void call('stream.abort', id) }
+		options.signal?.addEventListener('abort', abort)
+		try { return await call<AiSpeechResult>('ai.speech', id, request) }
+		finally { options.signal?.removeEventListener('abort', abort) }
+	},
+	/** Files the user imports for this hubby (a file dialog: their consent), on this device. */
+	files: {
+		/** null: cancelled */
+		import: (kind: AiImportKind) => call<AiImportedFile | null>('ai.files.import', kind),
+		list: () => call<AiImportedFile[]>('ai.files.list')
 	},
 	async chat(request: AiChatRequest, options: AiChatOptions = {}): Promise<AiChatResult> {
 		const id = nextStream++

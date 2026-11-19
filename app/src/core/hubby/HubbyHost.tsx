@@ -286,6 +286,58 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 					streams.delete(id)
 				}
 			},
+			// an image (ai.image) or speech in a voice (ai.speech), on this device (scope app:ai); the voice
+			// model asked like a chat's; the files they use, imported by the user for this hubby
+			'ai.image': async (id: unknown, request: unknown) => {
+				if (!granted('app:ai')) throw new Error('scope_denied: app:ai')
+				const ai = platform.localAi
+				if (!ai) throw new Error('local AI is not available on this device')
+				if (typeof id !== 'number') throw new Error('invalid stream id')
+				const runId = nextChat++
+				const controller = new AbortController()
+				streams.set(id, controller)
+				controller.signal.addEventListener('abort', () => ai.abort(runId))
+				try {
+					const out = await ai.image(runId, hubby, request)
+					if (out.ok) return out.result
+					throw new Error(`${out.code}: ${out.message}`)
+				}
+				finally {
+					streams.delete(id)
+				}
+			},
+			'ai.speech': async (id: unknown, request: unknown) => {
+				if (!granted('app:ai')) throw new Error('scope_denied: app:ai')
+				const ai = platform.localAi
+				if (!ai) throw new Error('local AI is not available on this device')
+				if (typeof id !== 'number') throw new Error('invalid stream id')
+				const runId = nextChat++
+				const controller = new AbortController()
+				streams.set(id, controller)
+				controller.signal.addEventListener('abort', () => ai.abort(runId))
+				try {
+					for (let attempt = 0; ; attempt++) {
+						const out = await ai.speech(runId, hubby, request)
+						if (out.ok) return out.result
+						const model = (request as { model?: unknown } | null)?.model
+						if ((out.code === 'consent' || out.code === 'missing') && attempt === 0 && typeof model === 'string' && await askModelConsent(hubby, model)) continue
+						throw new Error(`${out.code}: ${out.message}`)
+					}
+				}
+				finally {
+					streams.delete(id)
+				}
+			},
+			'ai.files.import': (kind: unknown) => {
+				if (!granted('app:ai')) throw new Error('scope_denied: app:ai')
+				if (!platform.localAi) throw new Error('local AI is not available on this device')
+				if (!['checkpoint', 'lora', 'audio'].includes(String(kind))) throw new Error('ai.files.import(checkpoint | lora | audio)')
+				return platform.localAi.importFile(hubby, kind as 'checkpoint' | 'lora' | 'audio')
+			},
+			'ai.files.list': () => {
+				if (!granted('app:ai')) throw new Error('scope_denied: app:ai')
+				return platform.localAi ? platform.localAi.importedFiles(hubby) : []
+			},
 			// models added from links the user gives (scope app:ai-links: an official hubby's): the repo read by
 			// the device, never by the frame
 			'ai.models.inspect': (link: unknown) => {

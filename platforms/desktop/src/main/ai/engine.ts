@@ -15,8 +15,10 @@ import { DEFAULT_LIMITS, holdGpu, releaseGpu, waitForCoolGpu } from './gpu'
  * started when something needs a model, on the GPU with the most memory (a laptop's integrated GPU
  * also shows up), listening on 127.0.0.1 only with a token only this process knows, and stopped
  * after IDLE_MS without use (it holds the GPU's memory) or when the app quits. While it runs it
- * holds the GPU (its limits: ai/gpu.ts). The image and voice servers come with the companion's
- * chantier, on the same lifecycle.
+ * holds the GPU (its limits: ai/gpu.ts). The image (stable-diffusion.cpp's sd-server) and voice
+ * (qwentts.cpp's tts-server) servers share that lifecycle (client docs/plan-ia-compagnon.md, phase 1):
+ * one server on the GPU at a time (a text model and an image model don't fit together in 8 GB), a
+ * switch waiting for the requests under way (use()).
  */
 
 export type EngineStatus = 'off' | 'downloading' | 'starting' | 'on' | 'error'
@@ -105,15 +107,34 @@ function bestDevice(binary: string): Promise<string | null> {
 export interface TextOptions {
 	/** the context, in tokens */
 	context?: number
+	/** a vision model's projector (its mmproj file) */
+	mmproj?: string
+}
+
+/** One of the engine's servers, for one model: how to start it and know it is ready. */
+interface ServerSpec {
+	/** what it runs (the same key: the same server, kept) */
+	key: string
+	binary: 'llama-server' | 'sd-server' | 'tts-server'
+	args: (port: number, device: string | null) => string[]
+	/** its readiness: a path answering 200 (and, for sd-server, its model loaded) */
+	health: string
+	ready?: (res: Response) => Promise<boolean>
+	/** it takes the engine's token (llama-server's --api-key); the others listen on 127.0.0.1 only */
+	auth: boolean
 }
 
 class LocalEngine extends EventEmitter {
 	private info: EngineInfo = { status: 'off', model: null, progress: null, error: null }
 	private proc: ChildProcess | null = null
 	private url: string | null = null
-	private readonly token = randomBytes(24).toString('hex')
+	readonly token = randomBytes(24).toString('hex')
 	private idle: NodeJS.Timeout | null = null
 	private starting: Promise<void> | null = null
+	private spec: ServerSpec | null = null
+	// the requests under way on the running server, and those waiting for it to switch
+	private inFlight = 0
+	private settledWaiters: Array<() => void> = []
 
 	getInfo(): EngineInfo {
 		return { ...this.info }
@@ -138,19 +159,45 @@ class LocalEngine extends EventEmitter {
 		}, IDLE_MS)
 	}
 
+	private settled(): Promise<void> {
+		return new Promise(resolve => this.inFlight === 0 ? resolve() : this.settledWaiters.push(resolve))
+	}
+
+	/**
+	 * Runs `fn` on the server `spec` describes: started (or switched to, once the requests under way on
+	 * another one are done), kept while `fn` runs.
+	 */
+	async use<T>(spec: ServerSpec, fn: () => Promise<T>): Promise<T> {
+		while (this.info.model !== spec.key && this.inFlight > 0) await this.settled()
+		this.inFlight++
+		try {
+			await this.serve(spec)
+			return await fn()
+		}
+		finally {
+			this.inFlight--
+			if (this.inFlight === 0) { const waiting = this.settledWaiters; this.settledWaiters = []; waiting.forEach(w => w()) }
+		}
+	}
+
 	/** The text server running `model` (a GGUF file): started, or restarted on another model. */
-	async text(model: string, options: TextOptions = {}): Promise<void> {
-		if (this.info.status === 'on' && this.info.model === model) {
+	text(model: string, options: TextOptions = {}): Promise<void> {
+		return this.serve(textSpec(model, options, this.token))
+	}
+
+	private async serve(spec: ServerSpec): Promise<void> {
+		if (this.info.status === 'on' && this.info.model === spec.key) {
 			this.touch()
 			return
 		}
-		if (this.starting && this.info.model === model) return this.starting
+		if (this.starting && this.info.model === spec.key) return this.starting
 		await this.stop()
-		this.starting = this.start(model, options).finally(() => { this.starting = null })
+		this.starting = this.start(spec).finally(() => { this.starting = null })
 		return this.starting
 	}
 
-	private async start(model: string, options: TextOptions): Promise<void> {
+	private async start(spec: ServerSpec): Promise<void> {
+		const model = spec.key
 		if (!engineBinary('llama-server')) {
 			this.set({ status: 'downloading', model, progress: null, error: null })
 			let shown = -1
@@ -163,12 +210,15 @@ class LocalEngine extends EventEmitter {
 				throw new Error('ai engine unavailable')
 			}
 		}
-		const binary = engineBinary('llama-server')!
+		const binary = engineBinary(spec.binary)
+		if (!binary) {
+			this.set({ status: 'error', error: `this engine has no ${spec.binary}` })
+			throw new Error(`ai engine: no ${spec.binary}`)
+		}
 		this.set({ status: 'starting', model, progress: null, error: null })
-		const [port, device] = await Promise.all([freePort(), bestDevice(binary)])
-		const args = ['-m', model, '--host', '127.0.0.1', '--port', String(port), '--api-key', this.token,
-			'-c', String(options.context ?? 8192), '--jinja', '--no-webui', '-ngl', '99']
-		if (device) args.push('--device', device)
+		// the GPUs as ggml names them (the same for the three servers)
+		const [port, device] = await Promise.all([freePort(), bestDevice(engineBinary('llama-server') ?? binary)])
+		const args = spec.args(port, device)
 		holdGpu(GPU_OWNER, DEFAULT_LIMITS)
 		const child = spawn(binary, args, { stdio: ['ignore', 'ignore', 'pipe'] })
 		this.proc = child
@@ -176,22 +226,24 @@ class LocalEngine extends EventEmitter {
 		if (child.pid) writeFileSync(pidFile(), JSON.stringify({ pid: child.pid, binary }))
 		let tail = ''
 		child.stderr?.on('data', (chunk: Buffer) => { tail = (tail + chunk.toString()).slice(-2_000) })
+		this.spec = spec
 		child.on('exit', (code, signal) => {
 			rmSync(pidFile(), { force: true })
 			if (this.proc !== child) return
 			this.proc = null
 			this.url = null
+			this.spec = null
 			releaseGpu(GPU_OWNER)
 			if (this.info.status !== 'off') {
-				console.error(`[ai:engine] llama-server exited (code=${code}, signal=${signal})`, tail.split('\n').slice(-5).join(' | '))
+				console.error(`[ai:engine] ${spec.binary} exited (code=${code}, signal=${signal})`, tail.split('\n').slice(-5).join(' | '))
 				this.set({ status: 'error', error: `the engine stopped (code ${code ?? signal})` })
 			}
 		})
 		const deadline = Date.now() + READY_TIMEOUT_MS
 		while (Date.now() < deadline && this.proc === child) {
 			try {
-				const res = await fetch(`${this.url}/health`, { signal: AbortSignal.timeout(1_000) })
-				if (res.ok) {
+				const res = await fetch(`${this.url}${spec.health}`, { signal: AbortSignal.timeout(1_000), headers: spec.auth ? { Authorization: `Bearer ${this.token}` } : {} })
+				if (res.ok && (!spec.ready || await spec.ready(res))) {
 					console.log(`[ai:engine] on: ${model} (${device ?? 'CPU'})`)
 					this.set({ status: 'on' })
 					this.touch()
@@ -215,7 +267,7 @@ class LocalEngine extends EventEmitter {
 		this.touch()
 		await waitForCoolGpu()
 		const headers = new Headers(init.headers)
-		headers.set('Authorization', `Bearer ${this.token}`)
+		if (this.spec?.auth) headers.set('Authorization', `Bearer ${this.token}`)
 		return fetch(`${this.url}${path}`, { ...init, headers })
 	}
 
@@ -226,6 +278,7 @@ class LocalEngine extends EventEmitter {
 		const child = this.proc
 		this.proc = null
 		this.url = null
+		this.spec = null
 		if (this.info.status !== 'off') this.set({ status: 'off', model: null, progress: null, error: null })
 		if (!child) return
 		child.kill('SIGTERM')
@@ -238,5 +291,48 @@ class LocalEngine extends EventEmitter {
 		releaseGpu(GPU_OWNER, sync)
 	}
 }
+
+// --- the three servers ---
+
+function textSpec(model: string, options: TextOptions, token: string): ServerSpec {
+	return {
+		key: options.mmproj ? `${model}|${options.mmproj}` : model,
+		binary: 'llama-server',
+		args: (port, device) => [
+			'-m', model, '--host', '127.0.0.1', '--port', String(port), '--api-key', token,
+			'-c', String(options.context ?? 8192), '--jinja', '--no-webui', '-ngl', '99',
+			...(options.mmproj ? ['--mmproj', options.mmproj] : []),
+			...(device ? ['--device', device] : [])
+		],
+		health: '/health',
+		auth: true
+	}
+}
+
+/** stable-diffusion.cpp's server on one checkpoint, its LoRA in `loraDir` (by file name). */
+export function imageSpec(checkpoint: string, loraDir: string): ServerSpec {
+	return {
+		key: `image:${checkpoint}`,
+		binary: 'sd-server',
+		args: (port, device) => ['-m', checkpoint, '--lora-model-dir', loraDir, '-l', '127.0.0.1', '--listen-port', String(port), ...(device ? ['--backend', device] : [])],
+		health: '/sdcpp/v1/models/status',
+		ready: async res => ((await res.json().catch(() => null)) as { state?: string } | null)?.state === 'ready',
+		auth: false
+	}
+}
+
+/** qwentts.cpp's server on one voice model (its talker and its codec). */
+export function voiceSpec(talker: string, codec: string): ServerSpec {
+	return {
+		key: `voice:${talker}`,
+		binary: 'tts-server',
+		args: (port, device) => ['--model', talker, '--codec', codec, '--host', '127.0.0.1', '--port', String(port), ...(device ? ['--device', device] : [])],
+		health: '/health',
+		auth: false
+	}
+}
+
+/** The text server's spec (for use()). */
+export const textServer = (model: string, options: TextOptions = {}): ServerSpec => textSpec(model, options, localEngine.token)
 
 export const localEngine = new LocalEngine()
