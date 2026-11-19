@@ -158,6 +158,8 @@ function downloadedIds(): string[] {
 function bestCopy(id: string, builtIn?: HubbyEntry): Active | null {
 	let best: Active | null = builtIn ? { ...builtIn, dir: null } : null
 	for (const copy of downloaded(id)) {
+		// a copy this app's SDK can't serve: said (a whole catalogue refused shows here first)
+		if (!fits(sdk, copy.sdk)) console.warn(`[hubbies] ${copy.id} ${copy.version} needs SDK ${copy.sdk}; this app has ${sdk.version}${sdk.compatible?.length ? ` (and serves ${sdk.compatible.join(', ')})` : ''}`)
 		if (fits(sdk, copy.sdk) && (!best || compareVersions(copy.version, best.version) > 0)) {
 			best = { ...copy, dir: join(STORE, copy.id, copy.version) }
 		}
