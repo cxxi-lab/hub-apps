@@ -99,14 +99,23 @@ let storeRead = 0
 let storeListed = 0
 let awaitingStore = false
 
+/**
+ * The restricted hubbies this account was given, listed again by the server (with the session): their
+ * new versions aren't in the public catalogue — a check without this sees only the ones known at start.
+ */
+export async function refreshRestricted(): Promise<void> {
+	const store = platform.hubbyStore
+	if (!store) return
+	await api<{ data: RestrictedHubbyPackage[] }>('/api/hub/hubbies/restricted')
+		.then(res => store.setRestricted(res.data))
+		.catch(err => console.warn('[hubbies] restricted hubbies not listed', err))
+}
+
 /** Lists the published hubbies not installed here (stand-ins). Without the server: the last catalogue read. */
 export async function refreshStore(): Promise<void> {
 	const store = platform.hubbyStore
 	if (!store) return
-	// the restricted hubbies this account was given: listed by the server (with the session)
-	await api<{ data: RestrictedHubbyPackage[] }>('/api/hub/hubbies/restricted')
-		.then(res => store.setRestricted(res.data))
-		.catch(err => console.warn('[hubbies] restricted hubbies not listed', err))
+	await refreshRestricted()
 	try {
 		const { hubbies } = await store.list()
 		storeRead = Date.now()

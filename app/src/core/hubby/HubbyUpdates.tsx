@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { platform } from '@platform'
 import { HUBBY_MANIFESTS } from '@core/hubby/registry'
-import { checkNow, runUpdates, UPDATE_CHECK_MS } from './updates'
+import { CHECK_NOW_MS, checkNow, runUpdates, UPDATE_CHECK_MS } from './updates'
 import { onHubbiesEvent } from '@core/notifications/notifications'
 
 /** Back after this long away (ms): a hubby running in the app gets its new version (the app reloads). */
@@ -27,8 +27,10 @@ export function HubbyUpdates({ activeHubby }: { activeHubby: string | null }) {
 		const timer = setInterval(() => void runUpdates(open.current), UPDATE_CHECK_MS)
 		// a version just published (the server's real-time event): fetched now
 		const offPublished = onHubbiesEvent(() => void checkNow(open.current))
-		// asked from the tray: every version ready, the open hubby's too
-		const offApply = store.onApplyRequested?.(() => void runUpdates(open.current, { includeOpen: true, report: true })) ?? (() => {})
+		// asked from the tray: looked for again (the restricted ones too), every version ready applied, the open hubby's too
+		const offApply = store.onApplyRequested?.(() => void checkNow(open.current, { includeOpen: true, report: true })) ?? (() => {})
+		// and now and then on its own (the restricted hubbies' versions come only this way)
+		const looking = setInterval(() => void checkNow(open.current), CHECK_NOW_MS)
 		const hide = () => { hiddenAt.current ??= Date.now() }
 		const show = () => {
 			const away = hiddenAt.current === null ? 0 : Date.now() - hiddenAt.current
@@ -50,6 +52,7 @@ export function HubbyUpdates({ activeHubby }: { activeHubby: string | null }) {
 		document.addEventListener('resume', show)
 		return () => {
 			clearInterval(timer)
+			clearInterval(looking)
 			offPublished()
 			offApply()
 			document.removeEventListener('visibilitychange', onVisibility)

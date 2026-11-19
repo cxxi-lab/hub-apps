@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { platform } from '@platform'
 import { setLocalNotification } from '@core/notifications/notifications'
-import { HUBBY_MANIFESTS, hubbyHomePath, reloadHubby } from './registry'
+import { HUBBY_MANIFESTS, hubbyHomePath, refreshRestricted, reloadHubby } from './registry'
 
 /**
  * Hubbies update themselves (asked by the user, 2026-11-18): a newer version downloaded in the
@@ -123,13 +123,21 @@ export async function runUpdates(open: string | null, options: { includeOpen?: b
 	}
 }
 
-/** The server said a version was published: the store looks now, then the ones ready are switched to. */
-export async function checkNow(open: string | null): Promise<void> {
+/**
+ * Looks now (the server said a version was published, the user asked, or a while went by): the
+ * restricted hubbies listed again (their versions aren't in the public catalogue), the store checks,
+ * then the ones ready are switched to.
+ */
+export async function checkNow(open: string | null, options: { includeOpen?: boolean, report?: boolean } = {}): Promise<void> {
 	const store = platform.hubbyStore
 	if (!store?.check) return
+	await refreshRestricted()
 	try { await store.check() }
 	catch { return }
-	await runUpdates(open)
+	await runUpdates(open, options)
 }
+
+/** How often the app looks on its own (the server's event usually comes first). */
+export const CHECK_NOW_MS = 15 * 60_000
 
 export const UPDATE_CHECK_MS = CHECK_EVERY_MS
