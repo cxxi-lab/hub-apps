@@ -109,6 +109,8 @@ export interface TextOptions {
 	context?: number
 	/** a vision model's projector (its mmproj file) */
 	mmproj?: string
+	/** a built-in chat template instead of the model's (llama.cpp's names: chatml…) */
+	template?: string
 }
 
 /** One of the engine's servers, for one model: how to start it and know it is ready. */
@@ -296,12 +298,13 @@ class LocalEngine extends EventEmitter {
 
 function textSpec(model: string, options: TextOptions, token: string): ServerSpec {
 	return {
-		key: options.mmproj ? `${model}|${options.mmproj}` : model,
+		key: [model, options.mmproj, options.template].filter(Boolean).join('|'),
 		binary: 'llama-server',
 		args: (port, device) => [
 			'-m', model, '--host', '127.0.0.1', '--port', String(port), '--api-key', token,
 			'-c', String(options.context ?? 8192), '--jinja', '--no-webui', '-ngl', '99',
 			...(options.mmproj ? ['--mmproj', options.mmproj] : []),
+			...(options.template ? ['--chat-template', options.template] : []),
 			...(device ? ['--device', device] : [])
 		],
 		health: '/health',

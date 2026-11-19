@@ -228,11 +228,18 @@ export interface LocalModelsApi {
 /** What a hubby asks a local model (`ai.chat`, client docs/plan-ia-moteur.md § 6). */
 export interface AiChatRequest {
 	model: string
-	messages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool', content: string, tool_calls?: unknown[], tool_call_id?: string }>
+	messages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool', content: string, images?: string[], tool_calls?: unknown[], tool_call_id?: string }>
 	tools?: Array<{ type: 'function', function: { name: string, description?: string, parameters?: Record<string, unknown> } }>
 	temperature?: number
 	maxTokens?: number
 	reasoning?: boolean
+	topP?: number
+	minP?: number
+	repeatPenalty?: number
+	repeatLastN?: number
+	presencePenalty?: number
+	stop?: string[]
+	template?: string
 }
 
 export interface AiChatResult {

@@ -233,6 +233,16 @@ export interface AiChatRequest {
 	maxTokens?: number
 	/** let a reasoning model think first (its thoughts: onReasoning); default false */
 	reasoning?: boolean
+	/** sampling: a role-play model's own settings (a Modelfile's top_p, min_p, repeat_penalty…) */
+	topP?: number
+	minP?: number
+	repeatPenalty?: number
+	repeatLastN?: number
+	presencePenalty?: number
+	/** at most 8 */
+	stop?: string[]
+	/** a chat template when the model's own doesn't fit it: chatml, llama3, mistral-v7, gemma, phi3, vicuna, zephyr, deepseek3 */
+	template?: string
 }
 
 export interface AiToolCall { id: string, name: string, arguments: unknown, error?: string }

@@ -32,6 +32,16 @@ export interface ChatRequest {
 	maxTokens?: number
 	/** let a reasoning model think first (its thoughts come as `reasoning`); default false */
 	reasoning?: boolean
+	/** sampling (a role-play model's own settings: a Modelfile's) */
+	topP?: number
+	minP?: number
+	repeatPenalty?: number
+	repeatLastN?: number
+	presencePenalty?: number
+	/** at most 8 stop sequences */
+	stop?: string[]
+	/** the chat template, when the model's own doesn't fit (a fine-tune trained on ChatML) */
+	template?: string
 }
 
 export interface ToolCall { id: string, name: string, arguments: unknown, error?: string }
@@ -55,6 +65,7 @@ const MAX_CHARS = 400_000
 const MAX_TOOLS = 64
 const MAX_TOKENS = 8_192
 const MAX_IMAGES = 4
+const TEMPLATES = ['chatml', 'llama3', 'mistral-v7', 'gemma', 'phi3', 'vicuna', 'zephyr', 'deepseek3']
 const MAX_IMAGE_CHARS = 8_000_000
 const IMAGE_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/
 
@@ -63,7 +74,7 @@ function invalid(message: string): ChatOutcome {
 }
 
 /** The request as the engine gets it (only what it should see), or why not. */
-function checked(request: unknown): { body: Record<string, unknown>, model: string, images: boolean } | ChatOutcome {
+function checked(request: unknown): { body: Record<string, unknown>, model: string, images: boolean, template: string | null } | ChatOutcome {
 	const r = request as Partial<ChatRequest> | null
 	if (!r || typeof r !== 'object' || typeof r.model !== 'string' || !NAME.test(r.model)) return invalid('model: a model it declares, by name')
 	if (!Array.isArray(r.messages) || r.messages.length === 0 || r.messages.length > MAX_MESSAGES) return invalid(`messages: 1 to ${MAX_MESSAGES}`)
@@ -99,6 +110,17 @@ function checked(request: unknown): { body: Record<string, unknown>, model: stri
 		chat_template_kwargs: { enable_thinking: r.reasoning === true }
 	}
 	if (typeof r.temperature === 'number' && r.temperature >= 0 && r.temperature <= 2) body.temperature = r.temperature
+	const range = (v: unknown, min: number, max: number) => typeof v === 'number' && v >= min && v <= max
+	if (range(r.topP, 0, 1)) body.top_p = r.topP
+	if (range(r.minP, 0, 1)) body.min_p = r.minP
+	if (range(r.repeatPenalty, 0.5, 2)) body.repeat_penalty = r.repeatPenalty
+	if (Number.isInteger(r.repeatLastN) && range(r.repeatLastN, -1, 8192)) body.repeat_last_n = r.repeatLastN
+	if (range(r.presencePenalty, -2, 2)) body.presence_penalty = r.presencePenalty
+	if (r.stop !== undefined) {
+		if (!Array.isArray(r.stop) || r.stop.length > 8 || r.stop.some(s => typeof s !== 'string' || !s || s.length > 64)) return invalid('stop: at most 8 strings')
+		body.stop = r.stop
+	}
+	if (r.template !== undefined && !TEMPLATES.includes(String(r.template))) return invalid(`template: one of ${TEMPLATES.join(', ')}`)
 	if (r.tools !== undefined) {
 		if (!Array.isArray(r.tools) || r.tools.length > MAX_TOOLS) return invalid(`tools: at most ${MAX_TOOLS}`)
 		for (const t of r.tools) {
@@ -106,7 +128,7 @@ function checked(request: unknown): { body: Record<string, unknown>, model: stri
 		}
 		if (r.tools.length) body.tools = r.tools.map(t => ({ type: 'function', function: { name: t.function.name, description: t.function.description ?? '', parameters: t.function.parameters ?? { type: 'object', properties: {} } } }))
 	}
-	return { body, model: r.model, images: images > 0 }
+	return { body, model: r.model, images: images > 0, template: r.template ? String(r.template) : null }
 }
 
 /** One chat; `onEvent` hears the answer as it comes ('delta': text, 'reasoning': its thoughts). */
@@ -127,7 +149,7 @@ export async function chat(hubby: string, request: unknown, onEvent: (kind: 'del
 	const main = files.find(f => f !== mmproj)!
 	if (req.images && !mmproj) return invalid(`${req.model} doesn't see images`)
 	try {
-		return await localEngine.use(textServer(main, mmproj ? { mmproj } : {}), async () => {
+		return await localEngine.use(textServer(main, { ...(mmproj ? { mmproj } : {}), ...(req.template ? { template: req.template } : {}) }), async () => {
 			const res = await localEngine.request('/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body), signal })
 			if (!res.ok || !res.body) return { ok: false as const, code: 'failed' as const, message: `the engine answered ${res.status}: ${(await res.text()).slice(0, 300)}` }
 			return { ok: true as const, result: await readStream(res.body, onEvent) }
