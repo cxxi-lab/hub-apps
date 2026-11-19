@@ -134,6 +134,13 @@ class LocalEngine extends EventEmitter {
 	private idle: NodeJS.Timeout | null = null
 	private starting: Promise<void> | null = null
 	private spec: ServerSpec | null = null
+	// each server started: one more (what lives in a server's memory, a voice registered, goes with it)
+	private started = 0
+
+	/** Which server process runs now (changes at each start). */
+	generation(): number {
+		return this.started
+	}
 	// the requests under way on the running server, and those waiting for it to switch
 	private inFlight = 0
 	private settledWaiters: Array<() => void> = []
@@ -229,6 +236,7 @@ class LocalEngine extends EventEmitter {
 		let tail = ''
 		child.stderr?.on('data', (chunk: Buffer) => { tail = (tail + chunk.toString()).slice(-2_000) })
 		this.spec = spec
+		this.started++
 		child.on('exit', (code, signal) => {
 			rmSync(pidFile(), { force: true })
 			if (this.proc !== child) return

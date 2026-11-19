@@ -34,7 +34,7 @@ const LANGUAGES = ['auto', 'French', 'English', 'German', 'Spanish', 'Italian', 
 const invalid = (message: string): SpeechOutcome => ({ ok: false, code: 'invalid', message })
 
 // the voices registered on the running server (they live in its memory: a new process starts empty)
-let registeredOn: string | null = null
+let registeredOn = -1
 const registered = new Set<string>()
 
 function wavSeconds(buf: Buffer): number {
@@ -74,7 +74,7 @@ export async function speak(hubby: string, request: unknown, signal: AbortSignal
 	const voice = `v${sample.file.sha256.slice(0, 24)}`
 	try {
 		return await localEngine.use(voiceSpec(talker, codec), async () => {
-			if (registeredOn !== talker || localEngine.getInfo().status !== 'on') { registered.clear(); registeredOn = talker }
+			if (registeredOn !== localEngine.generation()) { registered.clear(); registeredOn = localEngine.generation() }
 			const key = `${voice}\n${r.transcript}`
 			if (!registered.has(key)) {
 				const wav = await readFile(sample.path)
