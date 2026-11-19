@@ -9,7 +9,8 @@ import { HUBBY_MANIFESTS, hubbyHomePath, reloadHubby } from './registry'
  * again, the app going on — never while it is open (it waits until it is left: nothing being done
  * there is cut). While it updates, its icon shows it (a dark veil leaving clockwise, as phones do)
  * and it can't be opened. Once done, a notification says so. A hubby running in the app gets its
- * new version at the next start.
+ * new version at the next start. The open one's version ready: a notification offers it now (its
+ * page reloads). Asked by the user (the tray's Check for updates): every one ready, the open one's too.
  */
 
 export interface Updating {
@@ -88,7 +89,7 @@ async function update(id: string): Promise<void> {
  * the hubby on screen). Called every minute, when the app comes back, and when the open hubby
  * changes (one left gets its update then).
  */
-export async function runUpdates(open: string | null): Promise<void> {
+export async function runUpdates(open: string | null, options: { includeOpen?: boolean, report?: boolean } = {}): Promise<void> {
 	const store = platform.hubbyStore
 	if (!store) return
 	let pending: string[]
@@ -98,12 +99,37 @@ export async function runUpdates(open: string | null): Promise<void> {
 	catch {
 		return
 	}
+	const doing: Array<Promise<void>> = []
 	for (const p of pending) {
-		const id = p.split(' ')[0]
+		const [id, version] = p.split(' ')
 		const m = HUBBY_MANIFESTS.find(known => known.id === id)
-		if (!m?.isolated || id === open) continue
-		void update(id)
+		if (!m?.isolated) continue
+		if (id === open && !options.includeOpen) {
+			// the one on screen: never cut off, offered
+			setLocalNotification(`hubby-ready:${id}`, {
+				hubby: id,
+				title: `${labelOf(id)} ${version} is ready`,
+				body: 'Update it now: its page reloads.',
+				action: () => { setLocalNotification(`hubby-ready:${id}`, null); void update(id) }
+			})
+			continue
+		}
+		setLocalNotification(`hubby-ready:${id}`, null)
+		doing.push(update(id))
 	}
+	if (options.report) {
+		await Promise.all(doing)
+		if (!doing.length) setLocalNotification('hubbies-checked', { hubby: open ?? '', title: 'Your hubbies are up to date', body: null, action: () => setLocalNotification('hubbies-checked', null) })
+	}
+}
+
+/** The server said a version was published: the store looks now, then the ones ready are switched to. */
+export async function checkNow(open: string | null): Promise<void> {
+	const store = platform.hubbyStore
+	if (!store?.check) return
+	try { await store.check() }
+	catch { return }
+	await runUpdates(open)
 }
 
 export const UPDATE_CHECK_MS = CHECK_EVERY_MS

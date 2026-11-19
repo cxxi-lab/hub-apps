@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { platform } from '@platform'
 import { HUBBY_MANIFESTS } from '@core/hubby/registry'
-import { runUpdates, UPDATE_CHECK_MS } from './updates'
+import { checkNow, runUpdates, UPDATE_CHECK_MS } from './updates'
+import { onHubbiesEvent } from '@core/notifications/notifications'
 
 /** Back after this long away (ms): a hubby running in the app gets its new version (the app reloads). */
 const AWAY_MS = 2 * 60_000
@@ -24,6 +25,10 @@ export function HubbyUpdates({ activeHubby }: { activeHubby: string | null }) {
 	useEffect(() => {
 		if (!store) return
 		const timer = setInterval(() => void runUpdates(open.current), UPDATE_CHECK_MS)
+		// a version just published (the server's real-time event): fetched now
+		const offPublished = onHubbiesEvent(() => void checkNow(open.current))
+		// asked from the tray: every version ready, the open hubby's too
+		const offApply = store.onApplyRequested?.(() => void runUpdates(open.current, { includeOpen: true, report: true })) ?? (() => {})
 		const hide = () => { hiddenAt.current ??= Date.now() }
 		const show = () => {
 			const away = hiddenAt.current === null ? 0 : Date.now() - hiddenAt.current
@@ -45,6 +50,8 @@ export function HubbyUpdates({ activeHubby }: { activeHubby: string | null }) {
 		document.addEventListener('resume', show)
 		return () => {
 			clearInterval(timer)
+			offPublished()
+			offApply()
 			document.removeEventListener('visibilitychange', onVisibility)
 			document.removeEventListener('pause', hide)
 			document.removeEventListener('resume', show)

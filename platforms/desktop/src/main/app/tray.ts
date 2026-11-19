@@ -1,9 +1,10 @@
-import { app, Menu, nativeImage, Tray } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron'
 
 import { appIcon, onIconChange } from './icon'
 import { restartApp } from './restart'
 import { checkForUpdateNow, onUpdateFound, openPendingUpdate, pendingUpdateVersion } from '../network/updater'
 import { hideMainWindow, isMainWindowVisible, showMainWindow } from '../windows/main'
+import { checkHubbyUpdates } from '../hubbies/manager'
 
 // System tray icon, like Steam or Discord: closing the window keeps hub running in the
 // background; the tray brings it back, and its menu is the way to really quit.
@@ -15,11 +16,17 @@ function buildMenu(): Menu {
 		{ label: 'Open hub', click: () => showMainWindow() },
 		update
 			? { label: `Update to v${update}`, click: openPendingUpdate }
-			: { label: 'Check for updates', click: () => void checkForUpdateNow() },
+			: { label: 'Check for updates', click: () => void checkEverything() },
 		{ type: 'separator' },
 		{ label: 'Restart hub', click: restartApp },
 		{ label: 'Quit hub', click: () => app.quit() }
 	])
+}
+
+/** The app and its hubbies: the app's update offered as before; the hubbies' downloaded, then applied by the window (the open one's too). */
+async function checkEverything(): Promise<void> {
+	await Promise.all([checkForUpdateNow(), checkHubbyUpdates()])
+	for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('hubbies:apply')
 }
 
 export function refreshTray(): void {

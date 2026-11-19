@@ -643,6 +643,8 @@ export function setupHubbies(): void {
 	ipcMain.handle('hubbies:uninstall', (_event, id: unknown) => uninstallHubby(hubbyId(id)))
 	ipcMain.handle('hubbies:restricted', (_event, hubbies: unknown) => setRestricted(hubbies))
 	ipcMain.handle('hubbies:pending', () => pendingHubbies())
+	// a version just published (the server's real-time event): looked for now, not at the next half hour
+	ipcMain.handle('hubbies:check', async () => { await checkHubbyUpdates(); return pendingHubbies() })
 	ipcMain.handle('hubbies:activate', (_event, ids?: unknown) => activateHubbies(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string' && ID.test(id)) : undefined))
 	serveHubbies()
 	if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {

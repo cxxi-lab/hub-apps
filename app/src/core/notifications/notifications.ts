@@ -41,6 +41,16 @@ type ServerEvent =
 	| { type: 'sync', module: string, position: number }
 	/** a sealed message from another session of the account, for one of them (core/ai/remote.ts) */
 	| { type: 'relay', from: string, to: string, sealed: string }
+	/** a hubby's new version was published: the store looks now (core/hubby/HubbyUpdates.tsx) */
+	| { type: 'hubbies' }
+
+const hubbiesListeners = new Set<() => void>()
+
+/** Called when the server says a hubby's new version was published. */
+export function onHubbiesEvent(listener: () => void): () => void {
+	hubbiesListeners.add(listener)
+	return () => { hubbiesListeners.delete(listener) }
+}
 
 const relayListeners = new Set<(event: { from: string, to: string, sealed: string }) => void>()
 
@@ -171,6 +181,9 @@ function apply(event: ServerEvent): void {
 	}
 	else if (event.type === 'relay') {
 		relayListeners.forEach(listener => listener(event))
+	}
+	else if (event.type === 'hubbies') {
+		hubbiesListeners.forEach(listener => listener())
 	}
 	else {
 		void load().catch(() => {})

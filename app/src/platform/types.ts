@@ -91,6 +91,10 @@ export interface HubbyStoreApi {
 	 * the last catalogue read.
 	 */
 	list(): Promise<{ hubbies: HubbyPackage[]; installed: string[] }>
+	/** Looks at the catalogue now (a version just published: the server said so): downloads what is newer; the versions ready ("id version"). */
+	check?(): Promise<string[]>
+	/** The user asked (the tray's Check for updates): the renderer applies every version ready, the open hubby's too. */
+	onApplyRequested?(cb: () => void): Unsubscribe
 	/** Installs a hubby (its newest compatible version), usable at once. Already installed: at once. */
 	install(id: string): Promise<HubbyPackage>
 	/** Removes a hubby's files from this device (a loaded one stays until the app restarts). */
