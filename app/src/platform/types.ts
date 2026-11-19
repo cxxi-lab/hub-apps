@@ -35,53 +35,6 @@ export interface WebsiteIntegration {
 	referer?: IntegrationReferer
 }
 
-export type CompanionEngineStatus = 'off' | 'starting' | 'on' | 'error'
-
-export interface CompanionEngineInfo {
-	status: CompanionEngineStatus
-	external: boolean
-	error: string | null
-}
-
-/** One line of a conversation's activity log: what happened in the background. */
-export interface CompanionLogEntry {
-	id: number
-	at: number
-	level: 'info' | 'warn' | 'error'
-	text: string
-	/** raw text behind the line (reply, notes, scene, tags…) */
-	detail?: string
-}
-
-/** What the companion is doing right now: writing, recording a voice message or taking a photo. */
-export type CompanionActivity = 'typing' | 'recording' | 'photo' | null
-
-export interface CompanionProfile {
-	/** conversation id ('main' for the first one) */
-	id: string
-	name: string
-	/** name shown in the app (`name` unless the profile sets another one) */
-	label: string
-	userName: string
-	/** media file of the profile picture */
-	avatar: string | null
-}
-
-export interface CompanionMessage {
-	id: number
-	role: 'user' | 'companion'
-	kind: 'text' | 'image' | 'audio'
-	content: string
-	mediaPath: string | null
-	createdAt: number
-	readAt: number | null
-	proactive: boolean
-	userReaction: string | null
-	userReactionAt: number | null
-	companionReaction: string | null
-	replyId: number | null
-}
-
 /** Unsubscribe handle returned by every `on…` listener. */
 export type Unsubscribe = () => void
 
@@ -385,34 +338,6 @@ export interface PushApi {
 	onOpen(cb: (link: string) => void): Unsubscribe
 }
 
-/**
- * The AI companion. Desktop-only today (local Ollama); a shell without it
- * reports `capabilities.companion === false` and the UI hides the hubby.
- */
-export interface CompanionApi {
-	getEngine(): Promise<CompanionEngineInfo>
-	setEngine(on: boolean): void
-	onEngineChange(cb: (info: CompanionEngineInfo) => void): Unsubscribe
-	listConversations(): Promise<CompanionProfile[]>
-	getProfile(conversationId: string): Promise<CompanionProfile>
-	listMessages(conversationId: string, opts: { limit: number; beforeId?: number }): Promise<CompanionMessage[]>
-	send(conversationId: string, content: string): Promise<CompanionMessage>
-	react(conversationId: string, id: number, emoji: string | null): Promise<CompanionMessage | null>
-	regenerate(conversationId: string): Promise<number[] | null>
-	onMessagesDeleted(cb: (conversationId: string, ids: number[]) => void): Unsubscribe
-	onMessageUpdate(cb: (conversationId: string, message: CompanionMessage) => void): Unsubscribe
-	listImages(conversationId: string): Promise<CompanionMessage[]>
-	onMessage(cb: (conversationId: string, message: CompanionMessage) => void): Unsubscribe
-	onActivity(cb: (conversationId: string, activity: CompanionActivity) => void): Unsubscribe
-	onError(cb: (conversationId: string, error: string) => void): Unsubscribe
-	getActivity(conversationId: string): Promise<CompanionActivity>
-	listLog(conversationId: string): Promise<CompanionLogEntry[]>
-	onLog(cb: (conversationId: string, entry: CompanionLogEntry) => void): Unsubscribe
-	getUnread(): Promise<Record<string, number>>
-	onUnreadChange(cb: (counts: Record<string, number>) => void): Unsubscribe
-	markRead(conversationId: string): void
-}
-
 /** What the web layer hands the native player: desktop VideoPlayerModal's webview inputs. */
 export interface NativePlayerOptions {
 	url: string
@@ -477,11 +402,9 @@ export interface NativePlayerApi {
 
 /**
  * What the host shell can do. The UI reads these to hide what a shell lacks
- * (e.g. the Capacitor shell has no native windows and no companion engine).
+ * (e.g. the Capacitor shell has no native windows and no embedded browser).
  */
 export interface PlatformCapabilities {
-	/** AI companion engine (local LLM) */
-	companion: boolean
 	/** integrated WireGuard tunnel controllable from the UI */
 	vpn: boolean
 	/**
@@ -616,7 +539,6 @@ export interface Platform {
 	getPlayerBlocklistVersion(): Promise<string | null>
 	setPlayerBlocklist(version: string, hosts: string[]): Promise<void>
 
-	readonly companion: CompanionApi
 	readonly player: NativePlayerApi
 	/** null: the shell shows none (Android: they come by push, `push`) */
 	readonly systemNotifications: SystemNotificationsApi | null

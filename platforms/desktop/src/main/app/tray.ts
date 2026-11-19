@@ -2,7 +2,6 @@ import { app, Menu, nativeImage, Tray } from 'electron'
 
 import { appIcon, onIconChange } from './icon'
 import { restartApp } from './restart'
-import { engine } from '../companion/engine'
 import { checkForUpdateNow, onUpdateFound, openPendingUpdate, pendingUpdateVersion } from '../network/updater'
 import { hideMainWindow, isMainWindowVisible, showMainWindow } from '../windows/main'
 
@@ -11,21 +10,12 @@ import { hideMainWindow, isMainWindowVisible, showMainWindow } from '../windows/
 let tray: Tray | null = null
 
 function buildMenu(): Menu {
-	const status = engine.getInfo().status
 	const update = pendingUpdateVersion()
 	return Menu.buildFromTemplate([
 		{ label: 'Open hub', click: () => showMainWindow() },
 		update
 			? { label: `Update to v${update}`, click: openPendingUpdate }
 			: { label: 'Check for updates', click: () => void checkForUpdateNow() },
-		{ type: 'separator' },
-		{
-			// Neutral label on purpose, same as the Window menu.
-			label: status === 'starting' ? 'Toggle AI Engine (starting…)' : 'Toggle AI Engine',
-			type: 'checkbox',
-			checked: status === 'on' || status === 'starting',
-			click: () => void (status === 'off' || status === 'error' ? engine.start() : engine.stop())
-		},
 		{ type: 'separator' },
 		{ label: 'Restart hub', click: restartApp },
 		{ label: 'Quit hub', click: () => app.quit() }
@@ -89,6 +79,5 @@ export function setupTray(): void {
 	tray.setToolTip(app.getName())
 	tray.setContextMenu(buildMenu())
 	tray.on('click', () => (isMainWindowVisible() ? hideMainWindow() : showMainWindow()))
-	engine.on('status', refreshTray)
 	onUpdateFound(refreshTray)
 }

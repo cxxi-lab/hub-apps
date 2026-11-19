@@ -53,7 +53,7 @@ export interface HubbyManifest {
 	local?: boolean
 	/**
 	 * Host capabilities this hubby needs (see PlatformCapabilities). A shell that
-	 * lacks any of them hides the hubby entirely — e.g. 'companion' and 'webview'
+	 * lacks any of them hides the hubby entirely — e.g. 'localAi' and 'webview'
 	 * are desktop-only, so AI never appears in the mobile shell.
 	 */
 	requiresCapabilities?: Array<keyof PlatformCapabilities>

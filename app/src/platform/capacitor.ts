@@ -1,11 +1,11 @@
 import { registerPlugin } from '@capacitor/core'
-import type { CompanionApi, NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions, NativePlayerPanel, Platform, PushApi, PlatformCapabilities, Unsubscribe, VpnInfo, WebsiteIntegration } from './types'
+import type { NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions, NativePlayerPanel, Platform, PushApi, PlatformCapabilities, Unsubscribe, VpnInfo, WebsiteIntegration } from './types'
 import { checkHubbyUpdates, createHubbyStore, startHubbyUpdates } from './capacitorHubbies'
 import { createUpdater } from './capacitorUpdater'
 import { createLocalStore } from './capacitorLocalStore'
 
 // Capacitor (Android) adapter. The mobile shell is a second client of the
-// server hubbies; the desktop-only surfaces (AI companion, embedded browser,
+// server hubbies; the desktop-only surfaces (local AI, embedded browser,
 // native windows) are absent and advertised as such through `capabilities`, so
 // the UI hides them and never calls into them. The VPN (embedded WireGuard
 // tunnel), the video player (fullscreen native WebView) and the website
@@ -13,7 +13,6 @@ import { createLocalStore } from './capacitorLocalStore'
 // (mobile/android: VpnPlugin, PlayerPlugin, IntegrationsPlugin).
 
 const capabilities: PlatformCapabilities = {
-	companion: false,
 	localAi: false,
 	vpn: true,
 	vpnPerWebview: false,
@@ -34,15 +33,6 @@ const noSubscription = (): Unsubscribe => noop
 function unavailable(feature: string): never {
 	throw new Error(`[platform:capacitor] ${feature} is not available on mobile`)
 }
-
-// The companion is desktop-only; capabilities.companion is false so the hubby
-// is hidden and these are never reached. They throw rather than lie, to catch a
-// missing capability check during development.
-const companion: CompanionApi = new Proxy({} as CompanionApi, {
-	get(_t, prop) {
-		return () => unavailable(`companion.${String(prop)}`)
-	}
-})
 
 interface PluginListener { remove(): Promise<void> }
 
@@ -232,7 +222,6 @@ export function createCapacitorPlatform(): Platform {
 		getPlayerBlocklistVersion: () => Player.getBlocklistVersion().then(r => r.version),
 		setPlayerBlocklist: (version, hosts) => Player.setBlocklist({ version, hosts }),
 
-		companion,
 		player
 	}
 }

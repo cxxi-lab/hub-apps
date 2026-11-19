@@ -1,5 +1,5 @@
 import { call, currentInit, onHostMessage } from './sdk'
-import type { CompanionApi, NativePlayerAction, NativeIcon, NativePlayerApi, NativePlayerOptions, NativePlayerPanel } from './types'
+import type { NativePlayerAction, NativeIcon, NativePlayerApi, NativePlayerOptions, NativePlayerPanel } from './types'
 
 /**
  * The shell, as a hubby's frame sees it (docs/plan-isolation.md, phase 4): its capabilities (in the
@@ -59,8 +59,6 @@ export interface Capabilities {
 	vpnPerWebview?: boolean
 	/** AI models run on this device (`ai.chat`) */
 	localAi?: boolean
-	/** never in a frame (docs/plan-isolation.md D5) */
-	companion?: boolean
 	[name: string]: boolean | undefined
 }
 
@@ -68,18 +66,12 @@ export interface FramePlatform {
 	name: 'frame'
 	capabilities: Capabilities
 	player: NativePlayerApi
-	/**
-	 * Not in a frame (D5: the companion waits for the AI chantier): undefined. Typed for the code
-	 * kept until then, reached only behind `capabilities.companion`, never true here.
-	 */
-	companion: CompanionApi
 }
 
 export const platform: FramePlatform = {
 	name: 'frame',
 	capabilities: readCapabilities(),
-	player,
-	companion: undefined as unknown as CompanionApi
+	player
 }
 
 // --- the hubby's own storage ---

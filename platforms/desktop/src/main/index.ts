@@ -11,7 +11,6 @@ import { installSecurityHandlers } from './app/security'
 import './app/schemes'
 import './app/state'
 import './app/deviceSecrets'
-import { setupCompanion } from './companion'
 import { setupPlayerBlocklist } from './session/playerBlocklist'
 import { dropBrowseSession } from './session/dropBrowse'
 import { integrationsRegistry } from './session/integrations'
@@ -77,7 +76,6 @@ app.whenReady().then(async () => {
 	persistRefreshCookie()
 	setupPlayerBlocklist()
 	setupVpn()
-	setupCompanion()
 	setupLocalAi()
 	setupAgents()
 	applyMenu()

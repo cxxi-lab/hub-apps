@@ -1,10 +1,9 @@
 import { execFile, spawnSync } from 'node:child_process'
 
 /**
- * The GPU's limits while local AI runs (the engine, the companion while it is still here): sustained
- * inference can make a laptop GPU drop off the bus (power spikes, heat). A clock cap (and a power
- * cap) is applied while anything holds the GPU, stepped down as it heats up, and lifted when the
- * last holder lets go. nvidia-smi needs root: this relies on a sudoers rule allowing exactly these
+ * The GPU's limits while the local AI engine runs: sustained inference can make a laptop GPU drop
+ * off the bus (power spikes, heat). A clock cap (and a power cap) is applied while anything holds
+ * the GPU, stepped down as it heats up, and lifted when the last holder lets go. nvidia-smi needs root: this relies on a sudoers rule allowing exactly these
  * commands without a password (`sudo -n` never prompts; without the rule nothing is capped).
  * Measured on the benchmark (client docs/plan-ia-moteur.md § 3): 1500 MHz, 1200 above 83 °C, 900
  * above 87 °C — no drop-off.

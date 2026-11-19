@@ -5,8 +5,6 @@ import { useDeveloperMode } from '@core/settings/developer'
 import { useDevMode } from '@core/contexts/DevModeContext'
 import { getApiBaseUrl } from '@core/api/baseUrl'
 import type { VpnStatus } from '@platform'
-import { platform } from '@platform'
-import { AiEngineStatus } from './AiEngineStatus'
 import { CommandConsole } from './CommandConsole'
 
 const DOT_COLOR: Record<VpnStatus, string> = {
@@ -24,7 +22,7 @@ const STATUS_LABEL: Record<VpnStatus, string> = {
 }
 
 /**
- * The state of the background pieces: local mode, the AI engine, the VPN tunnel while it runs
+ * The state of the background pieces: local mode, the VPN tunnel while it runs
  * (`always`: its state even when off, as the phone's console shows it).
  */
 export function StatusItems({ always = false }: { always?: boolean }) {
@@ -37,7 +35,6 @@ export function StatusItems({ always = false }: { always?: boolean }) {
 					LOCAL MODE
 				</span>
 			)}
-			{platform.capabilities.companion && <AiEngineStatus />}
 			{(always || vpn.status !== 'disabled') && (
 				<span className="inline-flex items-center gap-1.5 tracking-wide px-1 py-0.5" title={`VPN: ${STATUS_LABEL[vpn.status]}${vpn.error ? ` (${vpn.error})` : ''}`}>
 					VPN

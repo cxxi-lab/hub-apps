@@ -28,12 +28,9 @@ import type { AiChatRequest } from '@platform'
 // ai.chat's ids, unique across the frames (the main process tells their answers apart by them)
 let nextChat = 1
 
-/**
- * What a frame learns of the shell (its URL: a manifest reads it as it loads). The companion's
- * engine isn't relayed to a frame (docs/plan-isolation.md D5): never said there.
- */
+/** What a frame learns of the shell (its URL: a manifest reads it as it loads). */
 function frameCapabilities(): string {
-	return Object.entries(platform.capabilities).filter(([name, on]) => on === true && name !== 'companion').map(([name]) => name).join(',')
+	return Object.entries(platform.capabilities).filter(([, on]) => on === true).map(([name]) => name).join(',')
 }
 
 /** The calls a frame may make to the server, as its hubby (the server checks what it declares). */

@@ -11,7 +11,6 @@ export { defineHubby, start, type HubbyDefinition, type HubbyPageDefinition } fr
 export { BottomBar, type BottomBarEntry, type BottomBarTab } from './BottomBar'
 export { platform, storage, type Capabilities, type FramePlatform } from './platform'
 export type {
-	CompanionActivity, CompanionApi, CompanionEngineInfo, CompanionEngineStatus, CompanionLogEntry, CompanionMessage, CompanionProfile,
 	HubbyManifest, HubbyNavItem, HubbyRoute, ListResponse, NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions,
 	NativePlayerPanel, PaginatedResponse, SingleResponse, TimelineItem, Unsubscribe
 } from './types'

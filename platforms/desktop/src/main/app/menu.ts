@@ -1,6 +1,5 @@
 import { ipcMain, Menu } from 'electron'
 import { getDevMode, setDevMode } from './state'
-import { engine } from '../companion/engine'
 import { localEngine, type EngineInfo } from '../ai/engine'
 import path from 'node:path'
 import { openAboutWindow } from '../windows/about'
@@ -33,13 +32,6 @@ function buildMenu(): Electron.Menu {
 					label: 'Toggle Developer Local Mode',
 					accelerator: 'CommandOrControl+Alt+L',
 					click: () => setDevMode(!getDevMode())
-				},
-				{
-					// Neutral label on purpose: the companion lives in a private hubby.
-					label: engine.getInfo().status === 'starting' ? 'Toggle AI Engine (starting…)' : 'Toggle AI Engine',
-					type: 'checkbox',
-					checked: engine.getInfo().status === 'on' || engine.getInfo().status === 'starting',
-					click: () => void (engine.getInfo().status === 'off' || engine.getInfo().status === 'error' ? engine.start() : engine.stop())
 				},
 				localAiItem(localEngine.getInfo()),
 				{ type: 'separator' },

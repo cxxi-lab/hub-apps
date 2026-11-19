@@ -4,11 +4,6 @@ import type {
 	VpnInfo,
 	UpdateState,
 	WebsiteIntegration,
-	CompanionEngineInfo,
-	CompanionProfile,
-	CompanionMessage,
-	CompanionActivity,
-	CompanionLogEntry,
 	HubbyPackage,
 	RestrictedHubbyPackage,
 	StoredDocument,
@@ -206,71 +201,7 @@ const api = {
 	getPlayerBlocklistVersion: (): Promise<string | null> => ipcRenderer.invoke('player-blocklist:version'),
 
 	setPlayerBlocklist: (version: string, hosts: string[]): Promise<void> =>
-		ipcRenderer.invoke('player-blocklist:set', { version, hosts }),
-
-	companion: {
-		getEngine: (): Promise<CompanionEngineInfo> => ipcRenderer.invoke('companion:engine:get'),
-
-		setEngine: (on: boolean): void => {
-			ipcRenderer.send('companion:engine:set', on)
-		},
-
-		onEngineChange: (cb: (info: CompanionEngineInfo) => void): (() => void) =>
-			subscribe('companion:engine:changed', cb),
-
-		/** Every conversation, the main one first. */
-		listConversations: (): Promise<CompanionProfile[]> => ipcRenderer.invoke('companion:conversations:list'),
-
-		getProfile: (conversationId: string): Promise<CompanionProfile> => ipcRenderer.invoke('companion:profile:get', conversationId),
-
-		listMessages: (conversationId: string, opts: { limit: number; beforeId?: number }): Promise<CompanionMessage[]> =>
-			ipcRenderer.invoke('companion:messages:list', conversationId, opts),
-
-		send: (conversationId: string, content: string): Promise<CompanionMessage> =>
-			ipcRenderer.invoke('companion:send', conversationId, content),
-
-		/** Puts (or removes, with null) the user's emoji on one of her messages. */
-		react: (conversationId: string, id: number, emoji: string | null): Promise<CompanionMessage | null> =>
-			ipcRenderer.invoke('companion:react', conversationId, id, emoji),
-
-		/** Rewrites her latest reply; resolves to the deleted message ids, or null if not possible. */
-		regenerate: (conversationId: string): Promise<number[] | null> => ipcRenderer.invoke('companion:regenerate', conversationId),
-
-		onMessagesDeleted: (cb: (conversationId: string, ids: number[]) => void): (() => void) =>
-			subscribe<{ conversationId: string; ids: number[] }>('companion:messages:deleted', p => cb(p.conversationId, p.ids)),
-
-		onMessageUpdate: (cb: (conversationId: string, message: CompanionMessage) => void): (() => void) =>
-			subscribe<{ conversationId: string; message: CompanionMessage }>('companion:message:updated', p => cb(p.conversationId, p.message)),
-
-		listImages: (conversationId: string): Promise<CompanionMessage[]> => ipcRenderer.invoke('companion:images:list', conversationId),
-
-		onMessage: (cb: (conversationId: string, message: CompanionMessage) => void): (() => void) =>
-			subscribe<{ conversationId: string; message: CompanionMessage }>('companion:message:new', p => cb(p.conversationId, p.message)),
-
-		onActivity: (cb: (conversationId: string, activity: CompanionActivity) => void): (() => void) =>
-			subscribe<{ conversationId: string; activity: CompanionActivity }>('companion:activity', p => cb(p.conversationId, p.activity)),
-
-		onError: (cb: (conversationId: string, error: string) => void): (() => void) =>
-			subscribe<{ conversationId: string; error: string }>('companion:error', p => cb(p.conversationId, p.error)),
-
-		/** What she is doing right now in that conversation (events only tell the changes). */
-		getActivity: (conversationId: string): Promise<CompanionActivity> => ipcRenderer.invoke('companion:activity:get', conversationId),
-
-		/** The conversation's recent activity log, oldest first. */
-		listLog: (conversationId: string): Promise<CompanionLogEntry[]> => ipcRenderer.invoke('companion:log:list', conversationId),
-
-		onLog: (cb: (conversationId: string, entry: CompanionLogEntry) => void): (() => void) =>
-			subscribe<{ conversationId: string; entry: CompanionLogEntry }>('companion:log', p => cb(p.conversationId, p.entry)),
-
-		/** Unread messages by conversation id. */
-		getUnread: (): Promise<Record<string, number>> => ipcRenderer.invoke('companion:unread:get'),
-
-		onUnreadChange: (cb: (counts: Record<string, number>) => void): (() => void) => subscribe('companion:unread:changed', cb),
-
-		markRead: (conversationId: string): void => {
-			ipcRenderer.send('companion:read', conversationId)
-		}
-	}
+		ipcRenderer.invoke('player-blocklist:set', { version, hosts })
 }
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
