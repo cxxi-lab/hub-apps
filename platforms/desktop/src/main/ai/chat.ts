@@ -10,13 +10,11 @@ import { modelFiles, modelPlans } from './models'
  * sane, the engine runs it; the answer streams (`delta`), tool calls gathered at the end.
  */
 
-/** A part of a user's message for a vision model: text, or an image (a data: URL, JPEG/PNG/WebP). */
-export type ContentPart = { type: 'text', text: string } | { type: 'image', data: string }
-
 export interface ChatMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool'
-	/** text; a user's message to a vision model may be parts (text and images) */
-	content: string | ContentPart[]
+	content: string
+	/** a user's message to a vision model: images (data: URLs, JPEG/PNG/WebP) */
+	images?: string[]
 	/** an assistant's tool calls, as it made them (sent back with their results) */
 	tool_calls?: Array<{ id: string, type: 'function', function: { name: string, arguments: string } }>
 	/** a tool message: the call it answers */
@@ -73,18 +71,14 @@ function checked(request: unknown): { body: Record<string, unknown>, model: stri
 	let images = 0
 	const messages = []
 	for (const m of r.messages) {
-		if (!m || !ROLES.has(m.role) || (typeof m.content !== 'string' && !(m.role === 'user' && Array.isArray(m.content)))) return invalid('a message is { role: system|user|assistant|tool, content: string } (a user\'s: or parts)')
+		if (!m || !ROLES.has(m.role) || typeof m.content !== 'string') return invalid('a message is { role: system|user|assistant|tool, content: string }')
+		chars += m.content.length
 		let content: unknown = m.content
-		if (Array.isArray(m.content)) {
-			const parts = []
-			for (const p of m.content) {
-				if (p?.type === 'text' && typeof p.text === 'string') { chars += p.text.length; parts.push({ type: 'text', text: p.text }) }
-				else if (p?.type === 'image' && typeof p.data === 'string' && p.data.length <= MAX_IMAGE_CHARS && IMAGE_URL.test(p.data)) { images++; parts.push({ type: 'image_url', image_url: { url: p.data } }) }
-				else return invalid('a part is { type: text, text } or { type: image, data: a data: URL (JPEG, PNG, WebP) }')
-			}
-			content = parts
+		if (m.images !== undefined) {
+			if (m.role !== 'user' || !Array.isArray(m.images) || m.images.some(i => typeof i !== 'string' || i.length > MAX_IMAGE_CHARS || !IMAGE_URL.test(i))) return invalid('images: on a user\'s message, data: URLs (JPEG, PNG, WebP)')
+			images += m.images.length
+			content = [{ type: 'text', text: m.content }, ...m.images.map(url => ({ type: 'image_url', image_url: { url } }))]
 		}
-		else chars += m.content.length
 		const out: Record<string, unknown> = { role: m.role, content }
 		if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
 			out.tool_calls = m.tool_calls.map(c => ({ id: String(c?.id ?? ''), type: 'function', function: { name: String(c?.function?.name ?? ''), arguments: String(c?.function?.arguments ?? '{}') } }))

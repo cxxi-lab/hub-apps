@@ -210,13 +210,11 @@ export async function apiStream(path: string, options: RequestInit, onEvent: (ev
 
 // --- its AI models (client docs/plan-ia-moteur.md § 6) ---
 
-/** A part of a user's message to a vision model: text, or an image (a data: URL: JPEG, PNG, WebP). */
-export type AiContentPart = { type: 'text', text: string } | { type: 'image', data: string }
-
 export interface AiMessage {
 	role: 'system' | 'user' | 'assistant' | 'tool'
-	/** text; a user's message to a vision model (its declared model has a projector, mmproj) may be parts */
-	content: string | AiContentPart[]
+	content: string
+	/** a user's message to a vision model (its declared model has a projector, mmproj): images it shows (data: URLs, JPEG/PNG/WebP), at most 4 a request */
+	images?: string[]
 	/** an assistant's tool calls, sent back with their results */
 	tool_calls?: Array<{ id: string, type: 'function', function: { name: string, arguments: string } }>
 	/** a tool message: the call it answers */
