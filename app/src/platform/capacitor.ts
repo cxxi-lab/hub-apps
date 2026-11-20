@@ -14,7 +14,9 @@ import { createLocalStore } from './capacitorLocalStore'
 // (mobile/android: VpnPlugin, PlayerPlugin, IntegrationsPlugin).
 
 const capabilities: PlatformCapabilities = {
-	localAi: false,
+	// the phone's own models (text, voice: client docs/plan-ia-android.md); a hubby asks which of its
+	// models run here (ai.models.available)
+	localAi: !import.meta.env.DEV,
 	vpn: true,
 	vpnPerWebview: false,
 	privateMode: true,
@@ -200,9 +202,7 @@ export function createCapacitorPlatform(): Platform {
 		push,
 		localStore: createLocalStore(),
 		hubbyStore: import.meta.env.DEV ? null : createHubbyStore(),
-		// the phone's own models (text, voice: client docs/plan-ia-android.md); capabilities.localAi stays
-		// false until a hubby can tell which of its models run here (phase 3): NSFW's companion would answer
-		// with a model a phone can't hold
+		// the phone's own models (text, voice: client docs/plan-ia-android.md)
 		localModels: import.meta.env.DEV ? null : createLocalModels(),
 		localAi: import.meta.env.DEV ? null : createLocalAi(),
 		agentBridge: null,

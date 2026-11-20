@@ -337,6 +337,13 @@ export function HubbyHost({ hubby, headless = false }: { hubby: string, headless
 			},
 			// models added from links the user gives (scope app:ai-links: an official hubby's): the repo read by
 			// the device, never by the frame
+			// whether one of its models can run on this device (a variant fits: the platform decides)
+			'ai.models.available': async (name: unknown) => {
+				if (!granted('app:ai')) throw new Error('scope_denied: app:ai')
+				if (!platform.localModels || typeof name !== 'string') return false
+				const plan = (await platform.localModels.state()).plans.find(p => p.hubby === hubby && p.name === name)
+				return !!plan && !plan.invalid && plan.chosen !== null
+			},
 			'ai.models.inspect': (link: unknown) => {
 				if (!granted('app:ai-links')) throw new Error('scope_denied: app:ai-links')
 				if (!platform.localModels) throw new Error('local AI is not available on this device')

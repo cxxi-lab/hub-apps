@@ -410,9 +410,12 @@ export const ai = {
 	 * Models added from links the user gives (scope app:ai-links, an official hubby's): `inspect` reads a
 	 * Hugging Face repo (by the device: its commit, its GGUF files with their sha256, how each fits);
 	 * `set` hands the device all the models the hubby keeps (it then offers them as models of its own,
-	 * by `name`, to allow and download as the declared ones).
+	 * by `name`, to allow and download as the declared ones). `available`: whether one of its models
+	 * (declared, or added by link) can run on this device at all (scope app:ai) — a phone runs no
+	 * image or vision model, nor one larger than its memory.
 	 */
 	models: {
+		available: (name: string) => call<boolean>('ai.models.available', name),
 		inspect: (link: string) => call<{ repo: string, revision: string, models: AiRepoModel[], selected: string | null }>('ai.models.inspect', link),
 		set: (list: AiUserModel[]) => call<number>('ai.models.set', list)
 	},
