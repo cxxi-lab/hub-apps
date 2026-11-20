@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import { createLocalAi, createLocalModels } from './capacitorLocalAi'
 import type { NativeIcon, NativePlayerAction, NativePlayerApi, NativePlayerOptions, NativePlayerPanel, Platform, PushApi, PlatformCapabilities, Unsubscribe, VpnInfo, WebsiteIntegration } from './types'
 import { checkHubbyUpdates, createHubbyStore, startHubbyUpdates } from './capacitorHubbies'
 import { createUpdater } from './capacitorUpdater'
@@ -199,8 +200,11 @@ export function createCapacitorPlatform(): Platform {
 		push,
 		localStore: createLocalStore(),
 		hubbyStore: import.meta.env.DEV ? null : createHubbyStore(),
-		localModels: null,
-		localAi: null,
+		// the phone's own models (text, voice: client docs/plan-ia-android.md); capabilities.localAi stays
+		// false until a hubby can tell which of its models run here (phase 3): NSFW's companion would answer
+		// with a model a phone can't hold
+		localModels: import.meta.env.DEV ? null : createLocalModels(),
+		localAi: import.meta.env.DEV ? null : createLocalAi(),
 		agentBridge: null,
 		// served by the WebView (HubbyStore intercepts these hosts)
 		hubbyUrl: hubby => `https://${hubby}.hubby.localhost/`,

@@ -98,7 +98,7 @@ export function SettingsModels() {
 					<h2 className="m-0 mb-1 text-sm font-semibold text-white uppercase tracking-wider">On this device</h2>
 					<p className="m-0 text-xs text-steel-300 break-all">
 						Kept once, whichever hubbies use them, in {device?.directory ?? '…'}{' '}
-						<button type="button" className="text-primary-400 underline" onClick={() => models.chooseDirectory().then(() => load()).catch(e => setError(errorMessage(e)))}>Change</button>
+						{platform.capabilities.localAi && <button type="button" className="text-primary-400 underline" onClick={() => models.chooseDirectory().then(() => load()).catch(e => setError(errorMessage(e)))}>Change</button>}
 					</p>
 				</div>
 				{state?.installed.length === 0 && <p className="m-0 text-xs text-steel-400">No model downloaded.</p>}

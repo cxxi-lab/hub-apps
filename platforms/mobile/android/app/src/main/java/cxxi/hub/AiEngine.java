@@ -123,6 +123,38 @@ final class AiEngine {
         return c;
     }
 
+    private final java.util.concurrent.locks.ReentrantLock busy = new java.util.concurrent.locks.ReentrantLock(true);
+
+    interface Work<T> { T run() throws Exception; }
+
+    /**
+     * The spec's server, held for `work` (the desktop's localEngine.use): another spec waits until
+     * it ends, then replaces it — never cut in the middle of an answer.
+     */
+    <T> T with(Context context, Spec spec, Work<T> work) throws Exception {
+        busy.lockInterruptibly();
+        try {
+            use(context, spec);
+            return work.run();
+        } finally {
+            busy.unlock();
+        }
+    }
+
+    /** A JSON POST to the running server, sent; the connection to read (inside with()). */
+    HttpURLConnection post(String path, String json) throws IOException {
+        String key;
+        synchronized (this) {
+            if (runningKey == null) throw new IOException("no AI engine running");
+            key = runningKey;
+        }
+        HttpURLConnection c = open("POST", path);
+        c.setDoOutput(true);
+        c.setRequestProperty("Content-Type", "application/json");
+        try (OutputStream out = c.getOutputStream()) { out.write(json.getBytes(StandardCharsets.UTF_8)); }
+        return c;
+    }
+
     /** A JSON request to the running server; its body (blocking). */
     synchronized byte[] request(String path, String json) throws IOException {
         if (runningKey == null) throw new IOException("no AI engine running");
