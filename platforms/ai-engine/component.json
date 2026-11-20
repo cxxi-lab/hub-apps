@@ -28,11 +28,11 @@
 		"files": {
 			"text": {
 				"asset": "libhubai-text-arm64-v8a.so",
-				"sha256": ""
+				"sha256": "e02e46e93352632e037ce336500991883fe3691866272479d0fa79b82340ab41"
 			},
 			"voice": {
 				"asset": "libhubai-voice-arm64-v8a.so",
-				"sha256": ""
+				"sha256": "c18b2cf5e0a64421a41cea0fb17119f547526fa7c39d3a191364cca39bd84cfd"
 			}
 		}
 	}
