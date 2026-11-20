@@ -51,7 +51,7 @@ public class LocalAiPlugin extends Plugin {
                     long ready = System.currentTimeMillis();
                     JSONObject voice = new JSONObject()
                         .put("name", "selftest")
-                        .put("ref_text", call.getString("transcript", ""))
+                        .put("ref_text", transcript(call))
                         .put("wav_b64", Base64.encodeToString(read(testFile(call.getString("sample"))), Base64.NO_WRAP));
                     AiEngine.get().request("/v1/audio/voices", voice.toString());
                     JSONObject speech = new JSONObject().put("input", call.getString("text", "Bonjour.")).put("voice", "selftest").put("response_format", "wav").put("language", "French");
@@ -80,6 +80,14 @@ public class LocalAiPlugin extends Plugin {
                 call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
             }
         }, "ai-selftest").start();
+    }
+
+    /** What the sample says: given, or its .txt beside it (normal.wav → normal.txt). */
+    private String transcript(PluginCall call) throws IOException {
+        String given = call.getString("transcript");
+        if (given != null && !given.trim().isEmpty()) return given;
+        String sample = call.getString("sample", "");
+        return new String(read(testFile(sample.replaceFirst("\\.[^.]+$", "") + ".txt")), StandardCharsets.UTF_8).trim();
     }
 
     /** The running engine stopped (its process and its model's memory go). */
