@@ -165,7 +165,8 @@ public class LocalAiPlugin extends Plugin {
             String revision = call.getString("revision", "");
             String path = call.getString("path", "");
             String sha = call.getString("sha256", "");
-            long size = call.getLong("size", 0L);
+            // a size that fits an int arrives as an Integer (getLong would miss it)
+            long size = call.getData().optLong("size", 0L);
             if (!REPO.matcher(repo).matches() || !COMMIT.matcher(revision).matches() || !REPO_PATH.matcher(path).matches() || !SHA256.matcher(sha).matches() || size <= 0) throw new IOException("a file is not pinned");
             String name = path.substring(path.lastIndexOf('/') + 1);
             File dir = new File(modelsDir(), sha);
