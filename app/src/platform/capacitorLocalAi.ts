@@ -406,9 +406,9 @@ function checked(request: unknown): { body: Record<string, unknown>, model: stri
 	return { body, model: r.model, template: r.template ? String(r.template) : null }
 }
 
-/** The text engine on a model: the whole model in memory (a mapped one is read again and again: § phase 1). */
+/** The text engine on a model: the whole model read into memory (`--load-mode none`; a mapped one is read again and again on a phone: phase 1). */
 function textSpec(model: string, template: string | null): Spec {
-	return { engine: 'text', args: ['-m', model, '-c', String(PHONE_CONTEXT), '--jinja', '--no-mmap', ...(template ? ['--chat-template', template] : [])] }
+	return { engine: 'text', args: ['-m', model, '-c', String(PHONE_CONTEXT), '--jinja', '--load-mode', 'none', ...(template ? ['--chat-template', template] : [])] }
 }
 
 interface Chunk {

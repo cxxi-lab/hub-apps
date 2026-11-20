@@ -74,10 +74,12 @@ final class AiEngine {
             .putExtra(AiService.EXTRA_ENGINE, spec.engine)
             .putExtra(AiService.EXTRA_LIBRARY, library.getAbsolutePath())
             .putExtra(AiService.EXTRA_ARGS, args.toArray(new String[0]));
+        final boolean[] died = { false };
         ServiceConnection c = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder service) {}
             @Override public void onServiceDisconnected(ComponentName name) {
                 Log.w(TAG, "the AI process ended");
+                died[0] = true;
                 synchronized (AiEngine.this) { if (connection == this) { runningKey = null; } }
             }
         };
@@ -85,9 +87,15 @@ final class AiEngine {
         connection = c;
         long until = System.currentTimeMillis() + START_TIMEOUT_MS;
         while (System.currentTimeMillis() < until) {
+            // the server quit at once (its arguments, its model): no use waiting, nor letting Android restart it
+            if (died[0]) {
+                stop(context);
+                throw new IOException("the " + spec.engine + " engine stopped as it started (see logcat AiEngine/" + spec.engine + ")");
+            }
             try {
                 if (status("GET", "/health") == 200) {
                     runningKey = spec.key();
+                    if ("text".equals(spec.engine)) warmUp();
                     Log.i(TAG, spec.engine + " engine ready on " + port);
                     return;
                 }
@@ -98,6 +106,19 @@ final class AiEngine {
         }
         stop(context);
         throw new IOException("the " + spec.engine + " engine didn't start (see logcat AiEngine/" + spec.engine + ")");
+    }
+
+    /**
+     * A one-token answer before the first real one: the CPU backend prepares its weights on its first
+     * batch (the first prompt read at ~1 token/s, the next ones at ~23) — paid here, while loading.
+     */
+    private void warmUp() {
+        try {
+            HttpURLConnection c = post("/completion", "{\"prompt\":\"Hello\",\"n_predict\":1}");
+            try { c.getResponseCode(); } finally { c.disconnect(); }
+        } catch (IOException e) {
+            Log.w(TAG, "warm-up failed", e);
+        }
     }
 
     /** The running server stopped (its process ends). */
