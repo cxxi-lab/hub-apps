@@ -45,8 +45,8 @@ public class LocalAiPlugin extends Plugin {
                 long started = System.currentTimeMillis();
                 JSObject ret = new JSObject();
                 if ("voice".equals(engine)) {
-                    File talker = testFile(call.getString("talker"));
-                    File codec = testFile(call.getString("codec"));
+                    File talker = internal(testFile(call.getString("talker")));
+                    File codec = internal(testFile(call.getString("codec")));
                     AiEngine.get().use(getContext(), new AiEngine.Spec("voice", Arrays.asList("--model", talker.getAbsolutePath(), "--codec", codec.getAbsolutePath())));
                     long ready = System.currentTimeMillis();
                     JSONObject voice = new JSONObject()
@@ -63,7 +63,8 @@ public class LocalAiPlugin extends Plugin {
                     ret.put("bytes", wav.length);
                     ret.put("file", out.getAbsolutePath());
                 } else {
-                    File model = testFile(call.getString("model"));
+                    // into the app's own storage first: shared storage (FUSE) is far too slow for a mapped model
+                    File model = internal(testFile(call.getString("model")));
                     AiEngine.get().use(getContext(), new AiEngine.Spec("text", Arrays.asList("-m", model.getAbsolutePath(), "-c", "4096", "--jinja")));
                     long ready = System.currentTimeMillis();
                     JSONObject body = new JSONObject()
@@ -80,6 +81,22 @@ public class LocalAiPlugin extends Plugin {
                 call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
             }
         }, "ai-selftest").start();
+    }
+
+    /** A copy in the app's internal files (where the real models will live), made once. */
+    private File internal(File shared) throws IOException {
+        File dir = new File(getContext().getFilesDir(), "ai-test");
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("no folder for the test models");
+        File copy = new File(dir, shared.getName());
+        if (copy.isFile() && copy.length() == shared.length()) return copy;
+        File part = new File(dir, shared.getName() + ".part");
+        try (InputStream in = new FileInputStream(shared); FileOutputStream out = new FileOutputStream(part)) {
+            byte[] buffer = new byte[1024 * 1024];
+            int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+        }
+        if (!part.renameTo(copy)) throw new IOException("couldn't copy " + shared.getName());
+        return copy;
     }
 
     /** What the sample says: given, or its .txt beside it (normal.wav → normal.txt). */
