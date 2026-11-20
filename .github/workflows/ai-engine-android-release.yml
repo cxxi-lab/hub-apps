@@ -1,0 +1,65 @@
+name: ai-engine-android-release
+
+# The local AI engine for Android (platforms/ai-engine/README.md, android/): llama.cpp's server
+# (text) and qwentts.cpp's (voice) built as libraries the app loads, at the upstream refs
+# component.json pins, published as the GitHub release ai-engine-android-v<android.version> with
+# SHA256SUMS. The APK pins their sha256 (BuildConfig) and downloads them only when a hubby needs them.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the component
+        id: component
+        run: |
+          echo "version=$(jq -r .android.version platforms/ai-engine/component.json)" >> "$GITHUB_OUTPUT"
+          for name in llama.cpp qwentts.cpp; do
+            jq -r --arg n "$name" '.upstream[$n] | "\(.repo) \(.ref)"' platforms/ai-engine/component.json > "upstream-$name"
+          done
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install the NDK and the build tools
+        run: |
+          sdkmanager "ndk;30.0.16248370"
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
+
+      - name: Fetch the sources
+        run: |
+          for name in llama.cpp qwentts.cpp; do
+            read -r repo ref < "upstream-$name"
+            git clone --quiet "$repo" "src/$name"
+            git -C "src/$name" checkout --quiet "$ref"
+            git -C "src/$name" submodule update --quiet --init --recursive
+          done
+
+      - name: Build
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+          platforms/ai-engine/android/build.sh "$PWD/src/llama.cpp" "$PWD/src/qwentts.cpp" "$PWD/build"
+          mkdir dist
+          cp build/libhubai-text.so dist/libhubai-text-arm64-v8a.so
+          cp build/libhubai-voice.so dist/libhubai-voice-arm64-v8a.so
+          for name in llama.cpp qwentts.cpp; do cp "src/$name/LICENSE" "dist/$name.LICENSE"; done
+          # only the JNI entry points are exported (the ggml of each engine stays inside)
+          for f in dist/*.so; do "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D --defined-only "$f"; done
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.component.outputs.version }}
+        run: |
+          set -e
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+          gh release create "ai-engine-android-v$VERSION" dist/* --title "AI engine for Android v$VERSION" --latest=false \
+            --notes "The local AI engine for Android (platforms/ai-engine/README.md). Copy the libraries' sums into platforms/ai-engine/component.json (android.files)."

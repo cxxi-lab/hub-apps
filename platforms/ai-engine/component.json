@@ -20,5 +20,20 @@
 			"asset": "ai-engine-linux-x64.tar.gz",
 			"sha256": "34a13f11983f8d119bd04ce0de0c0a6f601ff22bd5e588ef5457de8f7c2578a5"
 		}
+	},
+	"android": {
+		"version": 1,
+		"url": "https://github.com/cxxi-lab/hubbyware-client/releases/download/ai-engine-android-v1/",
+		"abi": "arm64-v8a",
+		"files": {
+			"text": {
+				"asset": "libhubai-text-arm64-v8a.so",
+				"sha256": ""
+			},
+			"voice": {
+				"asset": "libhubai-voice-arm64-v8a.so",
+				"sha256": ""
+			}
+		}
 	}
 }

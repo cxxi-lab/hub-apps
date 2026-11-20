@@ -124,6 +124,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- The local AI engine (AiService): one model server in its own process, ended when the app lets go. -->
+        <service
+            android:name=".AiService"
+            android:process=":ai"
+            android:exported="false" />
+
         <!-- Push (Firebase Cloud Messaging): shows the app's notifications, even closed. -->
         <service
             android:name=".HubMessagingService"

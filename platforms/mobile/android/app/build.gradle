@@ -13,6 +13,8 @@ if (keystorePropsFile.exists()) {
 // The tunnel, a component of the platform (platforms/tunnel/component.json): the version this
 // APK expects and each library's sha256, read by TunnelComponent.
 def tunnelComponent = new groovy.json.JsonSlurper().parse(file('../../../tunnel/component.json'))
+// The local AI engine for Android (platforms/ai-engine/component.json, "android"): its libraries' sha256 pinned here.
+def aiEngine = new groovy.json.JsonSlurper().parse(file('../../../ai-engine/component.json')).android
 
 android {
     namespace = "cxxi.hub"
@@ -27,6 +29,12 @@ android {
         buildConfigField "String", "TUNNEL_ARM64_SHA256", "\"${tunnelComponent.files['android-arm64-v8a'].sha256}\""
         buildConfigField "String", "TUNNEL_X86_64_ASSET", "\"${tunnelComponent.files['android-x86_64'].asset}\""
         buildConfigField "String", "TUNNEL_X86_64_SHA256", "\"${tunnelComponent.files['android-x86_64'].sha256}\""
+        buildConfigField "int", "AI_ENGINE_VERSION", "${aiEngine.version}"
+        buildConfigField "String", "AI_ENGINE_URL", "\"${aiEngine.url}\""
+        buildConfigField "String", "AI_TEXT_ASSET", "\"${aiEngine.files['text'].asset}\""
+        buildConfigField "String", "AI_TEXT_SHA256", "\"${aiEngine.files['text'].sha256}\""
+        buildConfigField "String", "AI_VOICE_ASSET", "\"${aiEngine.files['voice'].asset}\""
+        buildConfigField "String", "AI_VOICE_SHA256", "\"${aiEngine.files['voice'].sha256}\""
         applicationId "cxxi.hub"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion

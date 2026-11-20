@@ -30,4 +30,19 @@ GPU backend (Vulkan, through ggml), no Python:
    publishes the GitHub release `ai-engine-v<version>` with `SHA256SUMS`.
 3. Copy the sums into `component.json`, commit: the next app releases expect that engine.
 
+## Android
+
+The phone runs the text and the voice engines (client docs/plan-ia-android.md): `android/` builds
+llama.cpp's server and qwentts.cpp's as **libraries** (`libhubai-text.so`, `libhubai-voice.so`,
+arm64-v8a), since Android runs no executable from an app's files. Each brings its own ggml, linked
+in and hidden (only the JNI entry point is exported). The app loads one in its AI process
+(`AiService`, `android:process=":ai"`), runs the server's main on a thread, and talks to it over
+127.0.0.1 like the desktop does; unbinding ends the process and frees the model's memory.
+
+- `component.json` › `android`: its version, where to get it, each library's sha256 (pinned in the
+  APK's BuildConfig, `AiEngineComponent.java`).
+- A new version: bump `android.version` and `url`, run the `ai-engine-android-release` workflow,
+  copy the sums into `android.files`.
+- Locally: `ANDROID_NDK_HOME=… android/build.sh <llama.cpp> <qwentts.cpp> <out>`.
+
 Development: `HUB_AI_ENGINE_DIR=<folder with bin/<server>>` uses locally built servers instead.
